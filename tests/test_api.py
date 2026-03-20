@@ -111,10 +111,10 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/ui")
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("text/html", response.headers.get("content-type", ""))
-        self.assertIn("Design", response.text)
-        self.assertIn("ETABS Import", response.text)
-        self.assertIn("Results", response.text)
-        self.assertIn("Reports", response.text)
+        self.assertIn("Diseno", response.text)
+        self.assertIn("Importar ETABS", response.text)
+        self.assertIn("Resultados", response.text)
+        self.assertIn("Reportes", response.text)
         self.assertIn("beam-elevation-container", response.text)
         self.assertIn("Crear y ejecutar job", response.text)
 
@@ -336,6 +336,85 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(preview_response.status_code, 200, preview_response.text)
         preview_payload = preview_response.json()
         self.assertEqual(len(preview_payload.get("spans", [])), 2)
+
+    def test_create_job_from_form_with_span_layout_json(self) -> None:
+        span_layout = [
+            {
+                "id": "S1",
+                "seismic": "190",
+                "gravity": "190",
+                "c_ratio_extremos": 0.2,
+                "support_right_mm": 250,
+                "regions": [
+                    {"id": "R1", "from": 0.0, "to": 0.2, "type": "C"},
+                    {"id": "R2", "from": 0.2, "to": 0.8, "type": "NC"},
+                    {"id": "R3", "from": 0.8, "to": 1.0, "type": "C"},
+                ],
+            },
+            {
+                "id": "S2",
+                "seismic": "8",
+                "gravity": "8",
+                "c_ratio_extremos": 0.25,
+                "regions": [
+                    {"id": "R1", "from": 0.0, "to": 0.25, "confinado": True},
+                    {"id": "R2", "from": 0.25, "to": 0.75, "confinado": False},
+                    {"id": "R3", "from": 0.75, "to": 1.0, "confinado": True},
+                ],
+            },
+        ]
+        with (
+            self.seismic_excel.open("rb") as seismic_stream,
+            self.gravity_excel.open("rb") as gravity_stream,
+        ):
+            response = self.client.post(
+                "/v1/jobs/from-form",
+                data={
+                    "case_name": "case_span_layout",
+                    "sheet_name": "Conc Bm Sum - ACI 318-08",
+                    "detailing": "DMO",
+                    "units_rebar_per_length": "mm2/m",
+                    "beam_id": "B1",
+                    "cover_side_mm": "40",
+                    "cover_top_mm": "40",
+                    "cover_bottom_mm": "40",
+                    "fc_mpa": "28",
+                    "fy_mpa": "420",
+                    "width_mm": "300",
+                    "height_mm": "600",
+                    "d_mm": "600",
+                    "db_bar": "#6",
+                    "min_branches_c": "4",
+                    "min_branches_nc": "2",
+                    "region_c_ratio": "0.2",
+                    "span_layout_json": json.dumps(span_layout),
+                },
+                files={
+                    "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "gravity_excel": ("gravedad.xlsx", gravity_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 202, response.text)
+        job_id = response.json()["job_id"]
+
+        case_response = self.client.get(f"/v1/jobs/{job_id}/case")
+        self.assertEqual(case_response.status_code, 200, case_response.text)
+        case_payload = case_response.json()
+        spans = case_payload["beams"][0]["spans"]
+        self.assertEqual(len(spans), 2)
+        self.assertEqual(spans[0]["id"], "S1")
+        self.assertEqual(spans[1]["id"], "S2")
+        self.assertEqual(spans[0]["support_right_mm"], 250)
+
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        preview_response = self.client.get(f"/v1/jobs/{job_id}/preview")
+        self.assertEqual(preview_response.status_code, 200, preview_response.text)
+        preview_payload = preview_response.json()
+        self.assertEqual(len(preview_payload.get("spans", [])), 2)
+        self.assertEqual(preview_payload["spans"][0]["support_right_mm"], 250)
 
     def test_download_single_artifact_success(self) -> None:
         job_id = self._create_job()

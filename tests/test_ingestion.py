@@ -6,6 +6,7 @@ from app.core.errors import InvalidUploadError
 from app.domain.ingestion import (
     parse_optimization_overrides,
     parse_pairs_json,
+    parse_span_layout_json,
     resolve_span_pairs,
 )
 
@@ -41,6 +42,47 @@ class IngestionDomainTests(unittest.TestCase):
         payload = parse_optimization_overrides('{"enabled": false, "objective": "min_weight"}')
         self.assertEqual(payload["enabled"], False)
         self.assertEqual(payload["objective"], "min_weight")
+
+    def test_parse_span_layout_json_accepts_regions_with_confinado_flag(self) -> None:
+        raw = """
+        [
+          {
+            "id": "S1",
+            "seismic": "190",
+            "gravity": "190",
+            "c_ratio_extremos": 0.2,
+            "support_right_mm": 250,
+            "regions": [
+              {"id": "R1", "from": 0.0, "to": 0.2, "confinado": true},
+              {"id": "R2", "from": 0.2, "to": 0.8, "confinado": false},
+              {"id": "R3", "from": 0.8, "to": 1.0, "confinado": true}
+            ]
+          }
+        ]
+        """
+        parsed = parse_span_layout_json(raw)
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["id"], "S1")
+        self.assertEqual(parsed[0]["support_right_mm"], 250.0)
+        self.assertEqual(parsed[0]["regions"][0]["type"], "C")
+        self.assertEqual(parsed[0]["regions"][1]["type"], "NC")
+
+    def test_parse_span_layout_json_rejects_non_contiguous_regions(self) -> None:
+        raw = """
+        [
+          {
+            "id": "S1",
+            "seismic": "190",
+            "gravity": "190",
+            "regions": [
+              {"id": "R1", "from": 0.0, "to": 0.3, "type": "C"},
+              {"id": "R2", "from": 0.4, "to": 1.0, "type": "NC"}
+            ]
+          }
+        ]
+        """
+        with self.assertRaises(InvalidUploadError):
+            parse_span_layout_json(raw)
 
 
 if __name__ == "__main__":

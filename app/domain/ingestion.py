@@ -88,6 +88,288 @@ def parse_pairs_json(raw: str | None) -> list[dict[str, str]]:
     return parsed_pairs
 
 
+def _parse_optional_float(value: Any, field_name: str) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise InvalidUploadError(f"{field_name} debe ser numerico") from exc
+
+
+def _parse_optional_int(value: Any, field_name: str) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise InvalidUploadError(f"{field_name} debe ser entero") from exc
+    return parsed
+
+
+def _parse_confined_flag(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"1", "true", "t", "yes", "y", "si", "s", "confinado", "c"}:
+        return True
+    if text in {"0", "false", "f", "no", "n", "nc", "no_confinado", "noconfinado"}:
+        return False
+    return None
+
+
+def _validate_regions_cover_span(regions: list[dict[str, Any]], span_id: str) -> None:
+    if not regions:
+        raise InvalidUploadError(f"span_layout_json[{span_id}] requiere al menos una region")
+    ordered = sorted(regions, key=lambda item: float(item["from"]))
+    tol = 1.0e-9
+    if abs(float(ordered[0]["from"]) - 0.0) > tol:
+        raise InvalidUploadError(
+            f"span_layout_json[{span_id}] debe iniciar en from=0.0"
+        )
+    if abs(float(ordered[-1]["to"]) - 1.0) > tol:
+        raise InvalidUploadError(
+            f"span_layout_json[{span_id}] debe terminar en to=1.0"
+        )
+    current = 0.0
+    for region in ordered:
+        start = float(region["from"])
+        end = float(region["to"])
+        if abs(start - current) > tol:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_id}] tiene gap/overlap antes de region '{region['id']}'"
+            )
+        if end <= start:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_id}] region '{region['id']}' requiere from < to"
+            )
+        current = end
+
+
+def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
+    if not raw:
+        return []
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise InvalidUploadError("span_layout_json debe ser un JSON valido") from exc
+    if not isinstance(payload, list):
+        raise InvalidUploadError("span_layout_json debe ser una lista de vanos")
+
+    parsed_spans: list[dict[str, Any]] = []
+    used_ids: set[str] = set()
+    for span_index, item in enumerate(payload, start=1):
+        if not isinstance(item, dict):
+            raise InvalidUploadError(f"span_layout_json[{span_index}] debe ser un objeto")
+
+        span_id = str(item.get("id") or item.get("span_id") or f"S{span_index}").strip()
+        if not span_id:
+            raise InvalidUploadError(f"span_layout_json[{span_index}] requiere id")
+        if span_id in used_ids:
+            raise InvalidUploadError(f"span_layout_json tiene id repetido: '{span_id}'")
+        used_ids.add(span_id)
+
+        seismic = str(item.get("seismic", "")).strip()
+        gravity = str(item.get("gravity", "")).strip()
+        if not seismic or not gravity:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}] requiere 'seismic' y 'gravity'"
+            )
+
+        ratio_raw = (
+            item.get("c_ratio_extremos")
+            if item.get("c_ratio_extremos") is not None
+            else item.get("fraccion_c_extremos")
+        )
+        if ratio_raw is None:
+            ratio_raw = item.get("region_c_ratio")
+        c_ratio_extremos = _parse_optional_float(
+            ratio_raw, f"span_layout_json[{span_index}].c_ratio_extremos"
+        )
+        if c_ratio_extremos is not None and not (0.0 < c_ratio_extremos < 0.5):
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].c_ratio_extremos debe estar entre 0 y 0.5"
+            )
+
+        support_left_mm = _parse_optional_float(
+            item.get("support_left_mm")
+            if item.get("support_left_mm") is not None
+            else item.get("apoyo_izq_mm"),
+            f"span_layout_json[{span_index}].support_left_mm",
+        )
+        support_right_mm = _parse_optional_float(
+            item.get("support_right_mm")
+            if item.get("support_right_mm") is not None
+            else item.get("apoyo_der_mm"),
+            f"span_layout_json[{span_index}].support_right_mm",
+        )
+        if support_left_mm is not None and support_left_mm < 0.0:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].support_left_mm debe ser >= 0"
+            )
+        if support_right_mm is not None and support_right_mm < 0.0:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].support_right_mm debe ser >= 0"
+            )
+
+        raw_regions = item.get("regions")
+        if raw_regions is None:
+            raw_regions = item.get("regiones")
+        regions: list[dict[str, Any]] = []
+        if raw_regions is not None:
+            if not isinstance(raw_regions, list):
+                raise InvalidUploadError(
+                    f"span_layout_json[{span_index}].regions debe ser una lista"
+                )
+            if not raw_regions:
+                raise InvalidUploadError(
+                    f"span_layout_json[{span_index}].regions no puede estar vacia"
+                )
+            for region_index, region_item in enumerate(raw_regions, start=1):
+                if not isinstance(region_item, dict):
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}] debe ser un objeto"
+                    )
+                region_id = str(
+                    region_item.get("id")
+                    or region_item.get("region_id")
+                    or f"R{region_index}"
+                ).strip()
+                if not region_id:
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}] requiere id"
+                    )
+
+                start_raw = (
+                    region_item.get("from")
+                    if region_item.get("from") is not None
+                    else region_item.get("desde")
+                )
+                end_raw = (
+                    region_item.get("to")
+                    if region_item.get("to") is not None
+                    else region_item.get("hasta")
+                )
+                if start_raw in (None, "") or end_raw in (None, ""):
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}] requiere from y to"
+                    )
+                start_ratio = _parse_optional_float(
+                    start_raw,
+                    f"span_layout_json[{span_index}].regions[{region_index}].from",
+                )
+                end_ratio = _parse_optional_float(
+                    end_raw,
+                    f"span_layout_json[{span_index}].regions[{region_index}].to",
+                )
+                assert start_ratio is not None
+                assert end_ratio is not None
+                if not (0.0 <= start_ratio <= 1.0 and 0.0 <= end_ratio <= 1.0):
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}] debe estar dentro de [0,1]"
+                    )
+                if start_ratio >= end_ratio:
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}] requiere from < to"
+                    )
+
+                region_type = str(region_item.get("type") or "").strip().upper()
+                if region_type not in {"C", "NC"}:
+                    confined = _parse_confined_flag(
+                        region_item.get("is_confined")
+                        if region_item.get("is_confined") is not None
+                        else region_item.get("confinado")
+                    )
+                    if confined is None:
+                        raise InvalidUploadError(
+                            f"span_layout_json[{span_index}].regions[{region_index}] requiere type=C/NC o confinado=true/false"
+                        )
+                    region_type = "C" if confined else "NC"
+
+                min_branches = _parse_optional_int(
+                    region_item.get("min_branches")
+                    if region_item.get("min_branches") is not None
+                    else region_item.get("ramas_minimas"),
+                    f"span_layout_json[{span_index}].regions[{region_index}].min_branches",
+                )
+                if min_branches is not None and min_branches < 1:
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}].min_branches debe ser >= 1"
+                    )
+
+                spacing_mm = _parse_optional_int(
+                    region_item.get("spacing_mm"),
+                    f"span_layout_json[{span_index}].regions[{region_index}].spacing_mm",
+                )
+                if spacing_mm is not None and spacing_mm <= 0:
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}].spacing_mm debe ser > 0"
+                    )
+
+                d_mm = _parse_optional_float(
+                    region_item.get("d_mm"),
+                    f"span_layout_json[{span_index}].regions[{region_index}].d_mm",
+                )
+                width_mm = _parse_optional_float(
+                    region_item.get("width_mm"),
+                    f"span_layout_json[{span_index}].regions[{region_index}].width_mm",
+                )
+                height_mm = _parse_optional_float(
+                    region_item.get("height_mm"),
+                    f"span_layout_json[{span_index}].regions[{region_index}].height_mm",
+                )
+                if d_mm is not None and d_mm <= 0:
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}].d_mm debe ser > 0"
+                    )
+                if width_mm is not None and width_mm <= 0:
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}].width_mm debe ser > 0"
+                    )
+                if height_mm is not None and height_mm <= 0:
+                    raise InvalidUploadError(
+                        f"span_layout_json[{span_index}].regions[{region_index}].height_mm debe ser > 0"
+                    )
+
+                db_bar = region_item.get("db_bar")
+                db_bar_text = str(db_bar).strip() if db_bar not in (None, "") else None
+
+                regions.append(
+                    {
+                        "id": region_id,
+                        "from": float(start_ratio),
+                        "to": float(end_ratio),
+                        "type": region_type,
+                        "min_branches": min_branches,
+                        "spacing_mm": spacing_mm,
+                        "d_mm": d_mm,
+                        "db_bar": db_bar_text,
+                        "width_mm": width_mm,
+                        "height_mm": height_mm,
+                    }
+                )
+
+            _validate_regions_cover_span(regions, span_id)
+
+        parsed_spans.append(
+            {
+                "id": span_id,
+                "seismic": seismic,
+                "gravity": gravity,
+                "c_ratio_extremos": c_ratio_extremos,
+                "support_left_mm": support_left_mm,
+                "support_right_mm": support_right_mm,
+                "regions": regions,
+            }
+        )
+
+    return parsed_spans
+
+
 def parse_optimization_overrides(raw: str | None) -> dict[str, Any] | None:
     if not raw:
         return None
@@ -138,4 +420,3 @@ def resolve_span_pairs(
         {"id": f"S{index}", "seismic": frame_name, "gravity": frame_name}
         for index, frame_name in enumerate(shared, start=1)
     ]
-

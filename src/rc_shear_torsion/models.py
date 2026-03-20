@@ -43,6 +43,8 @@ class SpanConfig(BaseModel):
     id: str
     seismic: str
     gravity: str
+    support_left_mm: float | None = None
+    support_right_mm: float | None = None
     regions: list[RegionConfig]
 
     model_config = ConfigDict(extra="forbid")
@@ -51,6 +53,10 @@ class SpanConfig(BaseModel):
     def validate_regions(self) -> "SpanConfig":
         if not self.regions:
             raise ValueError(f"Span '{self.id}' must include at least one region")
+        if self.support_left_mm is not None and self.support_left_mm < 0.0:
+            raise ValueError(f"Span '{self.id}' support_left_mm must be >= 0")
+        if self.support_right_mm is not None and self.support_right_mm < 0.0:
+            raise ValueError(f"Span '{self.id}' support_right_mm must be >= 0")
         sorted_regions = sorted(self.regions, key=lambda region: region.from_)
         tol = 1.0e-9
         if abs(sorted_regions[0].from_ - 0.0) > tol:

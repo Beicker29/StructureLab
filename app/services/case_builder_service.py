@@ -7,6 +7,7 @@ from fastapi import UploadFile
 from app.domain.ingestion import (
     extract_unique_names_from_excel,
     parse_optimization_overrides,
+    parse_span_layout_json,
     resolve_span_pairs,
 )
 from app.core.errors import DomainValidationAppError, InvalidUploadError
@@ -44,6 +45,7 @@ def build_case_payload_from_form(
     frame_names_csv: str | None,
     frame_pairs_json: str | None,
     optimization_overrides_json: str | None,
+    span_layout_json: str | None = None,
 ) -> dict[str, Any]:
     case_name = case_name.strip() or "case_from_form"
     sheet_name = sheet_name.strip()
@@ -61,62 +63,130 @@ def build_case_payload_from_form(
 
     seismic_names = extract_unique_names_from_excel(seismic_bytes, sheet_name, "seismic_excel")
     gravity_names = extract_unique_names_from_excel(gravity_bytes, sheet_name, "gravity_excel")
-    span_pairs = resolve_span_pairs(
-        seismic_names=seismic_names,
-        gravity_names=gravity_names,
-        frame_names_csv=frame_names_csv,
-        frame_pairs_json=frame_pairs_json,
-    )
+    span_layout = parse_span_layout_json(span_layout_json)
+
+    span_layout_by_id: dict[str, dict[str, Any]] = {}
+    if span_layout:
+        for span_item in span_layout:
+            seismic_name = span_item["seismic"]
+            gravity_name = span_item["gravity"]
+            if seismic_name not in seismic_names:
+                raise InvalidUploadError(
+                    f"El vano seismic '{seismic_name}' no existe en seismic_excel"
+                )
+            if gravity_name not in gravity_names:
+                raise InvalidUploadError(
+                    f"El vano gravity '{gravity_name}' no existe en gravity_excel"
+                )
+            span_layout_by_id[span_item["id"]] = span_item
+        span_pairs = [
+            {
+                "id": span_item["id"],
+                "seismic": span_item["seismic"],
+                "gravity": span_item["gravity"],
+            }
+            for span_item in span_layout
+        ]
+    else:
+        span_pairs = resolve_span_pairs(
+            seismic_names=seismic_names,
+            gravity_names=gravity_names,
+            frame_names_csv=frame_names_csv,
+            frame_pairs_json=frame_pairs_json,
+        )
 
     optimization_overrides = parse_optimization_overrides(optimization_overrides_json)
     optimization_payload = merge_optimization_defaults(optimization_overrides)
 
     spans: list[dict[str, Any]] = []
-    middle_to = 1.0 - region_c_ratio
-    for index, pair in enumerate(span_pairs, start=1):
-        span_id = f"{beam_id}.{index}"
-        spans.append(
+
+    def _build_default_regions(ratio: float) -> list[dict[str, Any]]:
+        middle_to = 1.0 - ratio
+        return [
             {
-                "id": span_id,
-                "seismic": pair["seismic"],
-                "gravity": pair["gravity"],
-                "regions": [
+                "id": "R1",
+                "from": 0.0,
+                "to": ratio,
+                "type": "C",
+                "d_mm": d_mm,
+                "db_bar": db_bar,
+                "min_branches": min_branches_c,
+                "width_mm": width_mm,
+                "height_mm": height_mm,
+            },
+            {
+                "id": "R2",
+                "from": ratio,
+                "to": middle_to,
+                "type": "NC",
+                "d_mm": d_mm,
+                "db_bar": db_bar,
+                "min_branches": min_branches_nc,
+                "width_mm": width_mm,
+                "height_mm": height_mm,
+            },
+            {
+                "id": "R3",
+                "from": middle_to,
+                "to": 1.0,
+                "type": "C",
+                "d_mm": d_mm,
+                "db_bar": db_bar,
+                "min_branches": min_branches_c,
+                "width_mm": width_mm,
+                "height_mm": height_mm,
+            },
+        ]
+
+    def _build_regions_for_span(span_meta: dict[str, Any] | None) -> list[dict[str, Any]]:
+        if not span_meta:
+            return _build_default_regions(region_c_ratio)
+
+        configured_regions = span_meta.get("regions")
+        if isinstance(configured_regions, list) and configured_regions:
+            output_regions: list[dict[str, Any]] = []
+            for region in configured_regions:
+                region_type = str(region["type"]).upper()
+                min_branches_value = region.get("min_branches")
+                if min_branches_value is None:
+                    min_branches_value = min_branches_c if region_type == "C" else min_branches_nc
+                output_regions.append(
                     {
-                        "id": "R1",
-                        "from": 0.0,
-                        "to": region_c_ratio,
-                        "type": "C",
-                        "d_mm": d_mm,
-                        "db_bar": db_bar,
-                        "min_branches": min_branches_c,
-                        "width_mm": width_mm,
-                        "height_mm": height_mm,
-                    },
-                    {
-                        "id": "R2",
-                        "from": region_c_ratio,
-                        "to": middle_to,
-                        "type": "NC",
-                        "d_mm": d_mm,
-                        "db_bar": db_bar,
-                        "min_branches": min_branches_nc,
-                        "width_mm": width_mm,
-                        "height_mm": height_mm,
-                    },
-                    {
-                        "id": "R3",
-                        "from": middle_to,
-                        "to": 1.0,
-                        "type": "C",
-                        "d_mm": d_mm,
-                        "db_bar": db_bar,
-                        "min_branches": min_branches_c,
-                        "width_mm": width_mm,
-                        "height_mm": height_mm,
-                    },
-                ],
-            }
-        )
+                        "id": region["id"],
+                        "from": region["from"],
+                        "to": region["to"],
+                        "type": region_type,
+                        "d_mm": region.get("d_mm") if region.get("d_mm") is not None else d_mm,
+                        "db_bar": region.get("db_bar") if region.get("db_bar") else db_bar,
+                        "min_branches": min_branches_value,
+                        "width_mm": region.get("width_mm") if region.get("width_mm") is not None else width_mm,
+                        "height_mm": region.get("height_mm") if region.get("height_mm") is not None else height_mm,
+                    }
+                )
+            return output_regions
+
+        ratio = span_meta.get("c_ratio_extremos")
+        if ratio is None:
+            ratio = region_c_ratio
+        return _build_default_regions(float(ratio))
+
+    for index, pair in enumerate(span_pairs, start=1):
+        span_meta = span_layout_by_id.get(pair.get("id", ""))
+        span_id = (
+            str(pair.get("id", "")).strip() if span_layout else f"{beam_id}.{index}"
+        ) or f"{beam_id}.{index}"
+        span_payload: dict[str, Any] = {
+            "id": span_id,
+            "seismic": pair["seismic"],
+            "gravity": pair["gravity"],
+            "regions": _build_regions_for_span(span_meta),
+        }
+        if span_meta:
+            if span_meta.get("support_left_mm") is not None:
+                span_payload["support_left_mm"] = span_meta["support_left_mm"]
+            if span_meta.get("support_right_mm") is not None:
+                span_payload["support_right_mm"] = span_meta["support_right_mm"]
+        spans.append(span_payload)
 
     case_payload = {
         "case_name": case_name,

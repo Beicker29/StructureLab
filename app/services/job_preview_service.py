@@ -41,6 +41,18 @@ def _as_float(value: Any) -> float | None:
     return parsed
 
 
+def _as_non_negative_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed < 0:
+        return None
+    return parsed
+
+
 def _as_int(value: Any) -> int | None:
     parsed = _as_float(value)
     if parsed is None:
@@ -187,6 +199,8 @@ def _build_span_preview(
     default_span_length_mm: float = 6000.0,
 ) -> dict[str, Any]:
     span_id = _as_text(span.get("id")) or "S1"
+    support_left_mm = _as_non_negative_float(span.get("support_left_mm"))
+    support_right_mm = _as_non_negative_float(span.get("support_right_mm"))
     regions = span.get("regions") if isinstance(span.get("regions"), list) else []
     region_rows: list[dict[str, Any]] = []
     region_lengths: list[float] = []
@@ -244,6 +258,8 @@ def _build_span_preview(
         "span_id": span_id,
         "seismic": _as_text(span.get("seismic")),
         "gravity": _as_text(span.get("gravity")),
+        "support_left_mm": int(round(support_left_mm)) if support_left_mm is not None else None,
+        "support_right_mm": int(round(support_right_mm)) if support_right_mm is not None else None,
         "length_mm": span_length_mm,
         "length_estimated": any_estimated,
         "regions": region_rows,
@@ -273,6 +289,10 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
     ]
 
     total_span_mm = sum(span_row.get("length_mm", 0) for span_row in span_rows)
+    total_support_mm = sum(
+        int(span_row.get("support_right_mm", 0) or 0)
+        for span_row in span_rows
+    )
     if total_span_mm <= 0:
         total_span_mm = 6000
 
@@ -289,6 +309,8 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
         },
         "spans": span_rows,
         "total_span_mm": int(round(total_span_mm)),
+        "total_support_mm": int(round(total_support_mm)),
+        "total_system_mm": int(round(total_span_mm + total_support_mm)),
         "total_span_estimated": any(span_row.get("length_estimated", True) for span_row in span_rows),
         "data_source": {
             "optimized_results": bool(optimized_map),

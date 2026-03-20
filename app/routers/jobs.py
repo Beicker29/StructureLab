@@ -192,6 +192,7 @@ def create_job_from_form_endpoint(
     frame_names_csv: str | None = Form(default=None),
     frame_pairs_json: str | None = Form(default=None),
     optimization_overrides_json: str | None = Form(default=None),
+    span_layout_json: str | None = Form(default=None),
 ) -> JobCreateResponse:
     settings = get_settings()
     case_payload = build_case_payload_from_form(
@@ -218,6 +219,7 @@ def create_job_from_form_endpoint(
         frame_names_csv=frame_names_csv,
         frame_pairs_json=frame_pairs_json,
         optimization_overrides_json=optimization_overrides_json,
+        span_layout_json=span_layout_json,
     )
 
     meta = create_job_from_case_payload(
