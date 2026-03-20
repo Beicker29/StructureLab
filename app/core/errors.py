@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -11,6 +12,7 @@ class AppError(Exception):
     message: str
     status_code: int = 500
     code: str = "internal_error"
+    details: list[dict[str, Any]] | None = None
 
 
 class InvalidUploadError(AppError):
@@ -36,10 +38,23 @@ class JobNotReadyError(AppError):
         )
 
 
+class DomainValidationAppError(AppError):
+    def __init__(self, message: str, details: list[dict[str, Any]]) -> None:
+        super().__init__(
+            message=message,
+            status_code=422,
+            code="domain_validation_error",
+            details=details,
+        )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
+        payload: dict[str, Any] = {"error": exc.code, "message": exc.message}
+        if exc.details:
+            payload["details"] = exc.details
         return JSONResponse(
             status_code=exc.status_code,
-            content={"error": exc.code, "message": exc.message},
+            content=payload,
         )

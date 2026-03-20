@@ -7,14 +7,15 @@ from typing import Any
 from fastapi import UploadFile
 from openpyxl import load_workbook
 
-from app.core.errors import InvalidUploadError
+from app.core.errors import DomainValidationAppError, InvalidUploadError
 from app.services.case_service import (
     ensure_upload_suffix,
     merge_optimization_defaults,
     read_upload_bytes,
 )
+from rc_shear_torsion.domain.errors import DomainValidationError
+from rc_shear_torsion.domain.validation import validate_case_payload
 from rc_shear_torsion.io import REQUIRED_COLUMNS, as_text, find_header
-from rc_shear_torsion.models import ALLOWED_BAR_LABELS
 
 
 def _natural_name_key(value: str) -> tuple[int, Any]:
@@ -139,26 +140,8 @@ def build_case_payload_from_form(
         raise InvalidUploadError("sheet_name no puede estar vacio")
     beam_id = beam_id.strip() or "B1"
 
-    if units_rebar_per_length not in {"mm2/m", "cm2/m"}:
-        raise InvalidUploadError("units_rebar_per_length debe ser 'mm2/m' o 'cm2/m'")
-    if detailing not in {"DMO", "DES"}:
-        raise InvalidUploadError("detailing debe ser 'DMO' o 'DES'")
     if region_c_ratio <= 0.0 or region_c_ratio >= 0.5:
         raise InvalidUploadError("region_c_ratio debe estar entre 0 y 0.5")
-    if min_branches_c < 4 and detailing == "DMO":
-        raise InvalidUploadError("Para detailing DMO, min_branches_c debe ser >= 4")
-    if min_branches_nc < 0:
-        raise InvalidUploadError("min_branches_nc no puede ser negativo")
-    if db_bar not in ALLOWED_BAR_LABELS:
-        raise InvalidUploadError(f"db_bar invalido: '{db_bar}'. Opciones: {list(ALLOWED_BAR_LABELS)}")
-    if width_mm <= 0 or height_mm <= 0 or d_mm <= 0:
-        raise InvalidUploadError("width_mm, height_mm y d_mm deben ser mayores que cero")
-    if cover_side_mm < 0 or cover_top_mm < 0 or cover_bottom_mm < 0:
-        raise InvalidUploadError("Los recubrimientos no pueden ser negativos")
-    if width_mm <= (2.0 * cover_side_mm):
-        raise InvalidUploadError("width_mm debe ser mayor que 2*cover_side_mm")
-    if height_mm <= (cover_top_mm + cover_bottom_mm):
-        raise InvalidUploadError("height_mm debe ser mayor que cover_top_mm + cover_bottom_mm")
 
     ensure_upload_suffix(seismic_excel, {".xlsx"}, "seismic_excel")
     ensure_upload_suffix(gravity_excel, {".xlsx"}, "gravity_excel")
@@ -249,7 +232,7 @@ def build_case_payload_from_form(
             }
         )
 
-    return {
+    case_payload = {
         "case_name": case_name,
         "inputs": {
             "seismic_excel": "seismic.xlsx",
@@ -271,3 +254,12 @@ def build_case_payload_from_form(
         ],
         "optimization": optimization_payload,
     }
+    try:
+        validated = validate_case_payload(case_payload)
+    except DomainValidationError as exc:
+        raise DomainValidationAppError(
+            message="El formulario no cumple reglas de negocio/ingenieria",
+            details=exc.to_dicts(),
+        ) from exc
+
+    return validated.model_dump(mode="python", by_alias=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -18,7 +19,7 @@ from app.services.case_service import (
     save_excel_upload,
     write_case_json,
 )
-from rc_shear_torsion.run import run_case
+from rc_shear_torsion.engine import run_case
 
 EXPECTED_REPORTS = [
     "design_results.xlsx",
@@ -28,6 +29,7 @@ EXPECTED_REPORTS = [
     "run_log.txt",
 ]
 
+logger = logging.getLogger(__name__)
 _meta_lock = threading.Lock()
 
 
@@ -133,12 +135,14 @@ def create_job_from_case_payload(
 
 def run_job(job_id: str) -> None:
     meta = _load_job(job_id)
+    logger.info("job_run_started job_id=%s phase=prepare", job_id)
     meta["status"] = "running"
     meta["started_at"] = _now_iso()
     meta["updated_at"] = meta["started_at"]
     _save_job(meta)
 
     try:
+        logger.info("job_run_started job_id=%s phase=compute", job_id)
         case_json_path = Path(meta["paths"]["case_json"])
         output_root = Path(meta["paths"]["output_root"])
         output_dir = run_case(case_json_path, output_root)
@@ -157,7 +161,18 @@ def run_job(job_id: str) -> None:
         meta["artifacts"] = artifacts
         meta["error"] = None
         _save_job(meta)
+        logger.info(
+            "job_run_completed job_id=%s phase=complete artifacts=%s output_dir=%s",
+            job_id,
+            sorted(artifacts.keys()),
+            output_dir,
+        )
     except Exception as exc:
+        logger.exception(
+            "job_run_failed job_id=%s phase=compute exception_type=%s",
+            job_id,
+            type(exc).__name__,
+        )
         failed_at = _now_iso()
         meta["status"] = "failed"
         meta["updated_at"] = failed_at

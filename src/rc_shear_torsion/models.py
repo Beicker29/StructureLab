@@ -132,28 +132,6 @@ class VariablesConfig(BaseModel):
         for field_name, values in fields:
             if not values:
                 raise ValueError(f"optimization.variables.{field_name} cannot be empty")
-        if any(value <= 0 for value in self.stirrup_spacing_mm):
-            raise ValueError("optimization.variables.stirrup_spacing_mm must be > 0")
-        if any(value < 0 for value in self.G_counts):
-            raise ValueError("optimization.variables.G_counts must be >= 0")
-        if any(value <= 0 for value in self.longitudinal_bar_counts):
-            raise ValueError("optimization.variables.longitudinal_bar_counts must be > 0")
-        invalid_e = sorted({bar for bar in self.E_bars if bar not in ALLOWED_BAR_LABELS})
-        if invalid_e:
-            raise ValueError(
-                f"optimization.variables.E_bars contains unsupported bars {invalid_e}; allowed={list(ALLOWED_BAR_LABELS)}"
-            )
-        invalid_g = sorted({bar for bar in self.G_bars if bar not in ALLOWED_BAR_LABELS})
-        if invalid_g:
-            raise ValueError(
-                f"optimization.variables.G_bars contains unsupported bars {invalid_g}; allowed={list(ALLOWED_BAR_LABELS)}"
-            )
-        invalid_long = sorted({bar for bar in self.longitudinal_bars if bar not in ALLOWED_BAR_LABELS})
-        if invalid_long:
-            raise ValueError(
-                "optimization.variables.longitudinal_bars contains unsupported bars "
-                f"{invalid_long}; allowed={list(ALLOWED_BAR_LABELS)}"
-            )
         return self
 
 
@@ -165,20 +143,6 @@ class GAConfig(BaseModel):
     elite_count: int
 
     model_config = ConfigDict(extra="forbid")
-
-    @model_validator(mode="after")
-    def validate_values(self) -> "GAConfig":
-        if self.population_size < 4:
-            raise ValueError("population_size must be >= 4")
-        if self.generations < 1:
-            raise ValueError("generations must be >= 1")
-        if not (0.0 <= self.crossover_rate <= 1.0):
-            raise ValueError("crossover_rate must be in [0, 1]")
-        if not (0.0 <= self.mutation_rate <= 1.0):
-            raise ValueError("mutation_rate must be in [0, 1]")
-        if self.elite_count < 1 or self.elite_count >= self.population_size:
-            raise ValueError("elite_count must be >=1 and < population_size")
-        return self
 
 
 class OptimizationConfig(BaseModel):
@@ -206,87 +170,6 @@ class CaseConfig(BaseModel):
         beam_ids = [beam.beam_id for beam in self.beams]
         if len(beam_ids) != len(set(beam_ids)):
             raise ValueError("beam_id values must be unique")
-
-        if self.optimization.enabled:
-            for beam in self.beams:
-                if beam.cover_side_mm is None or beam.cover_top_mm is None or beam.cover_bottom_mm is None:
-                    raise ValueError(
-                        f"Optimization enabled: beam '{beam.beam_id}' must define "
-                        "cover_side_mm, cover_top_mm, and cover_bottom_mm"
-                    )
-                for span in beam.spans:
-                    for region in span.regions:
-                        required_geometry = (
-                            region.width_mm,
-                            region.height_mm,
-                        )
-                        if any(value is None for value in required_geometry):
-                            raise ValueError(
-                                f"Optimization enabled: region '{beam.beam_id}/{span.id}/{region.id}' "
-                                "must define width_mm and height_mm"
-                            )
-                        if region.width_mm <= 2.0 * beam.cover_side_mm:
-                            raise ValueError(
-                                f"Region '{beam.beam_id}/{span.id}/{region.id}' width_mm must be > 2*beam.cover_side_mm"
-                            )
-                        if region.height_mm <= (beam.cover_top_mm + beam.cover_bottom_mm):
-                            raise ValueError(
-                                f"Region '{beam.beam_id}/{span.id}/{region.id}' height_mm must be > "
-                                "beam.cover_top_mm + beam.cover_bottom_mm"
-                            )
-
-        for beam in self.beams:
-            if beam.detailing == "DES":
-                for span in beam.spans:
-                    for region in span.regions:
-                        if region.type != "C":
-                            continue
-                        if region.d_mm is None or region.db_bar is None:
-                            raise ValueError(
-                                f"Beam '{beam.beam_id}' is DES: region '{span.id}/{region.id}' "
-                                "with type='C' must define d_mm and db_bar"
-                            )
-
-        for beam in self.beams:
-            if beam.detailing != "DMO":
-                continue
-            for span in beam.spans:
-                for region in span.regions:
-                    if region.type == "NC":
-                        if beam.fc_mpa is None or beam.fy_mpa is None:
-                            raise ValueError(
-                                f"Beam '{beam.beam_id}' is DMO with region '{span.id}/{region.id}' type='NC': "
-                                "beam must define fc_mpa and fy_mpa"
-                            )
-                        if region.d_mm is None or region.db_bar is None:
-                            raise ValueError(
-                                f"Beam '{beam.beam_id}' is DMO: region '{span.id}/{region.id}' "
-                                "with type='NC' must define d_mm and db_bar"
-                            )
-                    if region.type != "C":
-                        continue
-                    if region.d_mm is None or region.db_bar is None:
-                        raise ValueError(
-                            f"Beam '{beam.beam_id}' is DMO: region '{span.id}/{region.id}' "
-                            "with type='C' must define d_mm and db_bar"
-                        )
-                    if region.min_branches is None:
-                        raise ValueError(
-                            f"Beam '{beam.beam_id}' is DMO: region '{span.id}/{region.id}' "
-                            "with type='C' must define min_branches"
-                        )
-                    if region.min_branches < 4:
-                        raise ValueError(
-                            f"Beam '{beam.beam_id}' is DMO: region '{span.id}/{region.id}' "
-                            "with type='C' requires min_branches >= 4"
-                        )
-                    min_required_g = region.min_branches - 2
-                    if max(self.optimization.variables.G_counts) < min_required_g:
-                        raise ValueError(
-                            f"Beam '{beam.beam_id}' region '{span.id}/{region.id}': "
-                            f"min_branches={region.min_branches} requires G_count >= {min_required_g}, "
-                            f"but optimization.variables.G_counts={self.optimization.variables.G_counts}"
-                        )
         return self
 
 
@@ -295,7 +178,9 @@ def load_case_config(case_json_path: str | Path) -> CaseConfig:
     if not case_path.exists():
         raise FileNotFoundError(f"Case file not found: {case_path}")
     payload = json.loads(case_path.read_text(encoding="utf-8"))
-    config = CaseConfig.model_validate(payload)
+    from .domain.validation import validate_case_payload
+
+    config = validate_case_payload(payload)
     validate_input_files(config, case_path.parent)
     return config
 
@@ -313,7 +198,13 @@ def resolve_path(path_value: str, base_dir: Path) -> Path:
     path = Path(path_value)
     if path.is_absolute():
         return path
-    cwd_candidate = path.resolve()
+    base_candidate = (base_dir / path).resolve()
+    if base_candidate.exists():
+        return base_candidate
+
+    cwd_candidate = (Path.cwd() / path).resolve()
     if cwd_candidate.exists():
         return cwd_candidate
-    return (base_dir / path).resolve()
+
+    # Keep deterministic error paths anchored to the case directory.
+    return base_candidate

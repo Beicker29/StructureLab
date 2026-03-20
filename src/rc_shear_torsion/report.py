@@ -6,7 +6,7 @@ from typing import Iterable
 
 from openpyxl import Workbook
 
-from .design import BeamSummary, RegionDesignResult, SpanSummary
+from .design import BAR_AREAS_MM2, BeamSummary, RegionDesignResult, SpanSummary
 
 
 DESIGN_COLUMNS = [
@@ -17,8 +17,11 @@ DESIGN_COLUMNS = [
     "source_control",
     "governing_station",
     "VRebar_req",
+    "VRebar_req_units",
     "TTrnRebar_req",
+    "TTrnRebar_req_units",
     "TLngRebar_req",
+    "TLngRebar_req_units",
     "E_bar",
     "G_bar",
     "G_count",
@@ -32,10 +35,28 @@ DESIGN_COLUMNS = [
     "Av_over_s",
     "long_bar",
     "long_count",
+    "long_provided_mm2",
+    "check_torsion",
+    "check_shear",
+    "check_longitudinal",
+    "check_detailing",
     "failure_mode",
     "status",
     "message",
 ]
+
+
+def _longitudinal_provided_mm2(result: RegionDesignResult) -> float:
+    return BAR_AREAS_MM2.get(result.long_bar, 0.0) * result.long_count
+
+
+def _check_flags(result: RegionDesignResult) -> tuple[bool, bool, bool, bool]:
+    long_provided = _longitudinal_provided_mm2(result)
+    check_torsion = result.at_over_s >= result.t_req
+    check_shear = result.av_over_s >= result.v_req
+    check_longitudinal = long_provided >= result.l_req
+    check_detailing = result.failure_mode != "region_detail_fail"
+    return check_torsion, check_shear, check_longitudinal, check_detailing
 
 
 def ensure_output_dir(path: Path) -> None:
@@ -48,6 +69,8 @@ def write_design_results(path: Path, region_results: Iterable[RegionDesignResult
     sheet.title = "design_results"
     sheet.append(DESIGN_COLUMNS)
     for result in region_results:
+        long_provided = _longitudinal_provided_mm2(result)
+        check_torsion, check_shear, check_longitudinal, check_detailing = _check_flags(result)
         sheet.append(
             [
                 result.beam_id,
@@ -57,8 +80,11 @@ def write_design_results(path: Path, region_results: Iterable[RegionDesignResult
                 result.source_control,
                 result.governing_station,
                 result.v_req,
+                "mm2/m",
                 result.t_req,
+                "mm2/m",
                 result.l_req,
+                "mm2",
                 result.e_bar,
                 result.g_bar,
                 result.g_count,
@@ -72,6 +98,11 @@ def write_design_results(path: Path, region_results: Iterable[RegionDesignResult
                 result.av_over_s,
                 result.long_bar,
                 result.long_count,
+                long_provided,
+                check_torsion,
+                check_shear,
+                check_longitudinal,
+                check_detailing,
                 result.failure_mode,
                 result.status,
                 result.message,
@@ -132,6 +163,17 @@ def write_optimized_results(path: Path, region_results: Iterable[RegionDesignRes
             "controlling_limit",
             "long_bar",
             "long_count",
+            "long_provided_mm2",
+            "VRebar_req",
+            "TTrnRebar_req",
+            "TLngRebar_req",
+            "VRebar_req_units",
+            "TTrnRebar_req_units",
+            "TLngRebar_req_units",
+            "check_torsion",
+            "check_shear",
+            "check_longitudinal",
+            "check_detailing",
             "transverse_weight_kg_per_m",
             "longitudinal_weight_kg_per_m",
             "total_weight_kg_per_m",
@@ -140,6 +182,8 @@ def write_optimized_results(path: Path, region_results: Iterable[RegionDesignRes
         ]
     )
     for result in region_results:
+        long_provided = _longitudinal_provided_mm2(result)
+        check_torsion, check_shear, check_longitudinal, check_detailing = _check_flags(result)
         sheet.append(
             [
                 result.beam_id,
@@ -158,6 +202,17 @@ def write_optimized_results(path: Path, region_results: Iterable[RegionDesignRes
                 result.controlling_limit,
                 result.long_bar,
                 result.long_count,
+                long_provided,
+                result.v_req,
+                result.t_req,
+                result.l_req,
+                "mm2/m",
+                "mm2/m",
+                "mm2",
+                check_torsion,
+                check_shear,
+                check_longitudinal,
+                check_detailing,
                 result.transverse_weight_kg_per_m,
                 result.longitudinal_weight_kg_per_m,
                 result.transverse_weight_kg_per_m + result.longitudinal_weight_kg_per_m,

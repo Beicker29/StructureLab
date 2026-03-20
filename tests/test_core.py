@@ -1,14 +1,30 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess
+import sys
 import unittest
 from pathlib import Path
+from uuid import uuid4
 
 from openpyxl import load_workbook
 
+from rc_shear_torsion.domain.errors import DomainValidationError
+from rc_shear_torsion.domain.validation import validate_case_payload
 from rc_shear_torsion.design import RegionDemand, evaluate_candidate, optimize_region_exhaustive
-from rc_shear_torsion.models import CaseConfig, VariablesConfig
+from rc_shear_torsion.models import CaseConfig, VariablesConfig, resolve_path
 from rc_shear_torsion.run import run_case
+
+TMP_TEST_ROOT = Path(__file__).resolve().parents[1] / ".tmp_test_runtime"
+TMP_TEST_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def _new_runtime_dir(prefix: str) -> Path:
+    path = TMP_TEST_ROOT / f"{prefix}_{uuid4().hex}"
+    path.mkdir(parents=True, exist_ok=False)
+    return path
 
 
 class CoreTests(unittest.TestCase):
@@ -148,8 +164,8 @@ class CoreTests(unittest.TestCase):
                 },
             },
         }
-        with self.assertRaises(ValueError):
-            CaseConfig.model_validate(payload)
+        with self.assertRaises(DomainValidationError):
+            validate_case_payload(payload)
 
     def test_des_requires_detail_inputs_in_confined_region(self) -> None:
         payload = {
@@ -201,8 +217,8 @@ class CoreTests(unittest.TestCase):
                 },
             },
         }
-        with self.assertRaises(ValueError):
-            CaseConfig.model_validate(payload)
+        with self.assertRaises(DomainValidationError):
+            validate_case_payload(payload)
 
     def test_dmo_non_confined_requires_fc_fy_and_detail_inputs(self) -> None:
         payload = {
@@ -256,8 +272,8 @@ class CoreTests(unittest.TestCase):
                 },
             },
         }
-        with self.assertRaises(ValueError):
-            CaseConfig.model_validate(payload)
+        with self.assertRaises(DomainValidationError):
+            validate_case_payload(payload)
 
     def test_bar_range_allows_from_2_to_11(self) -> None:
         payload = {
@@ -313,7 +329,7 @@ class CoreTests(unittest.TestCase):
                 },
             },
         }
-        cfg = CaseConfig.model_validate(payload)
+        cfg = validate_case_payload(payload)
         self.assertEqual(cfg.beams[0].spans[0].regions[0].db_bar, "#11")
 
     def test_dmo_confined_region_detailing_rule(self) -> None:
@@ -442,7 +458,7 @@ class CoreTests(unittest.TestCase):
             station_count=3,
         )
         # #3 -> dest=9.5 mm; 24*dest=228 mm. En este dominio de barras, 150 mm suele controlar.
-        # Esta prueba valida que 24*dest quede incluido explícitamente en la expresión de restricción.
+        # Esta prueba valida que 24*dest quede incluido explÃ­citamente en la expresiÃ³n de restricciÃ³n.
         candidate = evaluate_candidate(
             region,
             e_bar="#3",
@@ -655,8 +671,8 @@ class CoreTests(unittest.TestCase):
                 },
             },
         }
-        with self.assertRaises(ValueError):
-            CaseConfig.model_validate(payload)
+        with self.assertRaises(DomainValidationError):
+            validate_case_payload(payload)
 
     def test_dmo_confined_region_min_branches_must_be_covered_by_g_counts(self) -> None:
         payload = {
@@ -711,8 +727,8 @@ class CoreTests(unittest.TestCase):
                 },
             },
         }
-        with self.assertRaises(ValueError):
-            CaseConfig.model_validate(payload)
+        with self.assertRaises(DomainValidationError):
+            validate_case_payload(payload)
 
     def test_enabled_optimization_requires_region_geometry(self) -> None:
         payload = {
@@ -758,33 +774,255 @@ class CoreTests(unittest.TestCase):
                 },
             },
         }
-        with self.assertRaises(ValueError):
-            CaseConfig.model_validate(payload)
+        with self.assertRaises(DomainValidationError):
+            validate_case_payload(payload)
+
+    def test_domain_validation_rejects_invalid_optimization_ranges(self) -> None:
+        payload = {
+            "case_name": "bad_optimization_ranges",
+            "inputs": {
+                "seismic_excel": "a.xlsx",
+                "gravity_excel": "b.xlsx",
+                "sheet_name": "Conc Bm Sum - ACI 318-08",
+            },
+            "units": {"rebar_per_length": "mm2/m"},
+            "beams": [
+                {
+                    "beam_id": "B1",
+                    "detailing": "DES",
+                    "spans": [
+                        {
+                            "id": "S1",
+                            "seismic": "1",
+                            "gravity": "1",
+                            "regions": [
+                                {
+                                    "id": "R1",
+                                    "from": 0.0,
+                                    "to": 1.0,
+                                    "type": "C",
+                                    "d_mm": 600.0,
+                                    "db_bar": "#5",
+                                    "width_mm": 300.0,
+                                    "height_mm": 600.0,
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "optimization": {
+                "enabled": False,
+                "objective": "min_weight",
+                "variables": {
+                    "E_bars": ["#3"],
+                    "G_bars": ["#3"],
+                    "G_counts": [0],
+                    "stirrup_spacing_mm": [0],
+                    "longitudinal_bars": ["#4"],
+                    "longitudinal_bar_counts": [2],
+                },
+                "genetic_algorithm": {
+                    "population_size": 3,
+                    "generations": 0,
+                    "crossover_rate": 1.2,
+                    "mutation_rate": -0.1,
+                    "elite_count": 3,
+                },
+            },
+        }
+        with self.assertRaises(DomainValidationError) as ctx:
+            validate_case_payload(payload)
+        fields = {issue.field for issue in ctx.exception.issues}
+        self.assertIn("optimization.variables.stirrup_spacing_mm", fields)
+        self.assertIn("optimization.genetic_algorithm.population_size", fields)
+
+    def test_cli_reports_domain_validation_errors(self) -> None:
+        repo = Path(__file__).resolve().parents[1]
+        run_root = _new_runtime_dir("cli_invalid")
+        try:
+            bad_case = {
+                "case_name": "cli_bad_case",
+                "inputs": {
+                    "seismic_excel": str((repo / "cases" / "case_0001" / "sismo.xlsx").resolve()),
+                    "gravity_excel": str((repo / "cases" / "case_0001" / "gravedad.xlsx").resolve()),
+                    "sheet_name": "Conc Bm Sum - ACI 318-08",
+                },
+                "units": {"rebar_per_length": "mm2/m"},
+                "beams": [
+                    {
+                        "beam_id": "B1",
+                        "detailing": "DMO",
+                        "cover_side_mm": 40.0,
+                        "cover_top_mm": 40.0,
+                        "cover_bottom_mm": 40.0,
+                        "fc_mpa": 28.0,
+                        "fy_mpa": 420.0,
+                        "spans": [
+                            {
+                                "id": "S1",
+                                "seismic": "190",
+                                "gravity": "190",
+                                "regions": [
+                                    {
+                                        "id": "R1",
+                                        "from": 0.0,
+                                        "to": 1.0,
+                                        "type": "C",
+                                        "d_mm": 600.0,
+                                        "db_bar": "#6",
+                                        "min_branches": 3,
+                                        "width_mm": 300.0,
+                                        "height_mm": 600.0,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+                "optimization": {
+                    "enabled": False,
+                    "objective": "min_weight",
+                    "variables": {
+                        "E_bars": ["#3"],
+                        "G_bars": ["#3"],
+                        "G_counts": [0, 1, 2, 3],
+                        "stirrup_spacing_mm": [100],
+                        "longitudinal_bars": ["#4"],
+                        "longitudinal_bar_counts": [2],
+                    },
+                    "genetic_algorithm": {
+                        "population_size": 10,
+                        "generations": 2,
+                        "crossover_rate": 0.8,
+                        "mutation_rate": 0.1,
+                        "elite_count": 2,
+                    },
+                },
+            }
+            case_path = run_root / "bad_case.json"
+            case_path.write_text(json.dumps(bad_case), encoding="utf-8")
+
+            process = subprocess.run(
+                [sys.executable, "-m", "rc_shear_torsion.run", str(case_path), "--out", str(run_root / "out")],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(process.returncode, 2)
+            self.assertIn("Domain validation failed", process.stderr)
+            self.assertIn("min_branches", process.stderr)
+        finally:
+            shutil.rmtree(run_root, ignore_errors=True)
+
+    def test_resolve_path_prefers_case_directory_over_cwd(self) -> None:
+        root = _new_runtime_dir("resolve_prefers")
+        try:
+            case_dir = root / "case"
+            cwd_dir = root / "cwd"
+            case_inputs = case_dir / "inputs"
+            cwd_inputs = cwd_dir / "inputs"
+            case_inputs.mkdir(parents=True, exist_ok=True)
+            cwd_inputs.mkdir(parents=True, exist_ok=True)
+            case_file = case_inputs / "data.xlsx"
+            cwd_file = cwd_inputs / "data.xlsx"
+            case_file.write_text("case", encoding="utf-8")
+            cwd_file.write_text("cwd", encoding="utf-8")
+
+            previous_cwd = Path.cwd()
+            os.chdir(cwd_dir)
+            try:
+                resolved = resolve_path("inputs/data.xlsx", case_dir)
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(resolved, case_file.resolve())
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_resolve_path_falls_back_to_cwd(self) -> None:
+        root = _new_runtime_dir("resolve_fallback")
+        try:
+            case_dir = root / "case"
+            cwd_dir = root / "cwd"
+            case_dir.mkdir(parents=True, exist_ok=True)
+            cwd_inputs = cwd_dir / "inputs"
+            cwd_inputs.mkdir(parents=True, exist_ok=True)
+            cwd_file = cwd_inputs / "data.xlsx"
+            cwd_file.write_text("cwd", encoding="utf-8")
+
+            previous_cwd = Path.cwd()
+            os.chdir(cwd_dir)
+            try:
+                resolved = resolve_path("inputs/data.xlsx", case_dir)
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(resolved, cwd_file.resolve())
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+    def test_resolve_path_missing_is_anchored_to_case_directory(self) -> None:
+        root = _new_runtime_dir("resolve_missing")
+        try:
+            case_dir = root / "case"
+            cwd_dir = root / "cwd"
+            case_dir.mkdir(parents=True, exist_ok=True)
+            cwd_dir.mkdir(parents=True, exist_ok=True)
+
+            previous_cwd = Path.cwd()
+            os.chdir(cwd_dir)
+            try:
+                resolved = resolve_path("inputs/missing.xlsx", case_dir)
+            finally:
+                os.chdir(previous_cwd)
+
+            self.assertEqual(resolved, (case_dir / "inputs" / "missing.xlsx").resolve())
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
 
     def test_end_to_end_case_runs(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         case_json = repo / "cases" / "case_0001" / "case.json"
-        out_root = repo / "results"
-        out_dir = run_case(case_json, out_root)
-        self.assertTrue((out_dir / "design_results.xlsx").exists())
-        self.assertTrue((out_dir / "summary.xlsx").exists())
-        self.assertTrue((out_dir / "optimized_results.xlsx").exists())
-        self.assertTrue((out_dir / "reinforcement_schedule.xlsx").exists())
-        self.assertTrue((out_dir / "run_log.txt").exists())
+        run_root = _new_runtime_dir("end_to_end")
+        try:
+            out_root = run_root / "results"
+            out_dir = run_case(case_json, out_root)
+            self.assertTrue((out_dir / "design_results.xlsx").exists())
+            self.assertTrue((out_dir / "summary.xlsx").exists())
+            self.assertTrue((out_dir / "optimized_results.xlsx").exists())
+            self.assertTrue((out_dir / "reinforcement_schedule.xlsx").exists())
+            self.assertTrue((out_dir / "run_log.txt").exists())
 
-        wb = load_workbook(out_dir / "reinforcement_schedule.xlsx", data_only=True)
-        self.assertIn("por_region", wb.sheetnames)
-        por_region = wb["por_region"]
-        # 3 regiones en case_0001 con al menos 5 opciones por región.
-        self.assertGreaterEqual(por_region.max_row - 1, 15)
-        schedule_headers = [cell.value for cell in por_region[1]]
-        self.assertIn("limite_controlante", schedule_headers)
+            wb = load_workbook(out_dir / "reinforcement_schedule.xlsx", data_only=True)
+            self.assertIn("por_region", wb.sheetnames)
+            por_region = wb["por_region"]
+            # 3 regiones en case_0001 con al menos 5 opciones por region.
+            self.assertGreaterEqual(por_region.max_row - 1, 15)
+            schedule_headers = [cell.value for cell in por_region[1]]
+            self.assertIn("limite_controlante", schedule_headers)
 
-        optimized_wb = load_workbook(out_dir / "optimized_results.xlsx", data_only=True)
-        optimized = optimized_wb.active
-        optimized_headers = [cell.value for cell in optimized[1]]
-        self.assertIn("controlling_limit", optimized_headers)
+            optimized_wb = load_workbook(out_dir / "optimized_results.xlsx", data_only=True)
+            optimized = optimized_wb.active
+            optimized_headers = [cell.value for cell in optimized[1]]
+            self.assertIn("controlling_limit", optimized_headers)
+            self.assertIn("check_torsion", optimized_headers)
+            self.assertIn("check_shear", optimized_headers)
+            self.assertIn("check_longitudinal", optimized_headers)
+            self.assertIn("check_detailing", optimized_headers)
+            self.assertIn("VRebar_req_units", optimized_headers)
+
+            design_wb = load_workbook(out_dir / "design_results.xlsx", data_only=True)
+            design = design_wb.active
+            design_headers = [cell.value for cell in design[1]]
+            self.assertIn("VRebar_req_units", design_headers)
+            self.assertIn("TTrnRebar_req_units", design_headers)
+            self.assertIn("TLngRebar_req_units", design_headers)
+            self.assertIn("check_torsion", design_headers)
+        finally:
+            shutil.rmtree(run_root, ignore_errors=True)
 
 
 if __name__ == "__main__":
     unittest.main()
+

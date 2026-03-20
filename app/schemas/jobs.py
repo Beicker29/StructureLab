@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 JobStatus = Literal["queued", "running", "completed", "failed"]
@@ -25,5 +25,5 @@ class JobStatusResponse(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     error: str | None = None
-    artifacts: list[str] = []
+    artifacts: list[str] = Field(default_factory=list)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import time
 import unittest
@@ -70,6 +71,34 @@ class ApiTests(unittest.TestCase):
                 return payload
             time.sleep(0.25)
         self.fail(f"El job {job_id} no termino a tiempo. Ultimo estado: {last_payload}")
+
+    def _write_job_meta(self, job_id: str, status: str, artifacts: dict[str, str] | None = None) -> None:
+        job_dir = self.storage_dir / "jobs" / job_id
+        input_dir = job_dir / "input"
+        output_root = job_dir / "output"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        output_root.mkdir(parents=True, exist_ok=True)
+        meta = {
+            "job_id": job_id,
+            "status": status,
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+            "started_at": None,
+            "finished_at": None,
+            "error": None,
+            "paths": {
+                "job_dir": str(job_dir),
+                "input_dir": str(input_dir),
+                "output_root": str(output_root),
+                "case_json": str(input_dir / "case.json"),
+                "seismic_excel": str(input_dir / "seismic.xlsx"),
+                "gravity_excel": str(input_dir / "gravity.xlsx"),
+            },
+            "output_dir": None,
+            "artifacts": artifacts or {},
+            "zip_path": None,
+        }
+        (job_dir / "job.json").write_text(json.dumps(meta), encoding="utf-8")
 
     def test_healthcheck(self) -> None:
         response = self.client.get("/")
@@ -155,14 +184,61 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(case_payload["inputs"]["gravity_excel"], "gravity.xlsx")
         self.assertGreater(len(case_payload["beams"][0]["spans"]), 0)
 
+    def test_create_job_from_form_domain_validation_error(self) -> None:
+        with (
+            self.seismic_excel.open("rb") as seismic_stream,
+            self.gravity_excel.open("rb") as gravity_stream,
+        ):
+            response = self.client.post(
+                "/v1/jobs/from-form",
+                data={
+                    "case_name": "case_bad_domain",
+                    "sheet_name": "Conc Bm Sum - ACI 318-08",
+                    "detailing": "DMO",
+                    "units_rebar_per_length": "mm2/m",
+                    "beam_id": "BDOM",
+                    "cover_side_mm": "40",
+                    "cover_top_mm": "40",
+                    "cover_bottom_mm": "40",
+                    "fc_mpa": "28",
+                    "fy_mpa": "420",
+                    "width_mm": "300",
+                    "height_mm": "600",
+                    "d_mm": "600",
+                    "db_bar": "#6",
+                    "min_branches_c": "3",
+                    "min_branches_nc": "2",
+                    "region_c_ratio": "0.2",
+                },
+                files={
+                    "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "gravity_excel": ("gravedad.xlsx", gravity_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                },
+            )
+        self.assertEqual(response.status_code, 422, response.text)
+        payload = response.json()
+        self.assertEqual(payload["error"], "domain_validation_error")
+        self.assertTrue(payload.get("details"))
+        self.assertIn("code", payload["details"][0])
+        self.assertIn("field", payload["details"][0])
+        self.assertIn("message", payload["details"][0])
+
     def test_download_conflict_when_failed(self) -> None:
         invalid_case = b'{"case_name":"bad_case","inputs":{},"units":{"rebar_per_length":"mm2/m"},"beams":[],"optimization":{"enabled":true,"objective":"min_weight","variables":{"E_bars":["#3"],"G_bars":["#3"],"G_counts":[0],"stirrup_spacing_mm":[100],"longitudinal_bars":["#4"],"longitudinal_bar_counts":[2]},"genetic_algorithm":{"population_size":10,"generations":2,"crossover_rate":0.8,"mutation_rate":0.1,"elite_count":2}}}'
         job_id = self._create_job(case_content=invalid_case)
         final_status = self._wait_terminal_status(job_id)
         self.assertEqual(final_status["status"], "failed", final_status)
+        self.assertTrue(final_status.get("error"))
+        self.assertIsNotNone(final_status.get("finished_at"))
 
         download_response = self.client.get(f"/v1/jobs/{job_id}/download")
         self.assertEqual(download_response.status_code, 409, download_response.text)
+
+    def test_download_conflict_when_job_is_queued(self) -> None:
+        job_id = "queued_manual_job"
+        self._write_job_meta(job_id=job_id, status="queued", artifacts={})
+        response = self.client.get(f"/v1/jobs/{job_id}/download")
+        self.assertEqual(response.status_code, 409, response.text)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,8 @@
 case_name=case_0001
-case_file=C:\Users\LENOVO\Documents\Proyectos python\ShearTors_RC\cases\case_0001\case.json
+case_file=D:\Users\byomayusa\Documents\GitHub\ShearTors_RC\cases\case_0001\case.json
+units_v_rebar=mm2/m
+units_t_trn_rebar=mm2/m
+units_t_lng_rebar=mm2
 source=seismic unique_names=185 rows=2387 skipped_rows=1
 warning: seismic: skipped 1 rows with missing/invalid UniqueName or Station
 source=gravity unique_names=252 rows=3396 skipped_rows=78
