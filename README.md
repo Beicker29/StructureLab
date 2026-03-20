@@ -69,7 +69,7 @@ python -m rc_shear_torsion.run cases/case_0001/case.json --out results/
 ## Variables de entorno
 
 - `APP_ENV` (default: `production`)
-- `APP_STORAGE_DIR` (default: `storage`)
+- `APP_STORAGE_DIR` (default: `storage`; en Render Free usar `/tmp/storage`)
 - `APP_API_KEY` (opcional, si se define exige header `X-API-Key` en `/v1/jobs*`)
 - `APP_MAX_UPLOAD_MB` (default: `25`)
 - `APP_LOG_LEVEL` (default: `INFO`)
@@ -146,12 +146,17 @@ Este repo ya incluye `render.yaml` listo para Blueprint deploy.
 3. Render leera `render.yaml` y configurara:
    - Build: `pip install -r requirements.txt && pip install .`
    - Start: `uvicorn app.main:app --host 0.0.0.0 --port 10000`
-   - Disco persistente en `/var/data` (para `storage`).
+   - Storage temporal en `/tmp/storage` (compatible con plan `free`).
 4. Si deseas proteger API, define `APP_API_KEY` en Render.
 5. Despliega y prueba:
    - `GET /`
    - `GET /docs`
    - flujo de `POST /v1/jobs` -> `GET /v1/jobs/{id}` -> `GET /download`.
+
+### Nota sobre almacenamiento en Render Free
+
+- El plan `free` no soporta `disk` en `render.yaml`, por eso el storage es efimero (`/tmp/storage`).
+- Si necesitas persistencia entre reinicios, cambia a plan pago y agrega un disco montado (por ejemplo en `/var/data`) con `APP_STORAGE_DIR=/var/data/storage`.
 
 ## Notas tecnicas
 

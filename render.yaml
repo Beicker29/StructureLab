@@ -11,12 +11,8 @@ services:
       - key: APP_ENV
         value: production
       - key: APP_STORAGE_DIR
-        value: /var/data/storage
+        value: /tmp/storage
       - key: APP_MAX_UPLOAD_MB
         value: "25"
       - key: APP_LOG_LEVEL
         value: INFO
-    disk:
-      name: sheartors-storage
-      mountPath: /var/data
-      sizeGB: 1
