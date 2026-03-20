@@ -10,11 +10,13 @@ from app.dependencies.security import require_api_key
 from app.schemas.common import ErrorResponse
 from app.schemas.jobs import JobCreateResponse, JobStatusResponse
 from app.services.case_builder_service import build_case_payload_from_form
+from app.services.job_preview_service import build_job_preview_payload
 from app.services.job_service import (
     build_zip,
     create_job,
     create_job_from_case_payload,
     get_job,
+    get_artifact_path,
     get_job_case_payload,
     run_job,
 )
@@ -48,6 +50,20 @@ JOB_NOT_READY_RESPONSE = {
             "example": {
                 "error": "job_not_ready",
                 "message": "Job 'abc123' no esta listo para descarga (estado=running)",
+                "details": [],
+            }
+        }
+    },
+}
+
+JOB_ARTIFACT_NOT_FOUND_RESPONSE = {
+    "model": ErrorResponse,
+    "description": "El artefacto solicitado no existe para ese job",
+    "content": {
+        "application/json": {
+            "example": {
+                "error": "job_artifact_not_found",
+                "message": "El artefacto 'x.xlsx' no existe para el job 'abc123'",
                 "details": [],
             }
         }
@@ -245,6 +261,16 @@ def get_job_case_endpoint(job_id: str) -> dict:
 
 
 @router.get(
+    "/{job_id}/preview",
+    responses={
+        404: JOB_NOT_FOUND_RESPONSE,
+    },
+)
+def get_job_preview_endpoint(job_id: str) -> dict:
+    return build_job_preview_payload(job_id)
+
+
+@router.get(
     "/{job_id}/download",
     responses={
         404: JOB_NOT_FOUND_RESPONSE,
@@ -257,4 +283,19 @@ def download_job_reports(job_id: str) -> FileResponse:
         path=zip_path,
         media_type="application/zip",
         filename=f"{job_id}_reports.zip",
+    )
+
+
+@router.get(
+    "/{job_id}/artifacts/{artifact_name}",
+    responses={
+        404: JOB_ARTIFACT_NOT_FOUND_RESPONSE,
+        409: JOB_NOT_READY_RESPONSE,
+    },
+)
+def download_job_artifact(job_id: str, artifact_name: str) -> FileResponse:
+    artifact_path = get_artifact_path(job_id, artifact_name)
+    return FileResponse(
+        path=artifact_path,
+        filename=artifact_name,
     )

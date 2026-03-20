@@ -38,6 +38,15 @@ class JobNotReadyError(AppError):
         )
 
 
+class JobArtifactNotFoundError(AppError):
+    def __init__(self, job_id: str, artifact_name: str) -> None:
+        super().__init__(
+            message=f"El artefacto '{artifact_name}' no existe para el job '{job_id}'",
+            status_code=404,
+            code="job_artifact_not_found",
+        )
+
+
 class DomainValidationAppError(AppError):
     def __init__(self, message: str, details: list[dict[str, Any]]) -> None:
         super().__init__(

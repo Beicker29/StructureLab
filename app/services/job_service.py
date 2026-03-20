@@ -11,7 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from fastapi import UploadFile
 
 from app.core.config import get_settings
-from app.core.errors import JobNotFoundError, JobNotReadyError
+from app.core.errors import JobArtifactNotFoundError, JobNotFoundError, JobNotReadyError
 from app.models.job import JobRecord
 from app.services.case_service import (
     load_case_json,
@@ -217,3 +217,20 @@ def build_zip(job_id: str) -> Path:
     meta["updated_at"] = _now_iso()
     _save_job(meta)
     return zip_path
+
+
+def get_artifact_path(job_id: str, artifact_name: str) -> Path:
+    meta = _load_job(job_id)
+    status_value = meta["status"]
+    if status_value != "completed":
+        raise JobNotReadyError(job_id, status_value)
+
+    artifacts = meta.get("artifacts", {})
+    full_path = artifacts.get(artifact_name)
+    if not full_path:
+        raise JobArtifactNotFoundError(job_id, artifact_name)
+
+    artifact_path = Path(full_path)
+    if not artifact_path.exists():
+        raise JobArtifactNotFoundError(job_id, artifact_name)
+    return artifact_path

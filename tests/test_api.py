@@ -276,6 +276,87 @@ class ApiTests(unittest.TestCase):
             any(detail.get("field") == "optimization.genetic_algorithm.population_size" for detail in payload["details"])
         )
 
+    def test_job_preview_endpoint_returns_span_region_labels(self) -> None:
+        job_id = self._create_job()
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        response = self.client.get(f"/v1/jobs/{job_id}/preview")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["job_id"], job_id)
+        self.assertIn("spans", payload)
+        self.assertTrue(payload["spans"])
+        first_span = payload["spans"][0]
+        self.assertIn("regions", first_span)
+        self.assertTrue(first_span["regions"])
+        first_region = first_span["regions"][0]
+        self.assertIn("transverse_label", first_region)
+        self.assertIn("longitudinal_label", first_region)
+
+    def test_job_preview_endpoint_supports_multiple_spans_from_pairs(self) -> None:
+        with (
+            self.seismic_excel.open("rb") as seismic_stream,
+            self.gravity_excel.open("rb") as gravity_stream,
+        ):
+            response = self.client.post(
+                "/v1/jobs/from-form",
+                data={
+                    "case_name": "case_multi_span_preview",
+                    "sheet_name": "Conc Bm Sum - ACI 318-08",
+                    "detailing": "DMO",
+                    "units_rebar_per_length": "mm2/m",
+                    "beam_id": "B1",
+                    "cover_side_mm": "40",
+                    "cover_top_mm": "40",
+                    "cover_bottom_mm": "40",
+                    "fc_mpa": "28",
+                    "fy_mpa": "420",
+                    "width_mm": "300",
+                    "height_mm": "600",
+                    "d_mm": "600",
+                    "db_bar": "#6",
+                    "min_branches_c": "4",
+                    "min_branches_nc": "2",
+                    "region_c_ratio": "0.2",
+                    "frame_pairs_json": '[{"id":"S1","seismic":"190","gravity":"190"},{"id":"S2","seismic":"8","gravity":"8"}]',
+                },
+                files={
+                    "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "gravity_excel": ("gravedad.xlsx", gravity_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 202, response.text)
+        job_id = response.json()["job_id"]
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        preview_response = self.client.get(f"/v1/jobs/{job_id}/preview")
+        self.assertEqual(preview_response.status_code, 200, preview_response.text)
+        preview_payload = preview_response.json()
+        self.assertEqual(len(preview_payload.get("spans", [])), 2)
+
+    def test_download_single_artifact_success(self) -> None:
+        job_id = self._create_job()
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        response = self.client.get(f"/v1/jobs/{job_id}/artifacts/design_results.xlsx")
+        self.assertEqual(response.status_code, 200, response.text)
+        disposition = response.headers.get("content-disposition", "")
+        self.assertIn("design_results.xlsx", disposition)
+
+    def test_download_single_artifact_not_found(self) -> None:
+        job_id = self._create_job()
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        response = self.client.get(f"/v1/jobs/{job_id}/artifacts/noexiste.xlsx")
+        self.assertEqual(response.status_code, 404, response.text)
+        payload = response.json()
+        self.assertEqual(payload["error"], "job_artifact_not_found")
+
     def test_download_conflict_when_failed(self) -> None:
         invalid_case = b'{"case_name":"bad_case","inputs":{},"units":{"rebar_per_length":"mm2/m"},"beams":[],"optimization":{"enabled":true,"objective":"min_weight","variables":{"E_bars":["#3"],"G_bars":["#3"],"G_counts":[0],"stirrup_spacing_mm":[100],"longitudinal_bars":["#4"],"longitudinal_bar_counts":[2]},"genetic_algorithm":{"population_size":10,"generations":2,"crossover_rate":0.8,"mutation_rate":0.1,"elite_count":2}}}'
         job_id = self._create_job(case_content=invalid_case)
@@ -297,6 +378,14 @@ class ApiTests(unittest.TestCase):
         self.assertIn("message", payload)
         self.assertIn("details", payload)
         self.assertEqual(payload["details"], [])
+
+    def test_download_single_artifact_conflict_when_job_is_queued(self) -> None:
+        job_id = "queued_manual_job_artifact"
+        self._write_job_meta(job_id=job_id, status="queued", artifacts={})
+        response = self.client.get(f"/v1/jobs/{job_id}/artifacts/design_results.xlsx")
+        self.assertEqual(response.status_code, 409, response.text)
+        payload = response.json()
+        self.assertEqual(payload["error"], "job_not_ready")
 
     def test_openapi_error_response_schema_is_documented(self) -> None:
         response = self.client.get("/openapi.json")
