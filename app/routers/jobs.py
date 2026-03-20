@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse
 
+from app.core.config import get_settings
 from app.dependencies.security import require_api_key
 from app.schemas.jobs import JobCreateResponse, JobStatusResponse
-from app.services.job_service import build_zip, create_job, get_job, run_job
+from app.services.case_builder_service import build_case_payload_from_form
+from app.services.job_service import (
+    build_zip,
+    create_job,
+    create_job_from_case_payload,
+    get_job,
+    get_job_case_payload,
+    run_job,
+)
 
 router = APIRouter(
     prefix="/v1/jobs",
@@ -62,10 +71,87 @@ def create_job_endpoint(
     )
 
 
+@router.post("/from-form", response_model=JobCreateResponse, status_code=202)
+def create_job_from_form_endpoint(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    seismic_excel: UploadFile = File(...),
+    gravity_excel: UploadFile = File(...),
+    case_name: str = Form("case_from_form"),
+    sheet_name: str = Form("Conc Bm Sum - ACI 318-08"),
+    units_rebar_per_length: str = Form("mm2/m"),
+    beam_id: str = Form("B1"),
+    detailing: str = Form("DMO"),
+    cover_side_mm: float = Form(40.0),
+    cover_top_mm: float = Form(40.0),
+    cover_bottom_mm: float = Form(40.0),
+    fc_mpa: float = Form(28.0),
+    fy_mpa: float = Form(420.0),
+    width_mm: float = Form(300.0),
+    height_mm: float = Form(600.0),
+    d_mm: float = Form(600.0),
+    db_bar: str = Form("#6"),
+    min_branches_c: int = Form(4),
+    min_branches_nc: int = Form(2),
+    region_c_ratio: float = Form(0.2),
+    frame_names_csv: str | None = Form(default=None),
+    frame_pairs_json: str | None = Form(default=None),
+    optimization_overrides_json: str | None = Form(default=None),
+) -> JobCreateResponse:
+    settings = get_settings()
+    case_payload = build_case_payload_from_form(
+        seismic_excel=seismic_excel,
+        gravity_excel=gravity_excel,
+        max_upload_bytes=settings.max_upload_bytes,
+        case_name=case_name,
+        sheet_name=sheet_name,
+        units_rebar_per_length=units_rebar_per_length,
+        beam_id=beam_id,
+        detailing=detailing,
+        cover_side_mm=cover_side_mm,
+        cover_top_mm=cover_top_mm,
+        cover_bottom_mm=cover_bottom_mm,
+        fc_mpa=fc_mpa,
+        fy_mpa=fy_mpa,
+        width_mm=width_mm,
+        height_mm=height_mm,
+        d_mm=d_mm,
+        db_bar=db_bar,
+        min_branches_c=min_branches_c,
+        min_branches_nc=min_branches_nc,
+        region_c_ratio=region_c_ratio,
+        frame_names_csv=frame_names_csv,
+        frame_pairs_json=frame_pairs_json,
+        optimization_overrides_json=optimization_overrides_json,
+    )
+
+    meta = create_job_from_case_payload(
+        case_payload=case_payload,
+        seismic_excel=seismic_excel,
+        gravity_excel=gravity_excel,
+    )
+    job_id = meta["job_id"]
+    background_tasks.add_task(run_job, job_id)
+
+    base_url = str(request.base_url).rstrip("/")
+    return JobCreateResponse(
+        job_id=job_id,
+        status=meta["status"],
+        created_at=_parse_dt(meta["created_at"]),  # type: ignore[arg-type]
+        status_url=f"{base_url}/v1/jobs/{job_id}",
+        download_url=f"{base_url}/v1/jobs/{job_id}/download",
+    )
+
+
 @router.get("/{job_id}", response_model=JobStatusResponse)
 def get_job_endpoint(job_id: str) -> JobStatusResponse:
     meta = get_job(job_id)
     return _status_payload(meta)
+
+
+@router.get("/{job_id}/case")
+def get_job_case_endpoint(job_id: str) -> dict:
+    return get_job_case_payload(job_id)
 
 
 @router.get("/{job_id}/download")
@@ -76,4 +162,3 @@ def download_job_reports(job_id: str) -> FileResponse:
         media_type="application/zip",
         filename=f"{job_id}_reports.zip",
     )
-

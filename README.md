@@ -59,6 +59,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 10000
 Swagger UI:
 
 - `http://127.0.0.1:10000/docs`
+- UI para usuario final (sin editar `case.json`):
+  - `http://127.0.0.1:10000/ui`
 
 ### 3) Ejecutar por CLI (compatibilidad)
 
@@ -94,6 +96,22 @@ Respuesta `202`:
 - `status_url`
 - `download_url`
 
+### POST `/v1/jobs/from-form`
+
+Crea trabajo asincrono desde formulario + 2 Excel (sin `case.json` manual).
+
+Campos principales:
+
+- Archivos: `seismic_excel`, `gravity_excel`
+- Caso: `case_name`, `sheet_name`, `units_rebar_per_length`
+- Viga: `beam_id`, `detailing`, recubrimientos, `fc_mpa`, `fy_mpa`
+- Geometria/regiones base: `width_mm`, `height_mm`, `d_mm`, `db_bar`, `min_branches_c`, `min_branches_nc`, `region_c_ratio`
+- Vanos:
+  - `frame_names_csv` (opcional, lista de `UniqueName` comunes), o
+  - `frame_pairs_json` (opcional, mapeo avanzado `seismic/gravity`)
+
+Si no defines vanos manualmente, la API usa automaticamente la interseccion de `UniqueName` entre ambos Excel.
+
 ### GET `/v1/jobs/{job_id}`
 
 Consulta estado (`queued`, `running`, `completed`, `failed`), timestamps y artefactos.
@@ -101,6 +119,10 @@ Consulta estado (`queued`, `running`, `completed`, `failed`), timestamps y artef
 ### GET `/v1/jobs/{job_id}/download`
 
 Descarga ZIP con reportes al estar `completed`.
+
+### GET `/v1/jobs/{job_id}/case`
+
+Devuelve el `case.json` generado/normalizado para auditoria.
 
 ## Ejemplos curl
 
@@ -119,6 +141,31 @@ Con API key:
 curl -X POST "http://127.0.0.1:10000/v1/jobs" \
   -H "X-API-Key: TU_API_KEY" \
   -F "case_json=@cases/case_0001/case.json;type=application/json" \
+  -F "seismic_excel=@cases/case_0001/sismo.xlsx" \
+  -F "gravity_excel=@cases/case_0001/gravedad.xlsx"
+```
+
+### Crear job desde formulario (sin case.json)
+
+```bash
+curl -X POST "http://127.0.0.1:10000/v1/jobs/from-form" \
+  -F "case_name=case_web" \
+  -F "sheet_name=Conc Bm Sum - ACI 318-08" \
+  -F "detailing=DMO" \
+  -F "units_rebar_per_length=mm2/m" \
+  -F "beam_id=B1" \
+  -F "cover_side_mm=40" \
+  -F "cover_top_mm=40" \
+  -F "cover_bottom_mm=40" \
+  -F "fc_mpa=28" \
+  -F "fy_mpa=420" \
+  -F "width_mm=300" \
+  -F "height_mm=600" \
+  -F "d_mm=600" \
+  -F "db_bar=#6" \
+  -F "min_branches_c=4" \
+  -F "min_branches_nc=2" \
+  -F "region_c_ratio=0.2" \
   -F "seismic_excel=@cases/case_0001/sismo.xlsx" \
   -F "gravity_excel=@cases/case_0001/gravedad.xlsx"
 ```
@@ -151,6 +198,7 @@ Este repo ya incluye `render.yaml` listo para Blueprint deploy.
 5. Despliega y prueba:
    - `GET /`
    - `GET /docs`
+   - `GET /ui`
    - flujo de `POST /v1/jobs` -> `GET /v1/jobs/{id}` -> `GET /download`.
 
 ### Nota sobre almacenamiento en Render Free

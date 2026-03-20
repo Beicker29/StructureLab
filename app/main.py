@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.routers.health import router as health_router
 from app.routers.jobs import router as jobs_router
+from app.routers.ui import router as ui_router
 
 
 def _configure_logging() -> None:
@@ -32,4 +33,4 @@ app = FastAPI(
 register_exception_handlers(app)
 app.include_router(health_router)
 app.include_router(jobs_router)
-
+app.include_router(ui_router)

@@ -78,6 +78,12 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertIn("service", payload)
 
+    def test_ui_page_available(self) -> None:
+        response = self.client.get("/ui")
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertIn("text/html", response.headers.get("content-type", ""))
+        self.assertIn("Crear y ejecutar job", response.text)
+
     def test_job_flow_success_and_download(self) -> None:
         job_id = self._create_job()
         final_status = self._wait_terminal_status(job_id)
@@ -105,6 +111,49 @@ class ApiTests(unittest.TestCase):
     def test_create_job_validation_error(self) -> None:
         response = self.client.post("/v1/jobs")
         self.assertEqual(response.status_code, 422, response.text)
+
+    def test_create_job_from_form_and_case_endpoint(self) -> None:
+        with (
+            self.seismic_excel.open("rb") as seismic_stream,
+            self.gravity_excel.open("rb") as gravity_stream,
+        ):
+            response = self.client.post(
+                "/v1/jobs/from-form",
+                data={
+                    "case_name": "case_form_test",
+                    "sheet_name": "Conc Bm Sum - ACI 318-08",
+                    "detailing": "DMO",
+                    "units_rebar_per_length": "mm2/m",
+                    "beam_id": "BFORM",
+                    "cover_side_mm": "40",
+                    "cover_top_mm": "40",
+                    "cover_bottom_mm": "40",
+                    "fc_mpa": "28",
+                    "fy_mpa": "420",
+                    "width_mm": "300",
+                    "height_mm": "600",
+                    "d_mm": "600",
+                    "db_bar": "#6",
+                    "min_branches_c": "4",
+                    "min_branches_nc": "2",
+                    "region_c_ratio": "0.2",
+                },
+                files={
+                    "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "gravity_excel": ("gravedad.xlsx", gravity_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 202, response.text)
+        payload = response.json()
+        job_id = payload["job_id"]
+
+        case_response = self.client.get(f"/v1/jobs/{job_id}/case")
+        self.assertEqual(case_response.status_code, 200, case_response.text)
+        case_payload = case_response.json()
+        self.assertEqual(case_payload["inputs"]["seismic_excel"], "seismic.xlsx")
+        self.assertEqual(case_payload["inputs"]["gravity_excel"], "gravity.xlsx")
+        self.assertGreater(len(case_payload["beams"][0]["spans"]), 0)
 
     def test_download_conflict_when_failed(self) -> None:
         invalid_case = b'{"case_name":"bad_case","inputs":{},"units":{"rebar_per_length":"mm2/m"},"beams":[],"optimization":{"enabled":true,"objective":"min_weight","variables":{"E_bars":["#3"],"G_bars":["#3"],"G_counts":[0],"stirrup_spacing_mm":[100],"longitudinal_bars":["#4"],"longitudinal_bar_counts":[2]},"genetic_algorithm":{"population_size":10,"generations":2,"crossover_rate":0.8,"mutation_rate":0.1,"elite_count":2}}}'

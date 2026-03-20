@@ -69,7 +69,11 @@ def _load_job(job_id: str) -> JobRecord:
     return payload
 
 
-def create_job(case_json: UploadFile, seismic_excel: UploadFile, gravity_excel: UploadFile) -> JobRecord:
+def _create_job_from_payload(
+    case_payload: dict,
+    seismic_excel: UploadFile,
+    gravity_excel: UploadFile,
+) -> JobRecord:
     settings = get_settings()
     job_id = uuid.uuid4().hex
     job_dir = _job_dir(job_id)
@@ -85,7 +89,6 @@ def create_job(case_json: UploadFile, seismic_excel: UploadFile, gravity_excel: 
     save_excel_upload(seismic_excel, seismic_path, settings.max_upload_bytes, field_name="seismic_excel")
     save_excel_upload(gravity_excel, gravity_path, settings.max_upload_bytes, field_name="gravity_excel")
 
-    case_payload = load_case_json(case_json, settings.max_upload_bytes)
     normalized_case = normalize_case_inputs(case_payload)
     write_case_json(normalized_case, case_path)
 
@@ -112,6 +115,20 @@ def create_job(case_json: UploadFile, seismic_excel: UploadFile, gravity_excel: 
     }
     _save_job(meta)
     return meta
+
+
+def create_job(case_json: UploadFile, seismic_excel: UploadFile, gravity_excel: UploadFile) -> JobRecord:
+    settings = get_settings()
+    case_payload = load_case_json(case_json, settings.max_upload_bytes)
+    return _create_job_from_payload(case_payload, seismic_excel, gravity_excel)
+
+
+def create_job_from_case_payload(
+    case_payload: dict,
+    seismic_excel: UploadFile,
+    gravity_excel: UploadFile,
+) -> JobRecord:
+    return _create_job_from_payload(case_payload, seismic_excel, gravity_excel)
 
 
 def run_job(job_id: str) -> None:
@@ -151,6 +168,14 @@ def run_job(job_id: str) -> None:
 
 def get_job(job_id: str) -> JobRecord:
     return _load_job(job_id)
+
+
+def get_job_case_payload(job_id: str) -> dict:
+    meta = _load_job(job_id)
+    case_json_path = Path(meta["paths"]["case_json"])
+    if not case_json_path.exists():
+        raise JobNotFoundError(job_id)
+    return json.loads(case_json_path.read_text(encoding="utf-8"))
 
 
 def build_zip(job_id: str) -> Path:
