@@ -1,0 +1,10 @@
+case_name=case_0001
+case_file=D:\Users\byomayusa\Desktop\Proyectos\ShearTors_RC\cases\case_0001\case.json
+source=seismic unique_names=185 rows=2387 skipped_rows=1
+warning: seismic: skipped 1 rows with missing/invalid UniqueName or Station
+source=gravity unique_names=252 rows=3396 skipped_rows=78
+warning: gravity: skipped 78 rows with missing/invalid UniqueName or Station
+region=B1/B1.1/R1 method=genetic status=ok failure_mode=ok evaluated=4800 feasible=4297
+region=B1/B1.1/R2 method=genetic status=ok failure_mode=ok evaluated=4800 feasible=4271
+region=B1/B1.1/R3 method=genetic status=ok failure_mode=ok evaluated=4800 feasible=4298
+beam=B1 status=ok spans_ok=1/1

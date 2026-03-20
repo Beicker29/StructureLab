@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ShearTors_RC"
+version = "0.1.0"
+description = "RC beam shear and torsion design and optimization using ETABS exports."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "pydantic>=2.7",
+  "openpyxl>=3.1",
+  "deap>=1.4.1",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
