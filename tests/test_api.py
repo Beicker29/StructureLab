@@ -111,6 +111,11 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/ui")
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("text/html", response.headers.get("content-type", ""))
+        self.assertIn("Design", response.text)
+        self.assertIn("ETABS Import", response.text)
+        self.assertIn("Results", response.text)
+        self.assertIn("Reports", response.text)
+        self.assertIn("beam-elevation-container", response.text)
         self.assertIn("Crear y ejecutar job", response.text)
 
     def test_job_flow_success_and_download(self) -> None:
