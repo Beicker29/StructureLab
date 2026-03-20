@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: sheartors-rc-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && pip install .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: APP_ENV
+        value: production
+      - key: APP_STORAGE_DIR
+        value: /var/data/storage
+      - key: APP_MAX_UPLOAD_MB
+        value: "25"
+      - key: APP_LOG_LEVEL
+        value: INFO
+    disk:
+      name: sheartors-storage
+      mountPath: /var/data
+      sizeGB: 1

@@ -12,6 +12,11 @@
     {
       "beam_id": "B1",
       "detailing": "DMO",
+      "cover_side_mm": 40.0,
+      "cover_top_mm": 40.0,
+      "cover_bottom_mm": 40.0,
+      "fc_mpa": 28.0,
+      "fy_mpa": 420.0,
       "spans": [
         {
           "id": "B1.1",
@@ -24,13 +29,10 @@
               "to": 0.2,
               "type": "C",
               "d_mm": 600.0,
-              "db_mm": 20.0,
+              "db_bar": "#6",
               "min_branches": 4,
               "width_mm": 300.0,
-              "height_mm": 600.0,
-              "cover_side_mm": 40.0,
-              "cover_top_mm": 40.0,
-              "cover_bottom_mm": 40.0
+              "height_mm": 600.0
             },
             {
               "id": "R2",
@@ -38,13 +40,10 @@
               "to": 0.8,
               "type": "NC",
               "d_mm": 600.0,
-              "db_mm": 20.0,
+              "db_bar": "#6",
               "min_branches": 2,
               "width_mm": 300.0,
-              "height_mm": 600.0,
-              "cover_side_mm": 40.0,
-              "cover_top_mm": 40.0,
-              "cover_bottom_mm": 40.0
+              "height_mm": 600.0
             },
             {
               "id": "R3",
@@ -52,13 +51,10 @@
               "to": 1.0,
               "type": "C",
               "d_mm": 600.0,
-              "db_mm": 20.0,
+              "db_bar": "#6",
               "min_branches": 4,
               "width_mm": 300.0,
-              "height_mm": 600.0,
-              "cover_side_mm": 40.0,
-              "cover_top_mm": 40.0,
-              "cover_bottom_mm": 40.0
+              "height_mm": 600.0
             }
           ]
         }
@@ -71,11 +67,13 @@
     "variables": {
       "E_bars": [
         "#3",
-        "#4"
+        "#4",
+        "#6"
       ],
       "G_bars": [
         "#3",
-        "#4"
+        "#4",
+        "#6"
       ],
       "G_counts": [
         0,

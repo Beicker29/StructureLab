@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+import io
+import os
+import time
+import unittest
+from pathlib import Path
+import shutil
+from zipfile import ZipFile
+
+from fastapi.testclient import TestClient
+
+
+class ApiTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.repo_root = Path(__file__).resolve().parents[1]
+        cls.storage_dir = cls.repo_root / ".tmp_api_storage"
+        if cls.storage_dir.exists():
+            shutil.rmtree(cls.storage_dir, ignore_errors=True)
+        cls.storage_dir.mkdir(parents=True, exist_ok=True)
+
+        os.environ["APP_STORAGE_DIR"] = str(cls.storage_dir)
+        os.environ.pop("APP_API_KEY", None)
+
+        from app.core.config import get_settings
+
+        get_settings.cache_clear()
+        from app.main import app
+
+        cls.client = TestClient(app)
+        cls.case_json = cls.repo_root / "cases" / "case_0001" / "case.json"
+        cls.seismic_excel = cls.repo_root / "cases" / "case_0001" / "sismo.xlsx"
+        cls.gravity_excel = cls.repo_root / "cases" / "case_0001" / "gravedad.xlsx"
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        shutil.rmtree(cls.storage_dir, ignore_errors=True)
+
+    def _create_job(self, case_content: bytes | None = None) -> str:
+        if case_content is None:
+            case_content = self.case_json.read_bytes()
+
+        with (
+            io.BytesIO(case_content) as case_stream,
+            self.seismic_excel.open("rb") as seismic_stream,
+            self.gravity_excel.open("rb") as gravity_stream,
+        ):
+            response = self.client.post(
+                "/v1/jobs",
+                files={
+                    "case_json": ("case.json", case_stream, "application/json"),
+                    "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "gravity_excel": ("gravedad.xlsx", gravity_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 202, response.text)
+        return response.json()["job_id"]
+
+    def _wait_terminal_status(self, job_id: str, timeout_seconds: float = 120.0) -> dict:
+        deadline = time.time() + timeout_seconds
+        last_payload: dict | None = None
+        while time.time() < deadline:
+            response = self.client.get(f"/v1/jobs/{job_id}")
+            self.assertEqual(response.status_code, 200, response.text)
+            payload = response.json()
+            last_payload = payload
+            if payload["status"] in {"completed", "failed"}:
+                return payload
+            time.sleep(0.25)
+        self.fail(f"El job {job_id} no termino a tiempo. Ultimo estado: {last_payload}")
+
+    def test_healthcheck(self) -> None:
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertIn("service", payload)
+
+    def test_job_flow_success_and_download(self) -> None:
+        job_id = self._create_job()
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        download_response = self.client.get(f"/v1/jobs/{job_id}/download")
+        self.assertEqual(download_response.status_code, 200, download_response.text)
+        self.assertEqual(download_response.headers.get("content-type"), "application/zip")
+
+        with ZipFile(io.BytesIO(download_response.content)) as zip_file:
+            names = set(zip_file.namelist())
+        expected = {
+            "design_results.xlsx",
+            "summary.xlsx",
+            "optimized_results.xlsx",
+            "reinforcement_schedule.xlsx",
+            "run_log.txt",
+        }
+        self.assertTrue(expected.issubset(names), names)
+
+    def test_status_not_found(self) -> None:
+        response = self.client.get("/v1/jobs/noexiste")
+        self.assertEqual(response.status_code, 404, response.text)
+
+    def test_create_job_validation_error(self) -> None:
+        response = self.client.post("/v1/jobs")
+        self.assertEqual(response.status_code, 422, response.text)
+
+    def test_download_conflict_when_failed(self) -> None:
+        invalid_case = b'{"case_name":"bad_case","inputs":{},"units":{"rebar_per_length":"mm2/m"},"beams":[],"optimization":{"enabled":true,"objective":"min_weight","variables":{"E_bars":["#3"],"G_bars":["#3"],"G_counts":[0],"stirrup_spacing_mm":[100],"longitudinal_bars":["#4"],"longitudinal_bar_counts":[2]},"genetic_algorithm":{"population_size":10,"generations":2,"crossover_rate":0.8,"mutation_rate":0.1,"elite_count":2}}}'
+        job_id = self._create_job(case_content=invalid_case)
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "failed", final_status)
+
+        download_response = self.client.get(f"/v1/jobs/{job_id}/download")
+        self.assertEqual(download_response.status_code, 409, download_response.text)
+
+
+if __name__ == "__main__":
+    unittest.main()

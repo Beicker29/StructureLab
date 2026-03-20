@@ -1,87 +1,160 @@
-﻿# ShearTors_RC
+# ShearTors_RC
 
-Backend Python para diseno y optimizacion de refuerzo de vigas de concreto reforzado por cortante y torsion usando resultados ETABS exportados a Excel.
+API y motor de calculo para diseno/optimizacion de refuerzo de vigas de concreto reforzado por cortante y torsion, usando exportes de ETABS.
 
-## Estructura
+## Que hace el proyecto
+
+- Lee un `case.json` con configuracion de vigas/vanos/regiones.
+- Carga dos archivos Excel ETABS (sismico y gravedad).
+- Calcula demanda por region y optimiza refuerzo transversal/longitudinal.
+- Genera reportes:
+  - `design_results.xlsx`
+  - `summary.xlsx`
+  - `optimized_results.xlsx`
+  - `reinforcement_schedule.xlsx`
+  - `run_log.txt`
+
+El motor de negocio sigue en `src/rc_shear_torsion/` y puede ejecutarse por CLI o por API FastAPI.
+
+## Estructura principal
 
 ```text
 ShearTors_RC/
-|-- pyproject.toml
+|-- app/
+|   |-- main.py
+|   |-- core/
+|   |-- dependencies/
+|   |-- models/
+|   |-- routers/
+|   |-- schemas/
+|   `-- services/
+|-- src/rc_shear_torsion/
 |-- cases/
-|-- results/
-`-- src/
-    `-- rc_shear_torsion/
-        |-- run.py
-        |-- io.py
-        |-- models.py
-        |-- design.py
-        `-- report.py
+|-- requirements.txt
+|-- render.yaml
+`-- pyproject.toml
 ```
 
-## Requisito de Python
+## Requisitos
 
-Este proyecto esta fijado a Python 3.12.x:
+- Python `3.12.x`
 
-- `>=3.12,<3.13`
+## Ejecucion local
 
-## Crear entorno virtual (Python 3.12)
+### 1) Instalar dependencias
 
 ```powershell
 python3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-.\.venv\Scripts\python.exe -m pip install -e .
+pip install -r requirements.txt
+pip install -e .
 ```
 
-## Comando principal
+### 2) Ejecutar API
+
+```powershell
+uvicorn app.main:app --host 0.0.0.0 --port 10000
+```
+
+Swagger UI:
+
+- `http://127.0.0.1:10000/docs`
+
+### 3) Ejecutar por CLI (compatibilidad)
 
 ```powershell
 python -m rc_shear_torsion.run cases/case_0001/case.json --out results/
 ```
 
-La ejecucion genera:
+## Variables de entorno
 
-- `results/<case_name>/design_results.xlsx`
-- `results/<case_name>/summary.xlsx`
-- `results/<case_name>/optimized_results.xlsx`
-- `results/<case_name>/reinforcement_schedule.xlsx` (top 5 alternativas por region para arreglo de estribos, cada una con su mejor refuerzo longitudinal y resumen por vano usando opcion 1)
-- `results/<case_name>/run_log.txt`
+- `APP_ENV` (default: `production`)
+- `APP_STORAGE_DIR` (default: `storage`)
+- `APP_API_KEY` (opcional, si se define exige header `X-API-Key` en `/v1/jobs*`)
+- `APP_MAX_UPLOAD_MB` (default: `25`)
+- `APP_LOG_LEVEL` (default: `INFO`)
 
-En los reportes por region se incluye la columna `controlling_limit` (o `limite_controlante` en `por_region`) con el criterio que gobierna la separacion maxima de estribos (`d/4`, `d/2`, `16db`, `48dest`, `Ph/8`, etc.).
+## Endpoints API
 
-## Notas de implementacion
+### GET `/`
 
-- `case.json` se valida con Pydantic.
-- Barras permitidas en todo el flujo (`db_bar`, `E_bars`, `G_bars`, `longitudinal_bars`): `#2` a `#11`.
-- Datos internos de calculo usan dataclasses.
-- `VRebar` y `TTrnRebar` se convierten a base `mm2/m`.
-- `TLngRebar` se trata como area puntual requerida por estacion (`mm2`) y se envuelve por region.
-- `beam.detailing` admite `DES` y `DMO` (default: `DES`).
-- Recubrimientos se definen por viga: `cover_side_mm`, `cover_top_mm`, `cover_bottom_mm`.
-- Cada region define:
-  - detallado DMO:
-    - zona `C`: `d_mm`, `db_bar`, `min_branches`
-    - zona `NC`: `d_mm`, `db_bar`
-  - geometria para peso real: `width_mm`, `height_mm`
-- Con optimizacion activa, la geometria por region es obligatoria.
-- Para vigas `DMO`, las regiones `C` deben definir `d_mm`, `db_bar` y `min_branches` (con `min_branches >= 4`).
-- Para vigas `DES`, las regiones `C` deben definir `d_mm` y `db_bar`.
-- En vigas `DES` y region `C`, se verifica:
-  - `s <= min(d/4, 6*db, 150, 16*db, 48*dest, Ph/8)`
-- Para vigas `DMO` con regiones `NC`, la viga debe definir `fc_mpa` y `fy_mpa`.
-- En vigas `DMO` y region `C`, se verifica:
-  - `s <= min(d/4, 8*db, 150, 16*db, 48*dest, 24*dest)`
-  - ramas minimas: `provided = 2 + G_count` y debe cumplir `provided >= min_branches`
-- En vigas `DMO` y region `NC`, se verifica como restriccion dura:
-  - `s <= min(d/4 o d/2 segun Vrebar*fy*d, 16*db, 48*dest, Ph/8 si TTrnRebar > 0)`
-- Restriccion dura de optimizacion: si `G_counts` no incluye algun `G_count >= (min_branches - 2)` para una region `DMO` tipo `C`, el `case.json` se rechaza en validacion.
-- Independencia de diseño:
-  - la factibilidad de optimizacion se resuelve con restricciones de refuerzo transversal (torsion, cortante y detallado DMO).
-  - el refuerzo longitudinal se selecciona en una etapa independiente usando el menor arreglo disponible que cumpla `TLngRebar_req`.
-- Objetivo `min_weight`: minimiza peso total por region (kg/m), sumando:
-  - transversal real (estribo + ganchos) usando longitudes por geometria de seccion y separacion `s`
-  - longitudinal independiente: `Along = area(long_bar) * long_count`, convertido a kg/m
-- Supuestos geometricos para el peso transversal:
-  - longitud estribo exterior = perimetro a eje + 2 ganchos
-  - longitud de cada gancho/ramal adicional = ancho a eje + 2 ganchos
-  - longitudes de gancho fijas: `#3 = 110 mm`, `#4 = 120 mm`, `#5 = 140 mm`
-  - para otras barras (si se usan), fallback = `10*phi`
+Healthcheck del servicio.
+
+### POST `/v1/jobs`
+
+Crea trabajo asincrono con `multipart/form-data`:
+
+- `case_json` (`.json`)
+- `seismic_excel` (`.xlsx`)
+- `gravity_excel` (`.xlsx`)
+
+Respuesta `202`:
+
+- `job_id`
+- `status_url`
+- `download_url`
+
+### GET `/v1/jobs/{job_id}`
+
+Consulta estado (`queued`, `running`, `completed`, `failed`), timestamps y artefactos.
+
+### GET `/v1/jobs/{job_id}/download`
+
+Descarga ZIP con reportes al estar `completed`.
+
+## Ejemplos curl
+
+### Crear job
+
+```bash
+curl -X POST "http://127.0.0.1:10000/v1/jobs" \
+  -F "case_json=@cases/case_0001/case.json;type=application/json" \
+  -F "seismic_excel=@cases/case_0001/sismo.xlsx" \
+  -F "gravity_excel=@cases/case_0001/gravedad.xlsx"
+```
+
+Con API key:
+
+```bash
+curl -X POST "http://127.0.0.1:10000/v1/jobs" \
+  -H "X-API-Key: TU_API_KEY" \
+  -F "case_json=@cases/case_0001/case.json;type=application/json" \
+  -F "seismic_excel=@cases/case_0001/sismo.xlsx" \
+  -F "gravity_excel=@cases/case_0001/gravedad.xlsx"
+```
+
+### Consultar estado
+
+```bash
+curl "http://127.0.0.1:10000/v1/jobs/<job_id>"
+```
+
+### Descargar resultados
+
+```bash
+curl -L "http://127.0.0.1:10000/v1/jobs/<job_id>/download" -o reports.zip
+```
+
+## Despliegue en Render
+
+Este repo ya incluye `render.yaml` listo para Blueprint deploy.
+
+### Pasos
+
+1. Sube cambios a GitHub.
+2. En Render, crea un **Blueprint** apuntando al repo.
+3. Render leera `render.yaml` y configurara:
+   - Build: `pip install -r requirements.txt && pip install .`
+   - Start: `uvicorn app.main:app --host 0.0.0.0 --port 10000`
+   - Disco persistente en `/var/data` (para `storage`).
+4. Si deseas proteger API, define `APP_API_KEY` en Render.
+5. Despliega y prueba:
+   - `GET /`
+   - `GET /docs`
+   - flujo de `POST /v1/jobs` -> `GET /v1/jobs/{id}` -> `GET /download`.
+
+## Notas tecnicas
+
+- La logica de negocio no se reescribio; se encapsulo para ser llamada desde servicios API.
+- El procesamiento se ejecuta asincronamente por `job_id` para reducir riesgo de timeout en web.
+- El estado se persiste por archivos JSON en `APP_STORAGE_DIR/jobs/<job_id>/job.json`.
