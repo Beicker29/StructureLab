@@ -124,6 +124,26 @@ Descarga ZIP con reportes al estar `completed`.
 
 Devuelve el `case.json` generado/normalizado para auditoria.
 
+### Contrato de errores de dominio/aplicacion
+
+Los errores propios de la API (uploads invalidos, dominio, job no encontrado/no listo) responden con:
+
+```json
+{
+  "error": "codigo_estable",
+  "message": "descripcion legible",
+  "details": []
+}
+```
+
+Para errores de reglas de negocio (`domain_validation_error`), `details` contiene lista de issues con:
+
+- `code`
+- `field`
+- `message`
+- `severity`
+- `context` (opcional)
+
 ## Ejemplos curl
 
 ### Crear job
@@ -205,6 +225,16 @@ Este repo ya incluye `render.yaml` listo para Blueprint deploy.
 
 - El plan `free` no soporta `disk` en `render.yaml`, por eso el storage es efimero (`/tmp/storage`).
 - Si necesitas persistencia entre reinicios, cambia a plan pago y agrega un disco montado (por ejemplo en `/var/data`) con `APP_STORAGE_DIR=/var/data/storage`.
+
+## CI y smoke checks
+
+- CI en GitHub Actions: `.github/workflows/ci.yml`
+  - instala dependencias
+  - corre `unittest`
+  - levanta FastAPI local y ejecuta smoke end-to-end
+- Smoke post-deploy (manual): `.github/workflows/render-smoke.yml`
+  - usa `scripts/smoke_api.py` contra tu URL de Render
+  - opcionalmente lee `RENDER_API_KEY` desde secrets
 
 ## Notas tecnicas
 

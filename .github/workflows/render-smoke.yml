@@ -1,0 +1,46 @@
+name: Render Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL base del servicio desplegado en Render (ej: https://sheartors-rc-api.onrender.com)"
+        required: true
+        type: string
+      timeout_seconds:
+        description: "Timeout de espera del job"
+        required: false
+        default: "240"
+        type: string
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Run deployed smoke
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url }}
+          TIMEOUT_SECONDS: ${{ github.event.inputs.timeout_seconds }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          ARGS=(--base-url "$BASE_URL" --timeout-seconds "$TIMEOUT_SECONDS")
+          if [ -n "$RENDER_API_KEY" ]; then
+            ARGS+=(--api-key "$RENDER_API_KEY")
+          fi
+          python scripts/smoke_api.py "${ARGS[@]}"

@@ -136,6 +136,48 @@ class ApiTests(unittest.TestCase):
     def test_status_not_found(self) -> None:
         response = self.client.get("/v1/jobs/noexiste")
         self.assertEqual(response.status_code, 404, response.text)
+        payload = response.json()
+        self.assertEqual(payload["error"], "job_not_found")
+        self.assertIn("message", payload)
+        self.assertIn("details", payload)
+        self.assertEqual(payload["details"], [])
+
+    def test_job_create_and_status_response_contract_keys(self) -> None:
+        with (
+            io.BytesIO(self.case_json.read_bytes()) as case_stream,
+            self.seismic_excel.open("rb") as seismic_stream,
+            self.gravity_excel.open("rb") as gravity_stream,
+        ):
+            create_response = self.client.post(
+                "/v1/jobs",
+                files={
+                    "case_json": ("case.json", case_stream, "application/json"),
+                    "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "gravity_excel": ("gravedad.xlsx", gravity_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                },
+            )
+        self.assertEqual(create_response.status_code, 202, create_response.text)
+        create_payload = create_response.json()
+        expected_create_keys = {"job_id", "status", "status_url", "download_url", "created_at"}
+        self.assertEqual(set(create_payload.keys()), expected_create_keys)
+        job_id = create_payload["job_id"]
+
+        create_response = self.client.get(f"/v1/jobs/{job_id}")
+        self.assertEqual(create_response.status_code, 200, create_response.text)
+        status_payload = create_response.json()
+
+        expected_status_keys = {
+            "job_id",
+            "status",
+            "created_at",
+            "updated_at",
+            "started_at",
+            "finished_at",
+            "error",
+            "artifacts",
+        }
+        self.assertEqual(set(status_payload.keys()), expected_status_keys)
+        self.assertEqual(status_payload["job_id"], job_id)
 
     def test_create_job_validation_error(self) -> None:
         response = self.client.post("/v1/jobs")
@@ -219,9 +261,11 @@ class ApiTests(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["error"], "domain_validation_error")
         self.assertTrue(payload.get("details"))
-        self.assertIn("code", payload["details"][0])
-        self.assertIn("field", payload["details"][0])
-        self.assertIn("message", payload["details"][0])
+        first = payload["details"][0]
+        self.assertIn("code", first)
+        self.assertIn("field", first)
+        self.assertIn("message", first)
+        self.assertIn("severity", first)
 
     def test_download_conflict_when_failed(self) -> None:
         invalid_case = b'{"case_name":"bad_case","inputs":{},"units":{"rebar_per_length":"mm2/m"},"beams":[],"optimization":{"enabled":true,"objective":"min_weight","variables":{"E_bars":["#3"],"G_bars":["#3"],"G_counts":[0],"stirrup_spacing_mm":[100],"longitudinal_bars":["#4"],"longitudinal_bar_counts":[2]},"genetic_algorithm":{"population_size":10,"generations":2,"crossover_rate":0.8,"mutation_rate":0.1,"elite_count":2}}}'
@@ -239,6 +283,25 @@ class ApiTests(unittest.TestCase):
         self._write_job_meta(job_id=job_id, status="queued", artifacts={})
         response = self.client.get(f"/v1/jobs/{job_id}/download")
         self.assertEqual(response.status_code, 409, response.text)
+        payload = response.json()
+        self.assertEqual(payload["error"], "job_not_ready")
+        self.assertIn("message", payload)
+        self.assertIn("details", payload)
+        self.assertEqual(payload["details"], [])
+
+    def test_openapi_error_response_schema_is_documented(self) -> None:
+        response = self.client.get("/openapi.json")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+
+        components = payload["components"]["schemas"]
+        self.assertIn("ErrorResponse", components)
+        self.assertIn("ErrorDetail", components)
+
+        download_responses = payload["paths"]["/v1/jobs/{job_id}/download"]["get"]["responses"]
+        self.assertIn("409", download_responses)
+        schema_ref = download_responses["409"]["content"]["application/json"]["schema"]["$ref"]
+        self.assertEqual(schema_ref, "#/components/schemas/ErrorResponse")
 
 
 if __name__ == "__main__":

@@ -1000,25 +1000,136 @@ class CoreTests(unittest.TestCase):
             # 3 regiones en case_0001 con al menos 5 opciones por region.
             self.assertGreaterEqual(por_region.max_row - 1, 15)
             schedule_headers = [cell.value for cell in por_region[1]]
-            self.assertIn("limite_controlante", schedule_headers)
+            self.assertEqual(
+                schedule_headers,
+                [
+                    "viga_id",
+                    "vano_id",
+                    "region_id",
+                    "opcion",
+                    "longitud_region_mm",
+                    "estado",
+                    "arreglo_transversal",
+                    "limite_controlante",
+                    "cantidad_estribos_region",
+                    "arreglo_longitudinal",
+                    "peso_unitario_estribo_kg",
+                    "peso_transversal_region_kg",
+                    "peso_longitudinal_region_kg",
+                    "peso_total_region_kg",
+                ],
+            )
+
+            por_vano = wb["por_vano"]
+            por_vano_headers = [cell.value for cell in por_vano[1]]
+            self.assertEqual(
+                por_vano_headers,
+                [
+                    "viga_id",
+                    "vano_id",
+                    "regiones_totales",
+                    "regiones_cumplen",
+                    "regiones_fallan",
+                    "peso_transversal_total_kg",
+                    "peso_longitudinal_total_kg",
+                    "peso_total_kg",
+                ],
+            )
 
             optimized_wb = load_workbook(out_dir / "optimized_results.xlsx", data_only=True)
             optimized = optimized_wb.active
             optimized_headers = [cell.value for cell in optimized[1]]
-            self.assertIn("controlling_limit", optimized_headers)
-            self.assertIn("check_torsion", optimized_headers)
-            self.assertIn("check_shear", optimized_headers)
-            self.assertIn("check_longitudinal", optimized_headers)
-            self.assertIn("check_detailing", optimized_headers)
-            self.assertIn("VRebar_req_units", optimized_headers)
+            self.assertEqual(
+                optimized_headers,
+                [
+                    "beam_id",
+                    "span_id",
+                    "region_id",
+                    "method",
+                    "status",
+                    "failure_mode",
+                    "objective",
+                    "source_control",
+                    "governing_station",
+                    "E_bar",
+                    "G_bar",
+                    "G_count",
+                    "spacing_mm",
+                    "controlling_limit",
+                    "long_bar",
+                    "long_count",
+                    "long_provided_mm2",
+                    "VRebar_req",
+                    "TTrnRebar_req",
+                    "TLngRebar_req",
+                    "VRebar_req_units",
+                    "TTrnRebar_req_units",
+                    "TLngRebar_req_units",
+                    "check_torsion",
+                    "check_shear",
+                    "check_longitudinal",
+                    "check_detailing",
+                    "transverse_weight_kg_per_m",
+                    "longitudinal_weight_kg_per_m",
+                    "total_weight_kg_per_m",
+                    "evaluated_candidates",
+                    "feasible_candidates",
+                ],
+            )
 
             design_wb = load_workbook(out_dir / "design_results.xlsx", data_only=True)
             design = design_wb.active
             design_headers = [cell.value for cell in design[1]]
-            self.assertIn("VRebar_req_units", design_headers)
-            self.assertIn("TTrnRebar_req_units", design_headers)
-            self.assertIn("TLngRebar_req_units", design_headers)
-            self.assertIn("check_torsion", design_headers)
+            self.assertEqual(
+                design_headers,
+                [
+                    "beam_id",
+                    "span_id",
+                    "region_id",
+                    "region_type",
+                    "source_control",
+                    "governing_station",
+                    "VRebar_req",
+                    "VRebar_req_units",
+                    "TTrnRebar_req",
+                    "TTrnRebar_req_units",
+                    "TLngRebar_req",
+                    "TLngRebar_req_units",
+                    "E_bar",
+                    "G_bar",
+                    "G_count",
+                    "spacing_mm",
+                    "controlling_limit",
+                    "Av1",
+                    "Av2",
+                    "Av_total",
+                    "At",
+                    "At_over_s",
+                    "Av_over_s",
+                    "long_bar",
+                    "long_count",
+                    "long_provided_mm2",
+                    "check_torsion",
+                    "check_shear",
+                    "check_longitudinal",
+                    "check_detailing",
+                    "failure_mode",
+                    "status",
+                    "message",
+                ],
+            )
+
+            summary_wb = load_workbook(out_dir / "summary.xlsx", data_only=True)
+            span_summary_headers = [cell.value for cell in summary_wb["span_summary"][1]]
+            self.assertEqual(
+                span_summary_headers,
+                ["beam_id", "span_id", "total_regions", "ok_regions", "fail_regions", "status", "message"],
+            )
+            beam_summary_headers = [cell.value for cell in summary_wb["beam_summary"][1]]
+            self.assertEqual(
+                beam_summary_headers,
+                ["beam_id", "total_spans", "ok_spans", "fail_spans", "status"],
+            )
         finally:
             shutil.rmtree(run_root, ignore_errors=True)
 

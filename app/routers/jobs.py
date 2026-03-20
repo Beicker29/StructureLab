@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 
 from app.core.config import get_settings
 from app.dependencies.security import require_api_key
+from app.schemas.common import ErrorResponse
 from app.schemas.jobs import JobCreateResponse, JobStatusResponse
 from app.services.case_builder_service import build_case_payload_from_form
 from app.services.job_service import (
@@ -23,6 +24,70 @@ router = APIRouter(
     tags=["jobs"],
     dependencies=[Depends(require_api_key)],
 )
+
+
+JOB_NOT_FOUND_RESPONSE = {
+    "model": ErrorResponse,
+    "description": "El job solicitado no existe",
+    "content": {
+        "application/json": {
+            "example": {
+                "error": "job_not_found",
+                "message": "Job 'abc123' no existe",
+                "details": [],
+            }
+        }
+    },
+}
+
+JOB_NOT_READY_RESPONSE = {
+    "model": ErrorResponse,
+    "description": "El job existe pero no esta listo para descarga",
+    "content": {
+        "application/json": {
+            "example": {
+                "error": "job_not_ready",
+                "message": "Job 'abc123' no esta listo para descarga (estado=running)",
+                "details": [],
+            }
+        }
+    },
+}
+
+INVALID_UPLOAD_RESPONSE = {
+    "model": ErrorResponse,
+    "description": "Carga invalida o formulario con datos inconsistentes",
+    "content": {
+        "application/json": {
+            "example": {
+                "error": "invalid_upload",
+                "message": "'seismic_excel' debe tener extension ['.xlsx'] (archivo recibido: 'sismo.csv')",
+                "details": [],
+            }
+        }
+    },
+}
+
+DOMAIN_VALIDATION_RESPONSE = {
+    "model": ErrorResponse,
+    "description": "Reglas de negocio/ingenieria incumplidas",
+    "content": {
+        "application/json": {
+            "example": {
+                "error": "domain_validation_error",
+                "message": "El formulario no cumple reglas de negocio/ingenieria",
+                "details": [
+                    {
+                        "code": "dmo_confined_min_branches",
+                        "field": "beams[0].spans[0].regions[0].min_branches",
+                        "message": "En DMO region C, min_branches debe ser >= 4",
+                        "severity": "error",
+                    }
+                ],
+            }
+        }
+    },
+}
 
 
 def _parse_dt(raw: str | None) -> datetime | None:
@@ -45,7 +110,14 @@ def _status_payload(meta: dict) -> JobStatusResponse:
     )
 
 
-@router.post("", response_model=JobCreateResponse, status_code=202)
+@router.post(
+    "",
+    response_model=JobCreateResponse,
+    status_code=202,
+    responses={
+        422: INVALID_UPLOAD_RESPONSE,
+    },
+)
 def create_job_endpoint(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -71,7 +143,14 @@ def create_job_endpoint(
     )
 
 
-@router.post("/from-form", response_model=JobCreateResponse, status_code=202)
+@router.post(
+    "/from-form",
+    response_model=JobCreateResponse,
+    status_code=202,
+    responses={
+        422: DOMAIN_VALIDATION_RESPONSE,
+    },
+)
 def create_job_from_form_endpoint(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -143,18 +222,35 @@ def create_job_from_form_endpoint(
     )
 
 
-@router.get("/{job_id}", response_model=JobStatusResponse)
+@router.get(
+    "/{job_id}",
+    response_model=JobStatusResponse,
+    responses={
+        404: JOB_NOT_FOUND_RESPONSE,
+    },
+)
 def get_job_endpoint(job_id: str) -> JobStatusResponse:
     meta = get_job(job_id)
     return _status_payload(meta)
 
 
-@router.get("/{job_id}/case")
+@router.get(
+    "/{job_id}/case",
+    responses={
+        404: JOB_NOT_FOUND_RESPONSE,
+    },
+)
 def get_job_case_endpoint(job_id: str) -> dict:
     return get_job_case_payload(job_id)
 
 
-@router.get("/{job_id}/download")
+@router.get(
+    "/{job_id}/download",
+    responses={
+        404: JOB_NOT_FOUND_RESPONSE,
+        409: JOB_NOT_READY_RESPONSE,
+    },
+)
 def download_job_reports(job_id: str) -> FileResponse:
     zip_path = build_zip(job_id)
     return FileResponse(

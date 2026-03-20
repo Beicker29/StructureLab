@@ -51,9 +51,11 @@ class DomainValidationAppError(AppError):
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
-        payload: dict[str, Any] = {"error": exc.code, "message": exc.message}
-        if exc.details:
-            payload["details"] = exc.details
+        payload: dict[str, Any] = {
+            "error": exc.code,
+            "message": exc.message,
+            "details": exc.details or [],
+        }
         return JSONResponse(
             status_code=exc.status_code,
             content=payload,

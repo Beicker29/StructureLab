@@ -1,0 +1,125 @@
+{
+  "case_name": "case_0001",
+  "inputs": {
+    "seismic_excel": "seismic.xlsx",
+    "gravity_excel": "gravity.xlsx",
+    "sheet_name": "Conc Bm Sum - ACI 318-08"
+  },
+  "units": {
+    "rebar_per_length": "mm2/m"
+  },
+  "beams": [
+    {
+      "beam_id": "B1",
+      "detailing": "DMO",
+      "cover_side_mm": 40.0,
+      "cover_top_mm": 40.0,
+      "cover_bottom_mm": 40.0,
+      "fc_mpa": 28.0,
+      "fy_mpa": 420.0,
+      "spans": [
+        {
+          "id": "B1.1",
+          "seismic": "190",
+          "gravity": "190",
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 600.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 600.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 600.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "optimization": {
+    "enabled": true,
+    "objective": "min_weight",
+    "variables": {
+      "E_bars": [
+        "#3",
+        "#4",
+        "#6"
+      ],
+      "G_bars": [
+        "#3",
+        "#4",
+        "#6"
+      ],
+      "G_counts": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "stirrup_spacing_mm": [
+        70,
+        80,
+        90,
+        100,
+        110,
+        120,
+        130,
+        140,
+        150,
+        160,
+        170,
+        180,
+        190,
+        200
+      ],
+      "longitudinal_bars": [
+        "#4",
+        "#5",
+        "#6"
+      ],
+      "longitudinal_bar_counts": [
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14
+      ]
+    },
+    "genetic_algorithm": {
+      "population_size": 60,
+      "generations": 80,
+      "crossover_rate": 0.9,
+      "mutation_rate": 0.1,
+      "elite_count": 3
+    }
+  }
+}
