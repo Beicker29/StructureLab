@@ -251,6 +251,7 @@ class ApiTests(unittest.TestCase):
                     "min_branches_c": "3",
                     "min_branches_nc": "2",
                     "region_c_ratio": "0.2",
+                    "optimization_overrides_json": '{"genetic_algorithm":{"population_size":3}}',
                 },
                 files={
                     "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
@@ -266,6 +267,9 @@ class ApiTests(unittest.TestCase):
         self.assertIn("field", first)
         self.assertIn("message", first)
         self.assertIn("severity", first)
+        self.assertTrue(
+            any(detail.get("field") == "optimization.genetic_algorithm.population_size" for detail in payload["details"])
+        )
 
     def test_download_conflict_when_failed(self) -> None:
         invalid_case = b'{"case_name":"bad_case","inputs":{},"units":{"rebar_per_length":"mm2/m"},"beams":[],"optimization":{"enabled":true,"objective":"min_weight","variables":{"E_bars":["#3"],"G_bars":["#3"],"G_counts":[0],"stirrup_spacing_mm":[100],"longitudinal_bars":["#4"],"longitudinal_bar_counts":[2]},"genetic_algorithm":{"population_size":10,"generations":2,"crossover_rate":0.8,"mutation_rate":0.1,"elite_count":2}}}'

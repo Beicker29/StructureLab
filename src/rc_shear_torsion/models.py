@@ -30,8 +30,8 @@ class RegionConfig(BaseModel):
             raise ValueError(f"Region '{self.id}' must satisfy from < to")
         if self.d_mm is not None and self.d_mm <= 0.0:
             raise ValueError(f"Region '{self.id}' d_mm must be > 0")
-        if self.min_branches is not None and self.min_branches < 2:
-            raise ValueError(f"Region '{self.id}' min_branches must be >= 2")
+        if self.min_branches is not None and self.min_branches < 1:
+            raise ValueError(f"Region '{self.id}' min_branches must be >= 1")
         if self.width_mm is not None and self.width_mm <= 0.0:
             raise ValueError(f"Region '{self.id}' width_mm must be > 0")
         if self.height_mm is not None and self.height_mm <= 0.0:

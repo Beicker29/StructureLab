@@ -367,6 +367,44 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(candidate.failure_mode, "region_detail_fail")
         self.assertIn("minimum branches", candidate.message)
 
+    def test_dmo_region_torsion_requires_at_least_two_user_branches(self) -> None:
+        region = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="C",
+            beam_detailing="DMO",
+            d_mm=600.0,
+            db_bar="#5",
+            min_branches=1,
+            width_mm=300.0,
+            height_mm=600.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            source_control="gravity",
+            governing_station=0.0,
+            v_req=10.0,
+            t_req=100.0,
+            l_req=10.0,
+            station_count=3,
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+        )
+        candidate = evaluate_candidate(
+            region,
+            e_bar="#4",
+            g_bar="#3",
+            g_count=0,
+            spacing_mm=100,
+            long_bar="#4",
+            long_count=2,
+        )
+        self.assertEqual(candidate.status, "fail")
+        self.assertEqual(candidate.failure_mode, "region_detail_fail")
+        self.assertIn("TTrnRebar>0", candidate.message)
+        self.assertIn("min_branches >= 2", candidate.message)
+
     def test_min_branches_is_enforced_in_optimization_domain(self) -> None:
         region = RegionDemand(
             beam_id="B1",
@@ -618,7 +656,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(candidate.failure_mode, "region_detail_fail")
         self.assertIn("d/4", candidate.message)
 
-    def test_dmo_confined_region_requires_min_branches_at_least_four(self) -> None:
+    def test_dmo_confined_region_allows_user_defined_min_branches_below_four(self) -> None:
         payload = {
             "case_name": "dmo_bad_min_branches",
             "inputs": {
@@ -671,8 +709,66 @@ class CoreTests(unittest.TestCase):
                 },
             },
         }
-        with self.assertRaises(DomainValidationError):
-            validate_case_payload(payload)
+        cfg = validate_case_payload(payload)
+        self.assertEqual(cfg.beams[0].spans[0].regions[0].min_branches, 3)
+
+    def test_case_payload_allows_min_branches_equal_one(self) -> None:
+        payload = {
+            "case_name": "dmo_min_branches_one",
+            "inputs": {
+                "seismic_excel": "a.xlsx",
+                "gravity_excel": "b.xlsx",
+                "sheet_name": "Conc Bm Sum - ACI 318-08",
+            },
+            "units": {"rebar_per_length": "mm2/m"},
+            "beams": [
+                {
+                    "beam_id": "B1",
+                    "detailing": "DMO",
+                    "fc_mpa": 28.0,
+                    "fy_mpa": 420.0,
+                    "spans": [
+                        {
+                            "id": "S1",
+                            "seismic": "1",
+                            "gravity": "1",
+                            "regions": [
+                                {
+                                    "id": "R1",
+                                    "from": 0.0,
+                                    "to": 1.0,
+                                    "type": "C",
+                                    "d_mm": 600.0,
+                                    "db_bar": "#5",
+                                    "min_branches": 1,
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "optimization": {
+                "enabled": False,
+                "objective": "min_weight",
+                "variables": {
+                    "E_bars": ["#3"],
+                    "G_bars": ["#3"],
+                    "G_counts": [0, 1, 2, 3],
+                    "stirrup_spacing_mm": [100],
+                    "longitudinal_bars": ["#4"],
+                    "longitudinal_bar_counts": [2],
+                },
+                "genetic_algorithm": {
+                    "population_size": 10,
+                    "generations": 2,
+                    "crossover_rate": 0.8,
+                    "mutation_rate": 0.1,
+                    "elite_count": 2,
+                },
+            },
+        }
+        cfg = validate_case_payload(payload)
+        self.assertEqual(cfg.beams[0].spans[0].regions[0].min_branches, 1)
 
     def test_dmo_confined_region_min_branches_must_be_covered_by_g_counts(self) -> None:
         payload = {
@@ -892,7 +988,7 @@ class CoreTests(unittest.TestCase):
                         "longitudinal_bar_counts": [2],
                     },
                     "genetic_algorithm": {
-                        "population_size": 10,
+                        "population_size": 3,
                         "generations": 2,
                         "crossover_rate": 0.8,
                         "mutation_rate": 0.1,
@@ -911,7 +1007,7 @@ class CoreTests(unittest.TestCase):
             )
             self.assertEqual(process.returncode, 2)
             self.assertIn("Domain validation failed", process.stderr)
-            self.assertIn("min_branches", process.stderr)
+            self.assertIn("population_size", process.stderr)
         finally:
             shutil.rmtree(run_root, ignore_errors=True)
 

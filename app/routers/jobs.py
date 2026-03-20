@@ -78,9 +78,9 @@ DOMAIN_VALIDATION_RESPONSE = {
                 "message": "El formulario no cumple reglas de negocio/ingenieria",
                 "details": [
                     {
-                        "code": "dmo_confined_min_branches",
-                        "field": "beams[0].spans[0].regions[0].min_branches",
-                        "message": "En DMO region C, min_branches debe ser >= 4",
+                        "code": "invalid_range",
+                        "field": "optimization.genetic_algorithm.population_size",
+                        "message": "population_size must be >= 4",
                         "severity": "error",
                     }
                 ],

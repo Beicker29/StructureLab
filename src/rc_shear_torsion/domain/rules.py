@@ -205,16 +205,7 @@ def validate_case_rules(config: CaseConfig) -> list[DomainIssue]:
                         )
                     )
                     continue
-                if region.min_branches < 4:
-                    issues.append(
-                        _issue(
-                            "invalid_range",
-                            f"{region_path}.min_branches",
-                            "DMO with region type C requires min_branches >= 4",
-                        )
-                    )
-                    continue
-                min_required_g = region.min_branches - 2
+                min_required_g = max(0, region.min_branches - 2)
                 if max(variables.G_counts) < min_required_g:
                     issues.append(
                         _issue(
@@ -225,4 +216,3 @@ def validate_case_rules(config: CaseConfig) -> list[DomainIssue]:
                     )
 
     return issues
-

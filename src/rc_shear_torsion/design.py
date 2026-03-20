@@ -635,6 +635,13 @@ def check_region_rule(
     if region.region_type == "C":
         if region.d_mm is None or region.min_branches is None:
             return False, "DMO region C requires d_mm, db_bar, and min_branches in case.json", ""
+        if region.t_req > 0.0 and region.min_branches < 2:
+            return (
+                False,
+                "DMO region C with TTrnRebar>0 requires min_branches >= 2 "
+                "(closed stirrup equivalent)",
+                "",
+            )
 
         db_mm = BAR_DIAMETERS_MM[region.db_bar]
         d_limit = region.d_mm / 4.0
@@ -681,6 +688,13 @@ def check_region_rule(
 
     if region.d_mm is None:
         return False, "DMO region NC requires d_mm in case.json", ""
+    if region.t_req > 0.0 and region.min_branches is not None and region.min_branches < 2:
+        return (
+            False,
+            "DMO region NC with TTrnRebar>0 requires min_branches >= 2 "
+            "(closed stirrup equivalent)",
+            "",
+        )
     if region.fc_mpa is None or region.fy_mpa is None:
         return False, "DMO region NC requires beam fc_mpa and fy_mpa", ""
     if region.width_mm is None:
