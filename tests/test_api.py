@@ -344,6 +344,7 @@ class ApiTests(unittest.TestCase):
                 "seismic": "190",
                 "gravity": "190",
                 "c_ratio_extremos": 0.2,
+                "support_left_mm": 180,
                 "support_right_mm": 250,
                 "regions": [
                     {"id": "R1", "from": 0.0, "to": 0.2, "type": "C"},
@@ -356,6 +357,8 @@ class ApiTests(unittest.TestCase):
                 "seismic": "8",
                 "gravity": "8",
                 "c_ratio_extremos": 0.25,
+                "support_left_mm": 200,
+                "support_right_mm": 150,
                 "regions": [
                     {"id": "R1", "from": 0.0, "to": 0.25, "confinado": True},
                     {"id": "R2", "from": 0.25, "to": 0.75, "confinado": False},
@@ -405,7 +408,10 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(len(spans), 2)
         self.assertEqual(spans[0]["id"], "S1")
         self.assertEqual(spans[1]["id"], "S2")
+        self.assertEqual(spans[0]["support_left_mm"], 180)
         self.assertEqual(spans[0]["support_right_mm"], 250)
+        self.assertEqual(spans[1]["support_left_mm"], 250)
+        self.assertEqual(spans[1]["support_right_mm"], 150)
 
         final_status = self._wait_terminal_status(job_id)
         self.assertEqual(final_status["status"], "completed", final_status)

@@ -207,6 +207,14 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
             else item.get("apoyo_der_mm"),
             f"span_layout_json[{span_index}].support_right_mm",
         )
+        if support_left_mm is None:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].support_left_mm es obligatorio"
+            )
+        if support_right_mm is None:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].support_right_mm es obligatorio"
+            )
         if support_left_mm is not None and support_left_mm < 0.0:
             raise InvalidUploadError(
                 f"span_layout_json[{span_index}].support_left_mm debe ser >= 0"

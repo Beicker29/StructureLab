@@ -109,6 +109,9 @@ Campos principales:
 - Vanos:
   - `frame_names_csv` (opcional, lista de `UniqueName` comunes), o
   - `frame_pairs_json` (opcional, mapeo avanzado `seismic/gravity`)
+  - `span_layout_json` (opcional, configuracion detallada por vano)
+  - En `span_layout_json` cada vano debe incluir `support_left_mm` y `support_right_mm`
+  - Si hay incompatibilidad entre apoyo compartido (`der` del vano i vs `izq` del vano i+1), el sistema toma el mayor
 
 Si no defines vanos manualmente, la API usa automaticamente la interseccion de `UniqueName` entre ambos Excel.
 

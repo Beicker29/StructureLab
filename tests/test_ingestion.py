@@ -51,6 +51,7 @@ class IngestionDomainTests(unittest.TestCase):
             "seismic": "190",
             "gravity": "190",
             "c_ratio_extremos": 0.2,
+            "support_left_mm": 200,
             "support_right_mm": 250,
             "regions": [
               {"id": "R1", "from": 0.0, "to": 0.2, "confinado": true},
@@ -74,6 +75,8 @@ class IngestionDomainTests(unittest.TestCase):
             "id": "S1",
             "seismic": "190",
             "gravity": "190",
+            "support_left_mm": 200,
+            "support_right_mm": 250,
             "regions": [
               {"id": "R1", "from": 0.0, "to": 0.3, "type": "C"},
               {"id": "R2", "from": 0.4, "to": 1.0, "type": "NC"}

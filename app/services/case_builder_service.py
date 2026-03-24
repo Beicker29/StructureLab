@@ -20,6 +20,34 @@ from rc_shear_torsion.domain.errors import DomainValidationError
 from rc_shear_torsion.domain.validation import validate_case_payload
 
 
+def _to_non_negative_support(value: Any) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if parsed < 0.0:
+        return 0.0
+    return parsed
+
+
+def _harmonize_adjacent_supports(spans: list[dict[str, Any]]) -> None:
+    if not spans:
+        return
+    for span in spans:
+        span["support_left_mm"] = _to_non_negative_support(span.get("support_left_mm"))
+        span["support_right_mm"] = _to_non_negative_support(span.get("support_right_mm"))
+
+    for index in range(len(spans) - 1):
+        current = spans[index]
+        next_span = spans[index + 1]
+        shared_support = max(
+            _to_non_negative_support(current.get("support_right_mm")),
+            _to_non_negative_support(next_span.get("support_left_mm")),
+        )
+        current["support_right_mm"] = shared_support
+        next_span["support_left_mm"] = shared_support
+
+
 def build_case_payload_from_form(
     *,
     seismic_excel: UploadFile,
@@ -187,6 +215,8 @@ def build_case_payload_from_form(
             if span_meta.get("support_right_mm") is not None:
                 span_payload["support_right_mm"] = span_meta["support_right_mm"]
         spans.append(span_payload)
+
+    _harmonize_adjacent_supports(spans)
 
     case_payload = {
         "case_name": case_name,
