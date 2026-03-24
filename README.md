@@ -98,11 +98,11 @@ Respuesta `202`:
 
 ### POST `/v1/jobs/from-form`
 
-Crea trabajo asincrono desde formulario + 2 Excel (sin `case.json` manual).
+Crea trabajo asincrono desde formulario + Excel de sismo/gravedad y, opcionalmente, geometria (sin `case.json` manual).
 
 Campos principales:
 
-- Archivos: `seismic_excel`, `gravity_excel`
+- Archivos: `seismic_excel`, `gravity_excel`, `geometry_excel` (opcional)
 - Caso: `case_name`, `sheet_name`, `units_rebar_per_length`
 - Viga: `beam_id`, `detailing`, recubrimientos, `fc_mpa`, `fy_mpa`
 - Geometria/regiones base: `width_mm`, `height_mm`, `d_mm`, `db_bar`, `min_branches_c`, `min_branches_nc`, `region_c_ratio`
@@ -114,6 +114,8 @@ Campos principales:
   - Si hay incompatibilidad entre apoyo compartido (`der` del vano i vs `izq` del vano i+1), el sistema toma el mayor
 
 Si no defines vanos manualmente, la API usa automaticamente la interseccion de `UniqueName` entre ambos Excel.
+
+Si subes `geometry_excel`, el backend cruza `DesignSect` (sismo/gravedad) contra `Name` (geometria) y asigna `height_mm=Depth` y `width_mm=Width` por vano.
 
 ### GET `/v1/jobs/{job_id}`
 
@@ -190,7 +192,8 @@ curl -X POST "http://127.0.0.1:10000/v1/jobs/from-form" \
   -F "min_branches_nc=2" \
   -F "region_c_ratio=0.2" \
   -F "seismic_excel=@cases/case_0001/sismo.xlsx" \
-  -F "gravity_excel=@cases/case_0001/gravedad.xlsx"
+  -F "gravity_excel=@cases/case_0001/gravedad.xlsx" \
+  -F "geometry_excel=@cases/case_0001/geometria.xlsx"
 ```
 
 ### Consultar estado

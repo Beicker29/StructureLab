@@ -428,3 +428,124 @@ def resolve_span_pairs(
         {"id": f"S{index}", "seismic": frame_name, "gravity": frame_name}
         for index, frame_name in enumerate(shared, start=1)
     ]
+
+
+
+def extract_design_sections_by_unique_name(
+    excel_bytes: bytes,
+    sheet_name: str,
+    field_name: str,
+) -> dict[str, str]:
+    try:
+        workbook = load_workbook(filename=BytesIO(excel_bytes), read_only=True, data_only=True)
+    except Exception as exc:
+        raise InvalidUploadError(f"No fue posible leer '{field_name}' como archivo Excel valido") from exc
+
+    if sheet_name not in workbook.sheetnames:
+        raise InvalidUploadError(f"La hoja '{sheet_name}' no existe en '{field_name}'")
+
+    worksheet = workbook[sheet_name]
+    try:
+        header_row_idx, header_map = find_header(worksheet.iter_rows(min_row=1, max_row=30, values_only=True))
+    except ValueError as exc:
+        raise InvalidUploadError(
+            f"'{field_name}' no tiene encabezado ETABS valido en las primeras 30 filas"
+        ) from exc
+    missing_columns = [column for column in REQUIRED_COLUMNS if column not in header_map]
+    if missing_columns:
+        raise InvalidUploadError(
+            f"'{field_name}' no contiene columnas requeridas: {', '.join(missing_columns)}"
+        )
+
+    by_name: dict[str, dict[str, int]] = {}
+    for row in worksheet.iter_rows(min_row=header_row_idx + 1, values_only=True):
+        if row is None:
+            continue
+        unique_name = as_text(row[header_map["UniqueName"]])
+        station_value = row[header_map["Station"]]
+        if not unique_name or station_value in (None, ""):
+            continue
+        design_section = as_text(row[header_map["DesignSect"]])
+        if not design_section:
+            continue
+        counts = by_name.setdefault(unique_name, {})
+        counts[design_section] = counts.get(design_section, 0) + 1
+
+    output: dict[str, str] = {}
+    for unique_name, counts in by_name.items():
+        if not counts:
+            continue
+        output[unique_name] = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+    return output
+
+
+def _parse_positive_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0.0:
+        return None
+    return parsed
+
+
+def extract_geometry_sections(excel_bytes: bytes, field_name: str) -> dict[str, dict[str, float]]:
+    try:
+        workbook = load_workbook(filename=BytesIO(excel_bytes), read_only=True, data_only=True)
+    except Exception as exc:
+        raise InvalidUploadError(f"No fue posible leer '{field_name}' como archivo Excel valido") from exc
+
+    geometry_sheet = None
+    geometry_header_row_idx = 0
+    geometry_header_map: dict[str, int] = {}
+
+    for sheet_name in workbook.sheetnames:
+        worksheet = workbook[sheet_name]
+        for row_index, row in enumerate(
+            worksheet.iter_rows(min_row=1, max_row=80, values_only=True),
+            start=1,
+        ):
+            header_map = {as_text(value): i for i, value in enumerate(row) if as_text(value)}
+            if {"Name", "Depth", "Width"}.issubset(header_map):
+                geometry_sheet = worksheet
+                geometry_header_row_idx = row_index
+                geometry_header_map = header_map
+                break
+        if geometry_sheet is not None:
+            break
+
+    if geometry_sheet is None:
+        raise InvalidUploadError(
+            f"'{field_name}' no contiene una tabla con columnas Name, Depth y Width"
+        )
+
+    output: dict[str, dict[str, float]] = {}
+    for row in geometry_sheet.iter_rows(min_row=geometry_header_row_idx + 1, values_only=True):
+        if row is None:
+            continue
+        section_name = as_text(row[geometry_header_map["Name"]])
+        if not section_name:
+            continue
+        depth = _parse_positive_float(row[geometry_header_map["Depth"]])
+        width = _parse_positive_float(row[geometry_header_map["Width"]])
+        if depth is None or width is None:
+            continue
+
+        existing = output.get(section_name)
+        if existing is None:
+            output[section_name] = {"height_mm": depth, "width_mm": width}
+            continue
+
+        # En secciones repetidas conservamos la geometria mas conservadora (maxima).
+        output[section_name] = {
+            "height_mm": max(existing["height_mm"], depth),
+            "width_mm": max(existing["width_mm"], width),
+        }
+
+    if not output:
+        raise InvalidUploadError(
+            f"'{field_name}' no contiene filas validas para Name/Depth/Width"
+        )
+    return output

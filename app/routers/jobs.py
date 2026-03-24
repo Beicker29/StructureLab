@@ -172,6 +172,7 @@ def create_job_from_form_endpoint(
     background_tasks: BackgroundTasks,
     seismic_excel: UploadFile = File(...),
     gravity_excel: UploadFile = File(...),
+    geometry_excel: UploadFile | None = File(default=None),
     case_name: str = Form("case_from_form"),
     sheet_name: str = Form("Conc Bm Sum - ACI 318-08"),
     units_rebar_per_length: str = Form("mm2/m"),
@@ -198,6 +199,7 @@ def create_job_from_form_endpoint(
     case_payload = build_case_payload_from_form(
         seismic_excel=seismic_excel,
         gravity_excel=gravity_excel,
+        geometry_excel=geometry_excel,
         max_upload_bytes=settings.max_upload_bytes,
         case_name=case_name,
         sheet_name=sheet_name,

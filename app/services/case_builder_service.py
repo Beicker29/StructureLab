@@ -5,6 +5,8 @@ from typing import Any
 from fastapi import UploadFile
 
 from app.domain.ingestion import (
+    extract_design_sections_by_unique_name,
+    extract_geometry_sections,
     extract_unique_names_from_excel,
     parse_optimization_overrides,
     parse_span_layout_json,
@@ -48,10 +50,56 @@ def _harmonize_adjacent_supports(spans: list[dict[str, Any]]) -> None:
         next_span["support_left_mm"] = shared_support
 
 
+def _resolve_span_dimensions(
+    *,
+    pair: dict[str, str],
+    seismic_design_sections: dict[str, str],
+    gravity_design_sections: dict[str, str],
+    geometry_sections: dict[str, dict[str, float]],
+) -> tuple[float, float]:
+    seismic_name = pair["seismic"]
+    gravity_name = pair["gravity"]
+    seismic_section = seismic_design_sections.get(seismic_name, "")
+    gravity_section = gravity_design_sections.get(gravity_name, "")
+
+    section_candidates: list[str] = []
+    if seismic_section:
+        section_candidates.append(seismic_section)
+    if gravity_section and gravity_section not in section_candidates:
+        section_candidates.append(gravity_section)
+
+    if not section_candidates:
+        raise InvalidUploadError(
+            f"No se encontro DesignSect para vano seismic='{seismic_name}' y gravity='{gravity_name}'"
+        )
+
+    matched: list[tuple[str, dict[str, float]]] = [
+        (section_name, geometry_sections[section_name])
+        for section_name in section_candidates
+        if section_name in geometry_sections
+    ]
+    if not matched:
+        raise InvalidUploadError(
+            "No fue posible asignar geometria para el vano "
+            f"seismic='{seismic_name}' gravity='{gravity_name}'. "
+            f"DesignSect detectados={section_candidates} no existen en geometria(Name)."
+        )
+
+    if len(matched) == 1:
+        geometry = matched[0][1]
+        return float(geometry["width_mm"]), float(geometry["height_mm"])
+
+    # Si sismo y gravedad apuntan a dos secciones distintas existentes, usamos la mas conservadora.
+    selected = max(matched, key=lambda item: item[1]["width_mm"] * item[1]["height_mm"])
+    geometry = selected[1]
+    return float(geometry["width_mm"]), float(geometry["height_mm"])
+
+
 def build_case_payload_from_form(
     *,
     seismic_excel: UploadFile,
     gravity_excel: UploadFile,
+    geometry_excel: UploadFile | None = None,
     max_upload_bytes: int,
     case_name: str,
     sheet_name: str,
@@ -88,6 +136,24 @@ def build_case_payload_from_form(
     ensure_upload_suffix(gravity_excel, {".xlsx"}, "gravity_excel")
     seismic_bytes = read_upload_bytes(seismic_excel, max_upload_bytes)
     gravity_bytes = read_upload_bytes(gravity_excel, max_upload_bytes)
+
+    geometry_sections: dict[str, dict[str, float]] = {}
+    seismic_design_sections: dict[str, str] = {}
+    gravity_design_sections: dict[str, str] = {}
+    if geometry_excel is not None:
+        ensure_upload_suffix(geometry_excel, {".xlsx"}, "geometry_excel")
+        geometry_bytes = read_upload_bytes(geometry_excel, max_upload_bytes)
+        geometry_sections = extract_geometry_sections(geometry_bytes, "geometry_excel")
+        seismic_design_sections = extract_design_sections_by_unique_name(
+            seismic_bytes,
+            sheet_name,
+            "seismic_excel",
+        )
+        gravity_design_sections = extract_design_sections_by_unique_name(
+            gravity_bytes,
+            sheet_name,
+            "gravity_excel",
+        )
 
     seismic_names = extract_unique_names_from_excel(seismic_bytes, sheet_name, "seismic_excel")
     gravity_names = extract_unique_names_from_excel(gravity_bytes, sheet_name, "gravity_excel")
@@ -128,7 +194,11 @@ def build_case_payload_from_form(
 
     spans: list[dict[str, Any]] = []
 
-    def _build_default_regions(ratio: float) -> list[dict[str, Any]]:
+    def _build_default_regions(
+        ratio: float,
+        span_width_mm: float,
+        span_height_mm: float,
+    ) -> list[dict[str, Any]]:
         middle_to = 1.0 - ratio
         return [
             {
@@ -139,8 +209,8 @@ def build_case_payload_from_form(
                 "d_mm": d_mm,
                 "db_bar": db_bar,
                 "min_branches": min_branches_c,
-                "width_mm": width_mm,
-                "height_mm": height_mm,
+                "width_mm": span_width_mm,
+                "height_mm": span_height_mm,
             },
             {
                 "id": "R2",
@@ -150,8 +220,8 @@ def build_case_payload_from_form(
                 "d_mm": d_mm,
                 "db_bar": db_bar,
                 "min_branches": min_branches_nc,
-                "width_mm": width_mm,
-                "height_mm": height_mm,
+                "width_mm": span_width_mm,
+                "height_mm": span_height_mm,
             },
             {
                 "id": "R3",
@@ -161,14 +231,18 @@ def build_case_payload_from_form(
                 "d_mm": d_mm,
                 "db_bar": db_bar,
                 "min_branches": min_branches_c,
-                "width_mm": width_mm,
-                "height_mm": height_mm,
+                "width_mm": span_width_mm,
+                "height_mm": span_height_mm,
             },
         ]
 
-    def _build_regions_for_span(span_meta: dict[str, Any] | None) -> list[dict[str, Any]]:
+    def _build_regions_for_span(
+        span_meta: dict[str, Any] | None,
+        span_width_mm: float,
+        span_height_mm: float,
+    ) -> list[dict[str, Any]]:
         if not span_meta:
-            return _build_default_regions(region_c_ratio)
+            return _build_default_regions(region_c_ratio, span_width_mm, span_height_mm)
 
         configured_regions = span_meta.get("regions")
         if isinstance(configured_regions, list) and configured_regions:
@@ -187,8 +261,16 @@ def build_case_payload_from_form(
                         "d_mm": region.get("d_mm") if region.get("d_mm") is not None else d_mm,
                         "db_bar": region.get("db_bar") if region.get("db_bar") else db_bar,
                         "min_branches": min_branches_value,
-                        "width_mm": region.get("width_mm") if region.get("width_mm") is not None else width_mm,
-                        "height_mm": region.get("height_mm") if region.get("height_mm") is not None else height_mm,
+                        "width_mm": (
+                            region.get("width_mm")
+                            if region.get("width_mm") is not None
+                            else span_width_mm
+                        ),
+                        "height_mm": (
+                            region.get("height_mm")
+                            if region.get("height_mm") is not None
+                            else span_height_mm
+                        ),
                     }
                 )
             return output_regions
@@ -196,18 +278,33 @@ def build_case_payload_from_form(
         ratio = span_meta.get("c_ratio_extremos")
         if ratio is None:
             ratio = region_c_ratio
-        return _build_default_regions(float(ratio))
+        return _build_default_regions(float(ratio), span_width_mm, span_height_mm)
 
     for index, pair in enumerate(span_pairs, start=1):
         span_meta = span_layout_by_id.get(pair.get("id", ""))
         span_id = (
             str(pair.get("id", "")).strip() if span_layout else f"{beam_id}.{index}"
         ) or f"{beam_id}.{index}"
+
+        span_width_mm = width_mm
+        span_height_mm = height_mm
+        if geometry_sections:
+            span_width_mm, span_height_mm = _resolve_span_dimensions(
+                pair=pair,
+                seismic_design_sections=seismic_design_sections,
+                gravity_design_sections=gravity_design_sections,
+                geometry_sections=geometry_sections,
+            )
+
         span_payload: dict[str, Any] = {
             "id": span_id,
             "seismic": pair["seismic"],
             "gravity": pair["gravity"],
-            "regions": _build_regions_for_span(span_meta),
+            "regions": _build_regions_for_span(
+                span_meta,
+                span_width_mm,
+                span_height_mm,
+            ),
         }
         if span_meta:
             if span_meta.get("support_left_mm") is not None:

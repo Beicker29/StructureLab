@@ -33,6 +33,9 @@ class ApiTests(unittest.TestCase):
         cls.case_json = cls.repo_root / "cases" / "case_0001" / "case.json"
         cls.seismic_excel = cls.repo_root / "cases" / "case_0001" / "sismo.xlsx"
         cls.gravity_excel = cls.repo_root / "cases" / "case_0001" / "gravedad.xlsx"
+        geometry_upper = cls.repo_root / "cases" / "case_0001" / "Geometria.xlsx"
+        geometry_lower = cls.repo_root / "cases" / "case_0001" / "geometria.xlsx"
+        cls.geometry_excel = geometry_upper if geometry_upper.exists() else geometry_lower
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -230,6 +233,60 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(case_payload["inputs"]["seismic_excel"], "seismic.xlsx")
         self.assertEqual(case_payload["inputs"]["gravity_excel"], "gravity.xlsx")
         self.assertGreater(len(case_payload["beams"][0]["spans"]), 0)
+
+    def test_create_job_from_form_with_geometry_excel_maps_sections(self) -> None:
+        with (
+            self.seismic_excel.open("rb") as seismic_stream,
+            self.gravity_excel.open("rb") as gravity_stream,
+            self.geometry_excel.open("rb") as geometry_stream,
+        ):
+            response = self.client.post(
+                "/v1/jobs/from-form",
+                data={
+                    "case_name": "case_form_geometry_mapping",
+                    "sheet_name": "Conc Bm Sum - ACI 318-08",
+                    "detailing": "DMO",
+                    "units_rebar_per_length": "mm2/m",
+                    "beam_id": "BFORM",
+                    "cover_side_mm": "40",
+                    "cover_top_mm": "40",
+                    "cover_bottom_mm": "40",
+                    "fc_mpa": "28",
+                    "fy_mpa": "420",
+                    "width_mm": "300",
+                    "height_mm": "600",
+                    "d_mm": "600",
+                    "db_bar": "#6",
+                    "min_branches_c": "4",
+                    "min_branches_nc": "2",
+                    "region_c_ratio": "0.2",
+                    "frame_pairs_json": '[{"id":"S1","seismic":"190","gravity":"190"},{"id":"S2","seismic":"8","gravity":"8"}]',
+                },
+                files={
+                    "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "gravity_excel": ("gravedad.xlsx", gravity_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "geometry_excel": ("geometria.xlsx", geometry_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 202, response.text)
+        job_id = response.json()["job_id"]
+
+        case_response = self.client.get(f"/v1/jobs/{job_id}/case")
+        self.assertEqual(case_response.status_code, 200, case_response.text)
+        case_payload = case_response.json()
+        spans = case_payload["beams"][0]["spans"]
+
+        span_190 = next(span for span in spans if span.get("seismic") == "190")
+        span_8 = next(span for span in spans if span.get("seismic") == "8")
+
+        for region in span_190["regions"]:
+            self.assertEqual(region["width_mm"], 700.0)
+            self.assertEqual(region["height_mm"], 700.0)
+
+        for region in span_8["regions"]:
+            self.assertEqual(region["width_mm"], 500.0)
+            self.assertEqual(region["height_mm"], 500.0)
 
     def test_create_job_from_form_domain_validation_error(self) -> None:
         with (
