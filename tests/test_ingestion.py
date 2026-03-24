@@ -68,6 +68,24 @@ class IngestionDomainTests(unittest.TestCase):
         self.assertEqual(parsed[0]["regions"][0]["type"], "C")
         self.assertEqual(parsed[0]["regions"][1]["type"], "NC")
 
+    def test_parse_span_layout_json_accepts_clear_length_override_aliases(self) -> None:
+        raw = """
+        [
+          {
+            "id": "S1",
+            "seismic": "190",
+            "gravity": "190",
+            "support_left_mm": 200,
+            "support_right_mm": 250,
+            "L_libre_real_mm": 5370,
+            "regions": [
+              {"id": "R1", "from": 0.0, "to": 1.0, "type": "C"}
+            ]
+          }
+        ]
+        """
+        parsed = parse_span_layout_json(raw)
+        self.assertEqual(parsed[0]["clear_length_mm"], 5370.0)
     def test_parse_span_layout_json_rejects_non_contiguous_regions(self) -> None:
         raw = """
         [

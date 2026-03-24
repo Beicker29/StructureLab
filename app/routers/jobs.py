@@ -6,9 +6,15 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, Up
 from fastapi.responses import FileResponse
 
 from app.core.config import get_settings
+from app.core.errors import AppError
 from app.dependencies.security import require_api_key
 from app.schemas.common import ErrorResponse
-from app.schemas.jobs import JobCreateResponse, JobStatusResponse
+from app.schemas.jobs import (
+    JobCreateResponse,
+    JobSelectionSaveRequest,
+    JobSelectionSaveResponse,
+    JobStatusResponse,
+)
 from app.services.case_builder_service import build_case_payload_from_form
 from app.services.job_preview_service import build_job_preview_payload
 from app.services.job_service import (
@@ -19,6 +25,7 @@ from app.services.job_service import (
     get_artifact_path,
     get_job_case_payload,
     run_job,
+    save_selected_options_report,
 )
 
 router = APIRouter(
@@ -106,6 +113,21 @@ DOMAIN_VALIDATION_RESPONSE = {
 }
 
 
+SELECTION_VALIDATION_RESPONSE = {
+    "model": ErrorResponse,
+    "description": "La seleccion de alternativas por region es invalida",
+    "content": {
+        "application/json": {
+            "example": {
+                "error": "invalid_selection",
+                "message": "La opcion 8 no existe para la region S1/R2",
+                "details": [],
+            }
+        }
+    },
+}
+
+
 def _parse_dt(raw: str | None) -> datetime | None:
     if raw is None:
         return None
@@ -125,6 +147,17 @@ def _status_payload(meta: dict) -> JobStatusResponse:
         artifacts=artifacts,
     )
 
+
+def _job_create_payload(request: Request, meta: dict) -> JobCreateResponse:
+    job_id = meta["job_id"]
+    base_url = str(request.base_url).rstrip("/")
+    return JobCreateResponse(
+        job_id=job_id,
+        status=meta["status"],
+        created_at=_parse_dt(meta["created_at"]),  # type: ignore[arg-type]
+        status_url=f"{base_url}/v1/jobs/{job_id}",
+        download_url=f"{base_url}/v1/jobs/{job_id}/download",
+    )
 
 @router.post(
     "",
@@ -149,14 +182,7 @@ def create_job_endpoint(
     job_id = meta["job_id"]
     background_tasks.add_task(run_job, job_id)
 
-    base_url = str(request.base_url).rstrip("/")
-    return JobCreateResponse(
-        job_id=job_id,
-        status=meta["status"],
-        created_at=_parse_dt(meta["created_at"]),  # type: ignore[arg-type]
-        status_url=f"{base_url}/v1/jobs/{job_id}",
-        download_url=f"{base_url}/v1/jobs/{job_id}/download",
-    )
+    return _job_create_payload(request, meta)
 
 
 @router.post(
@@ -236,14 +262,7 @@ def create_job_from_form_endpoint(
     job_id = meta["job_id"]
     background_tasks.add_task(run_job, job_id)
 
-    base_url = str(request.base_url).rstrip("/")
-    return JobCreateResponse(
-        job_id=job_id,
-        status=meta["status"],
-        created_at=_parse_dt(meta["created_at"]),  # type: ignore[arg-type]
-        status_url=f"{base_url}/v1/jobs/{job_id}",
-        download_url=f"{base_url}/v1/jobs/{job_id}/download",
-    )
+    return _job_create_payload(request, meta)
 
 
 @router.get(
@@ -278,6 +297,216 @@ def get_job_preview_endpoint(job_id: str) -> dict:
     return build_job_preview_payload(job_id)
 
 
+
+
+@router.post(
+    "/{job_id}/selection",
+    response_model=JobSelectionSaveResponse,
+    responses={
+        404: JOB_NOT_FOUND_RESPONSE,
+        409: JOB_NOT_READY_RESPONSE,
+        422: SELECTION_VALIDATION_RESPONSE,
+    },
+)
+def save_job_selection_endpoint(
+    job_id: str,
+    payload: JobSelectionSaveRequest,
+    request: Request,
+) -> JobSelectionSaveResponse:
+    preview = build_job_preview_payload(job_id)
+    spans = preview.get("spans") if isinstance(preview.get("spans"), list) else []
+
+    region_data: dict[tuple[str, str], dict] = {}
+    for span in spans:
+        span_id = str(span.get("span_id") or "").strip()
+        if not span_id:
+            continue
+        regions = span.get("regions") if isinstance(span.get("regions"), list) else []
+        for region in regions:
+            region_id = str(region.get("region_id") or "").strip()
+            options = region.get("options") if isinstance(region.get("options"), list) else []
+            normalized_rows = sorted(
+                [
+                    {
+                        "option": int(opt.get("option")),
+                        "transverse_label": str(opt.get("transverse_label") or "").strip(),
+                        "longitudinal_label": str(opt.get("longitudinal_label") or "").strip(),
+                        "weight_total_kg": float(opt.get("weight_total_kg") or 0.0),
+                        "weight_transverse_kg": float(opt.get("weight_transverse_kg") or 0.0),
+                        "weight_longitudinal_kg": float(opt.get("weight_longitudinal_kg") or 0.0),
+                    }
+                    for opt in options
+                    if opt.get("option") is not None
+                ],
+                key=lambda item: item["option"],
+            )
+            if not region_id or not normalized_rows:
+                continue
+
+            best_row = normalized_rows[0]
+            trans_map: dict[str, dict] = {}
+            long_map: dict[str, dict] = {}
+            for row in normalized_rows:
+                trans_label = row["transverse_label"]
+                long_label = row["longitudinal_label"]
+                trans_weight = float(row.get("weight_transverse_kg") or 0.0)
+                long_weight = float(row.get("weight_longitudinal_kg") or 0.0)
+
+                if trans_label:
+                    current = trans_map.get(trans_label)
+                    if current is None or trans_weight < float(current["weight_kg"]):
+                        trans_map[trans_label] = {"label": trans_label, "weight_kg": trans_weight}
+                if long_label:
+                    current = long_map.get(long_label)
+                    if current is None or long_weight < float(current["weight_kg"]):
+                        long_map[long_label] = {"label": long_label, "weight_kg": long_weight}
+
+            if not trans_map and best_row["transverse_label"]:
+                trans_map[best_row["transverse_label"]] = {
+                    "label": best_row["transverse_label"],
+                    "weight_kg": float(best_row.get("weight_transverse_kg") or 0.0),
+                }
+            if not long_map and best_row["longitudinal_label"]:
+                long_map[best_row["longitudinal_label"]] = {
+                    "label": best_row["longitudinal_label"],
+                    "weight_kg": float(best_row.get("weight_longitudinal_kg") or 0.0),
+                }
+
+            region_data[(span_id, region_id)] = {
+                "best": best_row,
+                "rows": normalized_rows,
+                "transverse_options": sorted(trans_map.values(), key=lambda item: float(item["weight_kg"])),
+                "longitudinal_options": sorted(long_map.values(), key=lambda item: float(item["weight_kg"])),
+            }
+
+    if not region_data:
+        raise AppError(
+            message="No hay alternativas por region disponibles para este job.",
+            status_code=422,
+            code="selection_unavailable",
+        )
+
+    requested_map: dict[tuple[str, str], RegionOptionSelection] = {}
+    for item in payload.selections:
+        key = (item.span_id.strip(), item.region_id.strip())
+        if not key[0] or not key[1]:
+            raise AppError(
+                message="Cada seleccion debe incluir span_id y region_id validos.",
+                status_code=422,
+                code="invalid_selection",
+            )
+        if key in requested_map:
+            raise AppError(
+                message=f"La region {key[0]}/{key[1]} esta repetida en la seleccion.",
+                status_code=422,
+                code="invalid_selection",
+            )
+        requested_map[key] = item
+
+    invalid_regions = sorted(
+        [f"{span_id}/{region_id}" for (span_id, region_id) in requested_map if (span_id, region_id) not in region_data]
+    )
+    if invalid_regions:
+        raise AppError(
+            message=f"Estas regiones no existen en el preview del job: {', '.join(invalid_regions)}",
+            status_code=422,
+            code="invalid_selection",
+        )
+
+    resolved_rows: list[dict] = []
+    for key in sorted(region_data.keys()):
+        span_id, region_id = key
+        data = region_data[key]
+        best = data["best"]
+
+        trans_lookup = {item["label"]: item for item in data["transverse_options"] if item.get("label")}
+        long_lookup = {item["label"]: item for item in data["longitudinal_options"] if item.get("label")}
+
+        req = requested_map.get(key)
+        selected_transverse_label: str | None = None
+        selected_longitudinal_label: str | None = None
+
+        if req is not None:
+            if req.transverse_label:
+                selected_transverse_label = req.transverse_label.strip()
+            if req.longitudinal_label:
+                selected_longitudinal_label = req.longitudinal_label.strip()
+            if req.option is not None and (not selected_transverse_label or not selected_longitudinal_label):
+                option_row = next((row for row in data["rows"] if int(row["option"]) == int(req.option)), None)
+                if option_row is None:
+                    raise AppError(
+                        message=f"La opcion {req.option} no existe para la region {span_id}/{region_id}.",
+                        status_code=422,
+                        code="invalid_selection",
+                    )
+                selected_transverse_label = selected_transverse_label or option_row["transverse_label"]
+                selected_longitudinal_label = selected_longitudinal_label or option_row["longitudinal_label"]
+
+        selected_transverse_label = selected_transverse_label or str(best.get("transverse_label") or "").strip()
+        selected_longitudinal_label = selected_longitudinal_label or str(best.get("longitudinal_label") or "").strip()
+
+        if selected_transverse_label not in trans_lookup:
+            raise AppError(
+                message=f"El estribo '{selected_transverse_label}' no existe para la region {span_id}/{region_id}.",
+                status_code=422,
+                code="invalid_selection",
+            )
+        if selected_longitudinal_label not in long_lookup:
+            raise AppError(
+                message=f"El refuerzo longitudinal '{selected_longitudinal_label}' no existe para la region {span_id}/{region_id}.",
+                status_code=422,
+                code="invalid_selection",
+            )
+
+        selected_transverse = trans_lookup[selected_transverse_label]
+        selected_longitudinal = long_lookup[selected_longitudinal_label]
+
+        selected_combo = next(
+            (
+                row
+                for row in data["rows"]
+                if row["transverse_label"] == selected_transverse_label
+                and row["longitudinal_label"] == selected_longitudinal_label
+            ),
+            None,
+        )
+
+        best_weight = float(best.get("weight_total_kg") or 0.0)
+        selected_weight = float(selected_transverse.get("weight_kg") or 0.0) + float(
+            selected_longitudinal.get("weight_kg") or 0.0
+        )
+        diff_pct = ((selected_weight - best_weight) / best_weight * 100.0) if best_weight > 0 else None
+
+        resolved_rows.append(
+            {
+                "span_id": span_id,
+                "region_id": region_id,
+                "best_option": best["option"],
+                "selected_option": int(selected_combo["option"]) if selected_combo is not None else None,
+                "best_transverse_label": best.get("transverse_label") or "",
+                "best_longitudinal_label": best.get("longitudinal_label") or "",
+                "selected_transverse_label": selected_transverse_label,
+                "selected_longitudinal_label": selected_longitudinal_label,
+                "best_weight_kg": best_weight,
+                "selected_weight_kg": selected_weight,
+                "selected_transverse_weight_kg": float(selected_transverse.get("weight_kg") or 0.0),
+                "selected_longitudinal_weight_kg": float(selected_longitudinal.get("weight_kg") or 0.0),
+                "difference_kg": selected_weight - best_weight,
+                "difference_pct": diff_pct,
+            }
+        )
+
+    saved = save_selected_options_report(job_id, resolved_rows=resolved_rows)
+    base_url = str(request.base_url).rstrip("/")
+    artifact_name = str(saved["artifact_name"])
+    return JobSelectionSaveResponse(
+        job_id=job_id,
+        saved_regions=int(saved["saved_regions"]),
+        artifact_name=artifact_name,
+        artifact_url=f"{base_url}/v1/jobs/{job_id}/artifacts/{artifact_name}",
+    )
+
+
 @router.get(
     "/{job_id}/download",
     responses={
@@ -307,3 +536,4 @@ def download_job_artifact(job_id: str, artifact_name: str) -> FileResponse:
         path=artifact_path,
         filename=artifact_name,
     )
+

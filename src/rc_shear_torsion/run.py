@@ -20,7 +20,7 @@ def ensure_python_312() -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rc_shear_torsion.run")
     parser.add_argument("case_json", help="Path to case.json")
-    parser.add_argument("--out", default="results/", help="Output root directory")
+    parser.add_argument("--out", default="storage/cli_runs", help="Output root directory")
     return parser
 
 

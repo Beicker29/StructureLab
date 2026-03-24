@@ -1,8 +1,8 @@
 {
   "case_name": "case_0001",
   "inputs": {
-    "seismic_excel": "seismic.xlsx",
-    "gravity_excel": "gravity.xlsx",
+    "seismic_excel": "sismo.xlsx",
+    "gravity_excel": "gravedad.xlsx",
     "sheet_name": "Conc Bm Sum - ACI 318-08"
   },
   "units": {

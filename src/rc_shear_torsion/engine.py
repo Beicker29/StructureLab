@@ -113,14 +113,19 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
             stations = [row.station for row in seismic_frame.stations] if seismic_frame is not None else []
             if not stations and gravity_frame is not None:
                 stations = [row.station for row in gravity_frame.stations]
-            gross_span_length_mm = (max(stations) - min(stations)) if stations else 0.0
+            model_span_length_mm = (max(stations) - min(stations)) if stations else 0.0
             support_left_mm, support_right_mm = support_by_span.get(span.id, (0.0, 0.0))
-            span_length_mm = max(gross_span_length_mm - 0.5 * (support_left_mm + support_right_mm), 0.0)
-            if gross_span_length_mm > 0.0:
+            clear_length_raw = getattr(span, "clear_length_mm", None)
+            clear_length_override_mm = _to_non_negative(clear_length_raw)
+            use_override = clear_length_raw is not None and clear_length_override_mm > 0.0
+            span_length_mm = clear_length_override_mm if use_override else model_span_length_mm
+            length_source = "override" if use_override else "model_station_diff"
+            if model_span_length_mm > 0.0 or use_override:
                 log_lines.append(
-                    f"span={beam.beam_id}/{span.id} gross_length_mm={gross_span_length_mm:.3f} "
+                    f"span={beam.beam_id}/{span.id} model_length_mm={model_span_length_mm:.3f} "
                     f"support_left_mm={support_left_mm:.3f} support_right_mm={support_right_mm:.3f} "
-                    f"net_length_mm={span_length_mm:.3f}"
+                    f"clear_length_override_mm={clear_length_override_mm:.3f} "
+                    f"net_length_mm={span_length_mm:.3f} source={length_source}"
                 )
             for region in span.regions:
                 region_lengths_mm[(beam.beam_id, span.id, region.id)] = (region.to - region.from_) * span_length_mm
@@ -159,7 +164,7 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                         region_alternatives[(beam.beam_id, span.id, demand.region_id)] = top_region_alternatives(
                             demand,
                             config.optimization.variables,
-                            top_n=5,
+                            top_n=10,
                         )
                         log_lines.append(
                             f"region={beam.beam_id}/{span.id}/{demand.region_id} method={outcome.method} "

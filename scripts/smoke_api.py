@@ -117,17 +117,17 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-url", required=True, help="Base URL de la API")
     parser.add_argument(
         "--case-json",
-        default="cases/case_0001/case.json",
+        default="examples/case_0001/case.json",
         help="Ruta a case.json",
     )
     parser.add_argument(
         "--seismic-excel",
-        default="cases/case_0001/sismo.xlsx",
+        default="examples/case_0001/sismo.xlsx",
         help="Ruta al Excel sismico",
     )
     parser.add_argument(
         "--gravity-excel",
-        default="cases/case_0001/gravedad.xlsx",
+        default="examples/case_0001/gravedad.xlsx",
         help="Ruta al Excel de gravedad",
     )
     parser.add_argument("--api-key", default=None, help="API key opcional")

@@ -9,6 +9,7 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import UploadFile
+from openpyxl import Workbook
 
 from app.core.config import get_settings
 from app.core.errors import JobArtifactNotFoundError, JobNotFoundError, JobNotReadyError
@@ -28,6 +29,9 @@ EXPECTED_REPORTS = [
     "reinforcement_schedule.xlsx",
     "run_log.txt",
 ]
+
+SELECTION_REPORT_NAME = "selected_reinforcement_comparison.xlsx"
+SELECTION_JSON_NAME = "selection_applied.json"
 
 logger = logging.getLogger(__name__)
 _meta_lock = threading.Lock()
@@ -204,8 +208,10 @@ def build_zip(job_id: str) -> Path:
         raise JobNotReadyError(job_id, status_value)
 
     zip_path = _job_dir(job_id) / f"{job_id}_reports.zip"
+    ordered_names = [name for name in EXPECTED_REPORTS if name in artifacts]
+    extra_names = sorted(name for name in artifacts.keys() if name not in set(ordered_names))
     with ZipFile(zip_path, mode="w", compression=ZIP_DEFLATED) as zip_file:
-        for filename in EXPECTED_REPORTS:
+        for filename in [*ordered_names, *extra_names]:
             full_path = artifacts.get(filename)
             if not full_path:
                 continue
@@ -217,6 +223,127 @@ def build_zip(job_id: str) -> Path:
     meta["updated_at"] = _now_iso()
     _save_job(meta)
     return zip_path
+
+
+
+def save_selected_options_report(
+    job_id: str,
+    *,
+    resolved_rows: list[dict],
+) -> dict[str, str | int]:
+    meta = _load_job(job_id)
+    status_value = meta["status"]
+    if status_value != "completed":
+        raise JobNotReadyError(job_id, status_value)
+
+    job_dir = Path(meta["paths"]["job_dir"])
+    output_dir = Path(meta["output_dir"]) if meta.get("output_dir") else (job_dir / "output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    applied_json_path = output_dir / SELECTION_JSON_NAME
+    report_path = output_dir / SELECTION_REPORT_NAME
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "seleccion_usuario"
+    sheet.append(
+        [
+            "span_id",
+            "region_id",
+            "option_optima",
+            "option_seleccionada",
+            "arreglo_transversal_optimo",
+            "arreglo_longitudinal_optimo",
+            "arreglo_transversal_seleccionado",
+            "arreglo_longitudinal_seleccionado",
+            "peso_optimo_kg",
+            "peso_estribos_seleccionado_kg",
+            "peso_longitudinal_seleccionado_kg",
+            "peso_seleccionado_kg",
+            "diferencia_kg",
+            "diferencia_pct",
+        ]
+    )
+
+    total_best = 0.0
+    total_selected = 0.0
+    for row in resolved_rows:
+        best_weight = float(row.get("best_weight_kg") or 0.0)
+        selected_weight = float(row.get("selected_weight_kg") or 0.0)
+        diff = selected_weight - best_weight
+        diff_pct = (diff / best_weight * 100.0) if best_weight > 0 else None
+        total_best += best_weight
+        total_selected += selected_weight
+
+        sheet.append(
+            [
+                row.get("span_id"),
+                row.get("region_id"),
+                row.get("best_option"),
+                row.get("selected_option"),
+                row.get("best_transverse_label"),
+                row.get("best_longitudinal_label"),
+                row.get("selected_transverse_label"),
+                row.get("selected_longitudinal_label"),
+                best_weight,
+                float(row.get("selected_transverse_weight_kg") or 0.0),
+                float(row.get("selected_longitudinal_weight_kg") or 0.0),
+                selected_weight,
+                diff,
+                diff_pct,
+            ]
+        )
+
+    total_diff = total_selected - total_best
+    total_diff_pct = (total_diff / total_best * 100.0) if total_best > 0 else None
+    sheet.append([])
+    sheet.append(
+        [
+            "TOTAL",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            total_best,
+            "",
+            "",
+            total_selected,
+            total_diff,
+            total_diff_pct,
+        ]
+    )
+
+    workbook.save(report_path)
+
+    selection_payload = {
+        "job_id": job_id,
+        "saved_at": _now_iso(),
+        "selected_regions": len(resolved_rows),
+        "rows": resolved_rows,
+        "totals": {
+            "best_weight_kg": total_best,
+            "selected_weight_kg": total_selected,
+            "difference_kg": total_diff,
+            "difference_pct": total_diff_pct,
+        },
+    }
+    _write_json_atomic(applied_json_path, selection_payload)
+
+    artifacts = dict(meta.get("artifacts", {}))
+    artifacts[SELECTION_REPORT_NAME] = str(report_path)
+    artifacts[SELECTION_JSON_NAME] = str(applied_json_path)
+    meta["artifacts"] = artifacts
+    meta["updated_at"] = _now_iso()
+    _save_job(meta)
+
+    return {
+        "artifact_name": SELECTION_REPORT_NAME,
+        "artifact_path": str(report_path),
+        "saved_regions": len(resolved_rows),
+    }
 
 
 def get_artifact_path(job_id: str, artifact_name: str) -> Path:

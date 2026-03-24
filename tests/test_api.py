@@ -30,11 +30,11 @@ class ApiTests(unittest.TestCase):
         from app.main import app
 
         cls.client = TestClient(app)
-        cls.case_json = cls.repo_root / "cases" / "case_0001" / "case.json"
-        cls.seismic_excel = cls.repo_root / "cases" / "case_0001" / "sismo.xlsx"
-        cls.gravity_excel = cls.repo_root / "cases" / "case_0001" / "gravedad.xlsx"
-        geometry_upper = cls.repo_root / "cases" / "case_0001" / "Geometria.xlsx"
-        geometry_lower = cls.repo_root / "cases" / "case_0001" / "geometria.xlsx"
+        cls.case_json = cls.repo_root / "examples" / "case_0001" / "case.json"
+        cls.seismic_excel = cls.repo_root / "examples" / "case_0001" / "sismo.xlsx"
+        cls.gravity_excel = cls.repo_root / "examples" / "case_0001" / "gravedad.xlsx"
+        geometry_upper = cls.repo_root / "examples" / "case_0001" / "Geometria.xlsx"
+        geometry_lower = cls.repo_root / "examples" / "case_0001" / "geometria.xlsx"
         cls.geometry_excel = geometry_upper if geometry_upper.exists() else geometry_lower
 
     @classmethod
@@ -114,12 +114,13 @@ class ApiTests(unittest.TestCase):
         response = self.client.get("/ui")
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("text/html", response.headers.get("content-type", ""))
-        self.assertIn("Diseno", response.text)
-        self.assertIn("Importar ETABS", response.text)
+        self.assertIn("Configuracion", response.text)
+        self.assertIn("Entrada del modelo", response.text)
         self.assertIn("Resultados", response.text)
         self.assertIn("Reportes", response.text)
         self.assertIn("beam-elevation-container", response.text)
         self.assertIn("Crear y ejecutar job", response.text)
+        self.assertIn("Refuerzo transversal", response.text)
 
     def test_job_flow_success_and_download(self) -> None:
         job_id = self._create_job()
@@ -350,6 +351,105 @@ class ApiTests(unittest.TestCase):
         first_region = first_span["regions"][0]
         self.assertIn("transverse_label", first_region)
         self.assertIn("longitudinal_label", first_region)
+        self.assertIn("options", first_region)
+        self.assertIsInstance(first_region["options"], list)
+        self.assertLessEqual(len(first_region["options"]), 10)
+        self.assertIn("transverse_options", first_region)
+        self.assertIn("longitudinal_options", first_region)
+        self.assertIsInstance(first_region["transverse_options"], list)
+        self.assertIsInstance(first_region["longitudinal_options"], list)
+        self.assertLessEqual(len(first_region["transverse_options"]), 10)
+        self.assertLessEqual(len(first_region["longitudinal_options"]), 10)
+        if first_region["options"]:
+            first_option = first_region["options"][0]
+            self.assertIn("option", first_option)
+            self.assertIn("weight_total_kg", first_option)
+        if first_region["transverse_options"]:
+            first_transverse = first_region["transverse_options"][0]
+            self.assertIn("label", first_transverse)
+            self.assertIn("weight_kg", first_transverse)
+        if first_region["longitudinal_options"]:
+            first_longitudinal = first_region["longitudinal_options"][0]
+            self.assertIn("label", first_longitudinal)
+            self.assertIn("weight_kg", first_longitudinal)
+
+
+    def test_save_job_selection_generates_comparison_artifact(self) -> None:
+        job_id = self._create_job()
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        preview_response = self.client.get(f"/v1/jobs/{job_id}/preview")
+        self.assertEqual(preview_response.status_code, 200, preview_response.text)
+        preview = preview_response.json()
+
+        first_span = preview["spans"][0]
+        first_region = first_span["regions"][0]
+        options = first_region.get("options", [])
+        self.assertTrue(options)
+        selected_row = options[1] if len(options) > 1 else options[0]
+
+        save_response = self.client.post(
+            f"/v1/jobs/{job_id}/selection",
+            json={
+                "selections": [
+                    {
+                        "span_id": first_span["span_id"],
+                        "region_id": first_region["region_id"],
+                        "transverse_label": selected_row["transverse_label"],
+                        "longitudinal_label": selected_row["longitudinal_label"],
+                    }
+                ]
+            },
+        )
+        self.assertEqual(save_response.status_code, 200, save_response.text)
+        save_payload = save_response.json()
+        self.assertEqual(save_payload["artifact_name"], "selected_reinforcement_comparison.xlsx")
+        self.assertEqual(save_payload["job_id"], job_id)
+
+        status_response = self.client.get(f"/v1/jobs/{job_id}")
+        self.assertEqual(status_response.status_code, 200, status_response.text)
+        status_payload = status_response.json()
+        self.assertIn("selected_reinforcement_comparison.xlsx", status_payload["artifacts"])
+        self.assertIn("selection_applied.json", status_payload["artifacts"])
+
+        artifact_response = self.client.get(f"/v1/jobs/{job_id}/artifacts/selected_reinforcement_comparison.xlsx")
+        self.assertEqual(artifact_response.status_code, 200, artifact_response.text)
+
+        zip_response = self.client.get(f"/v1/jobs/{job_id}/download")
+        self.assertEqual(zip_response.status_code, 200, zip_response.text)
+        with ZipFile(io.BytesIO(zip_response.content)) as zip_file:
+            names = set(zip_file.namelist())
+        self.assertIn("selected_reinforcement_comparison.xlsx", names)
+        self.assertIn("selection_applied.json", names)
+
+    def test_save_job_selection_rejects_invalid_option(self) -> None:
+        job_id = self._create_job()
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        preview_response = self.client.get(f"/v1/jobs/{job_id}/preview")
+        self.assertEqual(preview_response.status_code, 200, preview_response.text)
+        preview = preview_response.json()
+
+        first_span = preview["spans"][0]
+        first_region = first_span["regions"][0]
+
+        save_response = self.client.post(
+            f"/v1/jobs/{job_id}/selection",
+            json={
+                "selections": [
+                    {
+                        "span_id": first_span["span_id"],
+                        "region_id": first_region["region_id"],
+                        "option": 9999,
+                    }
+                ]
+            },
+        )
+        self.assertEqual(save_response.status_code, 422, save_response.text)
+        payload = save_response.json()
+        self.assertEqual(payload["error"], "invalid_selection")
 
     def test_job_preview_endpoint_supports_multiple_spans_from_pairs(self) -> None:
         with (
@@ -403,6 +503,7 @@ class ApiTests(unittest.TestCase):
                 "c_ratio_extremos": 0.2,
                 "support_left_mm": 180,
                 "support_right_mm": 250,
+                "clear_length_mm": 5370,
                 "regions": [
                     {"id": "R1", "from": 0.0, "to": 0.2, "type": "C"},
                     {"id": "R2", "from": 0.2, "to": 0.8, "type": "NC"},
@@ -467,6 +568,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(spans[1]["id"], "S2")
         self.assertEqual(spans[0]["support_left_mm"], 180)
         self.assertEqual(spans[0]["support_right_mm"], 250)
+        self.assertEqual(spans[0]["clear_length_mm"], 5370)
         self.assertEqual(spans[1]["support_left_mm"], 250)
         self.assertEqual(spans[1]["support_right_mm"], 150)
 
@@ -478,6 +580,7 @@ class ApiTests(unittest.TestCase):
         preview_payload = preview_response.json()
         self.assertEqual(len(preview_payload.get("spans", [])), 2)
         self.assertEqual(preview_payload["spans"][0]["support_right_mm"], 250)
+        self.assertEqual(preview_payload["spans"][0]["length_mm"], 5370)
 
     def test_download_single_artifact_success(self) -> None:
         job_id = self._create_job()

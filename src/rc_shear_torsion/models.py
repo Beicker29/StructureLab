@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 ALLOWED_BAR_LABELS = ("#2", "#3", "#4", "#5", "#6", "#7", "#8", "#9", "#10", "#11")
 
@@ -45,6 +45,14 @@ class SpanConfig(BaseModel):
     gravity: str
     support_left_mm: float | None = None
     support_right_mm: float | None = None
+    clear_length_mm: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "clear_length_mm",
+            "L_libre_real_mm",
+            "longitud_libre_real_mm",
+        ),
+    )
     regions: list[RegionConfig]
 
     model_config = ConfigDict(extra="forbid")
@@ -57,6 +65,8 @@ class SpanConfig(BaseModel):
             raise ValueError(f"Span '{self.id}' support_left_mm must be >= 0")
         if self.support_right_mm is not None and self.support_right_mm < 0.0:
             raise ValueError(f"Span '{self.id}' support_right_mm must be >= 0")
+        if self.clear_length_mm is not None and self.clear_length_mm <= 0.0:
+            raise ValueError(f"Span '{self.id}' clear_length_mm must be > 0")
         sorted_regions = sorted(self.regions, key=lambda region: region.from_)
         tol = 1.0e-9
         if abs(sorted_regions[0].from_ - 0.0) > tol:

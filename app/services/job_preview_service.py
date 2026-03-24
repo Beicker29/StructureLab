@@ -146,6 +146,9 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
     length_col = _find_col(columns, "longitud_region_mm", "region_length_mm", "length_mm")
     trans_col = _find_col(columns, "arreglo_transversal", "transverse_arrangement")
     long_col = _find_col(columns, "arreglo_longitudinal", "longitudinal_arrangement")
+    weight_trans_col = _find_col(columns, "peso_transversal_region_kg", "transverse_weight_region_kg")
+    weight_long_col = _find_col(columns, "peso_longitudinal_region_kg", "longitudinal_weight_region_kg")
+    weight_total_col = _find_col(columns, "peso_total_region_kg", "total_weight_region_kg")
     if span_col is None or region_col is None or length_col is None:
         return {}
 
@@ -161,12 +164,18 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
         option = _as_int(row[option_col]) if option_col is not None else None
         transverse = _as_text(row[trans_col]) if trans_col is not None else ""
         longitudinal = _as_text(row[long_col]) if long_col is not None else ""
+        weight_trans_kg = _as_non_negative_float(row[weight_trans_col]) if weight_trans_col is not None else None
+        weight_long_kg = _as_non_negative_float(row[weight_long_col]) if weight_long_col is not None else None
+        weight_total_kg = _as_non_negative_float(row[weight_total_col]) if weight_total_col is not None else None
         output[(span_id, region_id)].append(
             {
                 "length_mm": length_mm,
                 "option": option,
                 "transverse_label": transverse,
                 "longitudinal_label": longitudinal,
+                "weight_transverse_kg": weight_trans_kg,
+                "weight_longitudinal_kg": weight_long_kg,
+                "weight_total_kg": weight_total_kg,
             }
         )
     return output
@@ -191,6 +200,36 @@ def _pick_schedule_row(
     return rows_sorted[0] if rows_sorted else None
 
 
+def _build_component_options(
+    rows: list[dict[str, Any]],
+    *,
+    label_key: str,
+    weight_key: str,
+    max_items: int = 10,
+) -> list[dict[str, Any]]:
+    best_by_label: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        label = _as_text(row.get(label_key))
+        if not label:
+            continue
+        weight = _as_non_negative_float(row.get(weight_key))
+        sort_weight = weight if weight is not None else float("inf")
+        current = best_by_label.get(label)
+        if current is None or sort_weight < current["_sort_weight"]:
+            best_by_label[label] = {
+                "label": label,
+                "weight_kg": float(weight) if weight is not None else None,
+                "_sort_weight": sort_weight,
+            }
+    ordered = sorted(best_by_label.values(), key=lambda item: (item["_sort_weight"], item["label"]))
+    return [
+        {
+            "label": item["label"],
+            "weight_kg": item["weight_kg"],
+        }
+        for item in ordered[:max_items]
+    ]
+
 def _build_span_preview(
     span: dict[str, Any],
     *,
@@ -201,6 +240,8 @@ def _build_span_preview(
     span_id = _as_text(span.get("id")) or "S1"
     support_left_mm = _as_non_negative_float(span.get("support_left_mm"))
     support_right_mm = _as_non_negative_float(span.get("support_right_mm"))
+    clear_length_mm = _as_float(span.get("clear_length_mm"))
+    span_default_length_mm = clear_length_mm if clear_length_mm is not None else default_span_length_mm
     regions = span.get("regions") if isinstance(span.get("regions"), list) else []
     region_rows: list[dict[str, Any]] = []
     region_lengths: list[float] = []
@@ -218,15 +259,35 @@ def _build_span_preview(
             end_ratio = start_ratio
         ratio = max(end_ratio - start_ratio, 0.0)
         optimized = optimized_map.get((span_id, region_id))
-        schedule_row = _pick_schedule_row(schedule_map.get((span_id, region_id), []), optimized)
+        schedule_rows = schedule_map.get((span_id, region_id), [])
+        sorted_schedule_rows = sorted(
+            schedule_rows,
+            key=lambda item: (
+                item.get("option") if item.get("option") is not None else 999_999,
+                item.get("weight_total_kg") if item.get("weight_total_kg") is not None else float("inf"),
+            ),
+        )
+        schedule_row = _pick_schedule_row(schedule_rows, optimized)
+        schedule_options = sorted_schedule_rows[:10]
+        transverse_options = _build_component_options(
+            sorted_schedule_rows,
+            label_key="transverse_label",
+            weight_key="weight_transverse_kg",
+        )
+        longitudinal_options = _build_component_options(
+            sorted_schedule_rows,
+            label_key="longitudinal_label",
+            weight_key="weight_longitudinal_kg",
+        )
 
         if schedule_row and schedule_row.get("length_mm"):
             length_mm = float(schedule_row["length_mm"])
             length_estimated = False
         else:
-            length_mm = max(default_span_length_mm * ratio, 1.0)
-            length_estimated = True
-            any_estimated = True
+            length_mm = max(span_default_length_mm * ratio, 1.0)
+            length_estimated = clear_length_mm is None
+            if length_estimated:
+                any_estimated = True
 
         spacing_mm = optimized.get("spacing_mm") if optimized else None
         if spacing_mm is None:
@@ -237,6 +298,11 @@ def _build_span_preview(
 
         transverse_label = (optimized or {}).get("transverse_label") or f"{region_type.upper()} @ {spacing_mm} mm est."
         longitudinal_label = (optimized or {}).get("longitudinal_label") or "long. n/d"
+        if schedule_row is None and schedule_options:
+            schedule_row = schedule_options[0]
+        if schedule_row is not None:
+            transverse_label = _as_text(schedule_row.get("transverse_label")) or transverse_label
+            longitudinal_label = _as_text(schedule_row.get("longitudinal_label")) or longitudinal_label
 
         region_width_mm = _as_float(region.get("width_mm"))
         region_height_mm = _as_float(region.get("height_mm"))
@@ -260,12 +326,49 @@ def _build_span_preview(
                 "spacing_estimated": spacing_estimated,
                 "transverse_label": transverse_label,
                 "longitudinal_label": longitudinal_label,
+                "selected_option": _as_int(schedule_row.get("option")) if schedule_row is not None else None,
+                "best_option": _as_int(schedule_options[0].get("option")) if schedule_options else None,
+                "best_weight_kg": (
+                    float(schedule_options[0]["weight_total_kg"])
+                    if schedule_options and schedule_options[0].get("weight_total_kg") is not None
+                    else None
+                ),
+                "selected_weight_kg": (
+                    float(schedule_row["weight_total_kg"])
+                    if schedule_row is not None and schedule_row.get("weight_total_kg") is not None
+                    else None
+                ),
+                "options": [
+                    {
+                        "option": _as_int(opt.get("option")) or (opt_index + 1),
+                        "transverse_label": _as_text(opt.get("transverse_label")),
+                        "longitudinal_label": _as_text(opt.get("longitudinal_label")),
+                        "weight_transverse_kg": (
+                            float(opt["weight_transverse_kg"])
+                            if opt.get("weight_transverse_kg") is not None
+                            else None
+                        ),
+                        "weight_longitudinal_kg": (
+                            float(opt["weight_longitudinal_kg"])
+                            if opt.get("weight_longitudinal_kg") is not None
+                            else None
+                        ),
+                        "weight_total_kg": (
+                            float(opt["weight_total_kg"])
+                            if opt.get("weight_total_kg") is not None
+                            else None
+                        ),
+                    }
+                    for opt_index, opt in enumerate(schedule_options)
+                ],
+                "transverse_options": transverse_options,
+                "longitudinal_options": longitudinal_options,
             }
         )
         region_lengths.append(length_mm)
 
-    span_length_mm = int(round(sum(region_lengths))) if region_lengths else int(default_span_length_mm)
-    if not region_rows:
+    span_length_mm = int(round(sum(region_lengths))) if region_lengths else int(span_default_length_mm)
+    if not region_rows and clear_length_mm is None:
         any_estimated = True
     return {
         "span_id": span_id,
@@ -275,12 +378,12 @@ def _build_span_preview(
         "support_right_mm": int(round(support_right_mm)) if support_right_mm is not None else None,
         "length_mm": span_length_mm,
         "length_estimated": any_estimated,
+        "clear_length_mm": int(round(clear_length_mm)) if clear_length_mm is not None else None,
         "width_mm": int(round(span_width_mm)) if span_width_mm is not None else None,
         "height_mm": int(round(span_height_mm)) if span_height_mm is not None else None,
         "d_mm": int(round(span_d_mm)) if span_d_mm is not None else None,
         "regions": region_rows,
     }
-
 
 def build_job_preview_payload(job_id: str) -> dict[str, Any]:
     meta = get_job(job_id)

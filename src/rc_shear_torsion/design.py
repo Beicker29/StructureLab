@@ -834,21 +834,11 @@ def select_longitudinal_independent(
     return long_bar, long_count, provided, False
 
 
-def attach_independent_longitudinal(
+def _attach_candidate_longitudinal_mass(
     candidate: Candidate,
     region: RegionDemand,
-    variables: VariablesConfig,
 ) -> Candidate:
-    long_bar, long_count, long_provided, long_ok = select_longitudinal_independent(region, variables)
-    if long_ok:
-        message = candidate.message
-    else:
-        message = (
-            f"{candidate.message} | longitudinal independent warning: "
-            f"max domain provided={long_provided:.2f} < required={region.l_req:.2f}"
-        )
-
-    longitudinal_mass_per_m = longitudinal_mass_kg_per_m(long_provided)
+    longitudinal_mass_per_m = longitudinal_mass_kg_per_m(candidate.long_provided)
     region_length_m = max(0.0, region.region_length_mm / 1000.0)
     longitudinal_mass_region_kg = longitudinal_mass_per_m * region_length_m
     transverse_mass_region_kg = candidate.stirrup_unit_weight_kg * stirrup_count_in_region(
@@ -868,6 +858,47 @@ def attach_independent_longitudinal(
         g_bar=candidate.g_bar,
         g_count=candidate.g_count,
         spacing_mm=candidate.spacing_mm,
+        long_bar=candidate.long_bar,
+        long_count=candidate.long_count,
+        at=candidate.at,
+        at_over_s=candidate.at_over_s,
+        av1=candidate.av1,
+        av2=candidate.av2,
+        av_total=candidate.av_total,
+        av_over_s=candidate.av_over_s,
+        long_provided=candidate.long_provided,
+        f_free=candidate.f_free,
+        failure_mode=candidate.failure_mode,
+        status=candidate.status,
+        message=candidate.message,
+        objective=objective,
+        score=score,
+        transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
+        longitudinal_weight_kg_per_m=longitudinal_mass_per_m,
+        stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
+        controlling_limit=candidate.controlling_limit,
+    )
+
+
+def attach_independent_longitudinal(
+    candidate: Candidate,
+    region: RegionDemand,
+    variables: VariablesConfig,
+) -> Candidate:
+    long_bar, long_count, long_provided, long_ok = select_longitudinal_independent(region, variables)
+    if long_ok:
+        message = candidate.message
+    else:
+        message = (
+            f"{candidate.message} | longitudinal independent warning: "
+            f"max domain provided={long_provided:.2f} < required={region.l_req:.2f}"
+        )
+
+    candidate_with_long = Candidate(
+        e_bar=candidate.e_bar,
+        g_bar=candidate.g_bar,
+        g_count=candidate.g_count,
+        spacing_mm=candidate.spacing_mm,
         long_bar=long_bar,
         long_count=long_count,
         at=candidate.at,
@@ -881,14 +912,14 @@ def attach_independent_longitudinal(
         failure_mode=candidate.failure_mode,
         status=candidate.status,
         message=message,
-        objective=objective,
-        score=score,
+        objective=candidate.objective,
+        score=candidate.score,
         transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
-        longitudinal_weight_kg_per_m=longitudinal_mass_per_m,
+        longitudinal_weight_kg_per_m=candidate.longitudinal_weight_kg_per_m,
         stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
         controlling_limit=candidate.controlling_limit,
     )
-
+    return _attach_candidate_longitudinal_mass(candidate_with_long, region)
 
 def optimize_region(region: RegionDemand, optimization: OptimizationConfig) -> OptimizationOutcome:
     if optimization.enabled:
@@ -1164,20 +1195,21 @@ def top_region_alternatives(
     region: RegionDemand,
     variables: VariablesConfig,
     *,
-    top_n: int = 5,
+    top_n: int = 10,
 ) -> list[RegionDesignResult]:
     allowed_g_counts, _ = g_count_domain_for_region(region, variables.G_counts)
     if not allowed_g_counts:
         return []
 
-    default_long_bar = variables.longitudinal_bars[0]
-    default_long_count = variables.longitudinal_bar_counts[0]
+    top_n = max(1, int(top_n))
     evaluated: list[Candidate] = []
-    for e_bar, g_bar, g_count, spacing in itertools.product(
+    for e_bar, g_bar, g_count, spacing, long_bar, long_count in itertools.product(
         variables.E_bars,
         variables.G_bars,
         allowed_g_counts,
         variables.stirrup_spacing_mm,
+        variables.longitudinal_bars,
+        variables.longitudinal_bar_counts,
     ):
         candidate = evaluate_candidate(
             region,
@@ -1185,24 +1217,98 @@ def top_region_alternatives(
             g_bar=g_bar,
             g_count=g_count,
             spacing_mm=spacing,
-            long_bar=default_long_bar,
-            long_count=default_long_count,
+            long_bar=long_bar,
+            long_count=long_count,
         )
-        evaluated.append(attach_independent_longitudinal(candidate, region, variables))
+        if candidate.status == "ok" and candidate.long_provided < region.l_req:
+            candidate = failed_candidate(
+                e_bar=candidate.e_bar,
+                g_bar=candidate.g_bar,
+                g_count=candidate.g_count,
+                spacing_mm=candidate.spacing_mm,
+                long_bar=candidate.long_bar,
+                long_count=candidate.long_count,
+                failure_mode="longitudinal_fail",
+                message="Along_real < Along_req",
+                at=candidate.at,
+                at_over_s=candidate.at_over_s,
+                av1=candidate.av1,
+                av2=candidate.av2,
+                av_total=candidate.av_total,
+                av_over_s=candidate.av_over_s,
+                long_provided=candidate.long_provided,
+                f_free=candidate.f_free,
+                objective=candidate.objective,
+                transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
+                stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
+                controlling_limit=candidate.controlling_limit,
+                deficit=deficit_ratio(region.l_req, candidate.long_provided),
+            )
+        evaluated.append(_attach_candidate_longitudinal_mass(candidate, region))
 
     feasible = sorted(
         (candidate for candidate in evaluated if candidate.status == "ok"),
         key=lambda candidate: (candidate.objective, candidate.score),
     )
     feasible_count = len(feasible)
-    if len(feasible) >= top_n:
-        selected = feasible[:top_n]
-    else:
+
+    selected: list[Candidate] = []
+    seen: set[tuple[str, str, int, int, str, int, str]] = set()
+
+    def candidate_key(candidate: Candidate) -> tuple[str, str, int, int, str, int, str]:
+        return (
+            candidate.e_bar,
+            candidate.g_bar,
+            candidate.g_count,
+            candidate.spacing_mm,
+            candidate.long_bar,
+            candidate.long_count,
+            candidate.status,
+        )
+
+    def add_candidate(candidate: Candidate) -> None:
+        key = candidate_key(candidate)
+        if key in seen:
+            return
+        seen.add(key)
+        selected.append(candidate)
+
+    best_by_long: dict[tuple[str, int], Candidate] = {}
+    for candidate in feasible:
+        key = (candidate.long_bar, candidate.long_count)
+        if key not in best_by_long:
+            best_by_long[key] = candidate
+    for candidate in best_by_long.values():
+        add_candidate(candidate)
+        if len(selected) >= top_n:
+            break
+
+    if len(selected) < top_n:
+        best_by_transverse: dict[tuple[str, str, int, int], Candidate] = {}
+        for candidate in feasible:
+            key = (candidate.e_bar, candidate.g_bar, candidate.g_count, candidate.spacing_mm)
+            if key not in best_by_transverse:
+                best_by_transverse[key] = candidate
+        for candidate in best_by_transverse.values():
+            add_candidate(candidate)
+            if len(selected) >= top_n:
+                break
+
+    if len(selected) < top_n:
+        for candidate in feasible:
+            add_candidate(candidate)
+            if len(selected) >= top_n:
+                break
+
+    if len(selected) < top_n:
         failed = sorted(
             (candidate for candidate in evaluated if candidate.status != "ok"),
             key=lambda candidate: candidate.score,
         )
-        selected = (feasible + failed)[:top_n]
+        for candidate in failed:
+            add_candidate(candidate)
+            if len(selected) >= top_n:
+                break
 
     return [
         candidate_to_region_result(
@@ -1214,7 +1320,6 @@ def top_region_alternatives(
         )
         for candidate in selected
     ]
-
 
 def to_region_result(
     demand: RegionDemand,

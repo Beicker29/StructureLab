@@ -383,6 +383,8 @@ def build_case_payload_from_form(
                 span_payload["support_left_mm"] = span_meta["support_left_mm"]
             if span_meta.get("support_right_mm") is not None:
                 span_payload["support_right_mm"] = span_meta["support_right_mm"]
+            if span_meta.get("clear_length_mm") is not None:
+                span_payload["clear_length_mm"] = span_meta["clear_length_mm"]
         spans.append(span_payload)
 
     _harmonize_adjacent_supports(spans)

@@ -17,7 +17,11 @@ def _natural_name_key(value: str) -> tuple[int, Any]:
     return (1, text)
 
 
-def extract_unique_names_from_excel(excel_bytes: bytes, sheet_name: str, field_name: str) -> set[str]:
+def _open_etabs_sheet_with_required_columns(
+    excel_bytes: bytes,
+    sheet_name: str,
+    field_name: str,
+):
     try:
         workbook = load_workbook(filename=BytesIO(excel_bytes), read_only=True, data_only=True)
     except Exception as exc:
@@ -33,11 +37,21 @@ def extract_unique_names_from_excel(excel_bytes: bytes, sheet_name: str, field_n
         raise InvalidUploadError(
             f"'{field_name}' no tiene encabezado ETABS valido en las primeras 30 filas"
         ) from exc
+
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in header_map]
     if missing_columns:
         raise InvalidUploadError(
             f"'{field_name}' no contiene columnas requeridas: {', '.join(missing_columns)}"
         )
+    return worksheet, header_row_idx, header_map
+
+
+def extract_unique_names_from_excel(excel_bytes: bytes, sheet_name: str, field_name: str) -> set[str]:
+    worksheet, header_row_idx, header_map = _open_etabs_sheet_with_required_columns(
+        excel_bytes,
+        sheet_name,
+        field_name,
+    )
 
     names: set[str] = set()
     for row in worksheet.iter_rows(min_row=header_row_idx + 1, values_only=True):
@@ -54,7 +68,6 @@ def extract_unique_names_from_excel(excel_bytes: bytes, sheet_name: str, field_n
             f"'{field_name}' no contiene filas validas con columnas UniqueName y Station"
         )
     return names
-
 
 def parse_csv_names(raw: str | None) -> list[str]:
     if not raw:
@@ -221,6 +234,15 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
             else item.get("apoyo_der_mm"),
             f"span_layout_json[{span_index}].support_right_mm",
         )
+        clear_length_raw = item.get("clear_length_mm")
+        if clear_length_raw is None:
+            clear_length_raw = item.get("L_libre_real_mm")
+        if clear_length_raw is None:
+            clear_length_raw = item.get("longitud_libre_real_mm")
+        clear_length_mm = _parse_optional_float(
+            clear_length_raw,
+            f"span_layout_json[{span_index}].clear_length_mm",
+        )
         if support_left_mm is None:
             raise InvalidUploadError(
                 f"span_layout_json[{span_index}].support_left_mm es obligatorio"
@@ -236,6 +258,10 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
         if support_right_mm is not None and support_right_mm < 0.0:
             raise InvalidUploadError(
                 f"span_layout_json[{span_index}].support_right_mm debe ser >= 0"
+            )
+        if clear_length_mm is not None and clear_length_mm <= 0.0:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].clear_length_mm debe ser > 0"
             )
 
         raw_regions = item.get("regions")
@@ -386,6 +412,7 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
                 "d_ratio": d_ratio,
                 "support_left_mm": support_left_mm,
                 "support_right_mm": support_right_mm,
+                "clear_length_mm": clear_length_mm,
                 "regions": regions,
             }
         )
@@ -451,26 +478,11 @@ def extract_design_sections_by_unique_name(
     sheet_name: str,
     field_name: str,
 ) -> dict[str, str]:
-    try:
-        workbook = load_workbook(filename=BytesIO(excel_bytes), read_only=True, data_only=True)
-    except Exception as exc:
-        raise InvalidUploadError(f"No fue posible leer '{field_name}' como archivo Excel valido") from exc
-
-    if sheet_name not in workbook.sheetnames:
-        raise InvalidUploadError(f"La hoja '{sheet_name}' no existe en '{field_name}'")
-
-    worksheet = workbook[sheet_name]
-    try:
-        header_row_idx, header_map = find_header(worksheet.iter_rows(min_row=1, max_row=30, values_only=True))
-    except ValueError as exc:
-        raise InvalidUploadError(
-            f"'{field_name}' no tiene encabezado ETABS valido en las primeras 30 filas"
-        ) from exc
-    missing_columns = [column for column in REQUIRED_COLUMNS if column not in header_map]
-    if missing_columns:
-        raise InvalidUploadError(
-            f"'{field_name}' no contiene columnas requeridas: {', '.join(missing_columns)}"
-        )
+    worksheet, header_row_idx, header_map = _open_etabs_sheet_with_required_columns(
+        excel_bytes,
+        sheet_name,
+        field_name,
+    )
 
     by_name: dict[str, dict[str, int]] = {}
     for row in worksheet.iter_rows(min_row=header_row_idx + 1, values_only=True):
@@ -492,7 +504,6 @@ def extract_design_sections_by_unique_name(
             continue
         output[unique_name] = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
     return output
-
 
 def _parse_positive_float(value: Any) -> float | None:
     if value in (None, ""):

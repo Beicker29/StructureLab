@@ -183,3 +183,9 @@ cython_debug/
 # API runtime artifacts
 storage/
 *.zip
+
+# Generated local artifacts
+.tmp_api_storage/
+.tmp_smoke_storage/
+.tmp_test_runtime/
+results/

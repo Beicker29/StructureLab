@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -940,8 +940,8 @@ class CoreTests(unittest.TestCase):
             bad_case = {
                 "case_name": "cli_bad_case",
                 "inputs": {
-                    "seismic_excel": str((repo / "cases" / "case_0001" / "sismo.xlsx").resolve()),
-                    "gravity_excel": str((repo / "cases" / "case_0001" / "gravedad.xlsx").resolve()),
+                    "seismic_excel": str((repo / "examples" / "case_0001" / "sismo.xlsx").resolve()),
+                    "gravity_excel": str((repo / "examples" / "case_0001" / "gravedad.xlsx").resolve()),
                     "sheet_name": "Conc Bm Sum - ACI 318-08",
                 },
                 "units": {"rebar_per_length": "mm2/m"},
@@ -1079,7 +1079,7 @@ class CoreTests(unittest.TestCase):
 
     def test_end_to_end_case_runs(self) -> None:
         repo = Path(__file__).resolve().parents[1]
-        case_json = repo / "cases" / "case_0001" / "case.json"
+        case_json = repo / "examples" / "case_0001" / "case.json"
         run_root = _new_runtime_dir("end_to_end")
         try:
             out_root = run_root / "results"
