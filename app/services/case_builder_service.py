@@ -22,6 +22,14 @@ from rc_shear_torsion.domain.errors import DomainValidationError
 from rc_shear_torsion.domain.validation import validate_case_payload
 
 
+_GEOMETRY_UNIT_FACTORS_TO_MM = {
+    "mm": 1.0,
+    "cm": 10.0,
+    "m": 1000.0,
+    "in": 25.4,
+}
+
+
 def _to_non_negative_support(value: Any) -> float:
     try:
         parsed = float(value)
@@ -30,6 +38,39 @@ def _to_non_negative_support(value: Any) -> float:
     if parsed < 0.0:
         return 0.0
     return parsed
+
+
+def _to_positive_ratio(value: Any, *, field_name: str) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise InvalidUploadError(f"{field_name} debe ser numerico") from exc
+    if parsed <= 0.0 or parsed > 1.0:
+        raise InvalidUploadError(f"{field_name} debe estar en (0, 1]")
+    return parsed
+
+
+def _geometry_unit_factor_to_mm(units: str) -> float:
+    normalized = (units or "").strip().lower()
+    if normalized not in _GEOMETRY_UNIT_FACTORS_TO_MM:
+        allowed = ", ".join(sorted(_GEOMETRY_UNIT_FACTORS_TO_MM.keys()))
+        raise InvalidUploadError(f"geometry_units invalido: '{units}'. Valores permitidos: {allowed}")
+    return _GEOMETRY_UNIT_FACTORS_TO_MM[normalized]
+
+
+def _scale_geometry_sections(
+    sections: dict[str, dict[str, float]],
+    factor_to_mm: float,
+) -> dict[str, dict[str, float]]:
+    if factor_to_mm == 1.0:
+        return sections
+    return {
+        name: {
+            "width_mm": float(values["width_mm"]) * factor_to_mm,
+            "height_mm": float(values["height_mm"]) * factor_to_mm,
+        }
+        for name, values in sections.items()
+    }
 
 
 def _harmonize_adjacent_supports(spans: list[dict[str, Any]]) -> None:
@@ -114,6 +155,8 @@ def build_case_payload_from_form(
     width_mm: float,
     height_mm: float,
     d_mm: float,
+    d_ratio_default: float | None,
+    geometry_units: str,
     db_bar: str,
     min_branches_c: int,
     min_branches_nc: int,
@@ -132,6 +175,12 @@ def build_case_payload_from_form(
     if region_c_ratio <= 0.0 or region_c_ratio >= 0.5:
         raise InvalidUploadError("region_c_ratio debe estar entre 0 y 0.5")
 
+    if d_ratio_default is None:
+        if height_mm <= 0.0:
+            raise InvalidUploadError("height_mm debe ser > 0 para inferir d_ratio_default")
+        d_ratio_default = d_mm / height_mm
+    default_d_ratio = _to_positive_ratio(d_ratio_default, field_name="d_ratio_default")
+
     ensure_upload_suffix(seismic_excel, {".xlsx"}, "seismic_excel")
     ensure_upload_suffix(gravity_excel, {".xlsx"}, "gravity_excel")
     seismic_bytes = read_upload_bytes(seismic_excel, max_upload_bytes)
@@ -144,6 +193,9 @@ def build_case_payload_from_form(
         ensure_upload_suffix(geometry_excel, {".xlsx"}, "geometry_excel")
         geometry_bytes = read_upload_bytes(geometry_excel, max_upload_bytes)
         geometry_sections = extract_geometry_sections(geometry_bytes, "geometry_excel")
+        factor_to_mm = _geometry_unit_factor_to_mm(geometry_units)
+        geometry_sections = _scale_geometry_sections(geometry_sections, factor_to_mm)
+
         seismic_design_sections = extract_design_sections_by_unique_name(
             seismic_bytes,
             sheet_name,
@@ -198,6 +250,7 @@ def build_case_payload_from_form(
         ratio: float,
         span_width_mm: float,
         span_height_mm: float,
+        span_d_mm: float,
     ) -> list[dict[str, Any]]:
         middle_to = 1.0 - ratio
         return [
@@ -206,7 +259,7 @@ def build_case_payload_from_form(
                 "from": 0.0,
                 "to": ratio,
                 "type": "C",
-                "d_mm": d_mm,
+                "d_mm": span_d_mm,
                 "db_bar": db_bar,
                 "min_branches": min_branches_c,
                 "width_mm": span_width_mm,
@@ -217,7 +270,7 @@ def build_case_payload_from_form(
                 "from": ratio,
                 "to": middle_to,
                 "type": "NC",
-                "d_mm": d_mm,
+                "d_mm": span_d_mm,
                 "db_bar": db_bar,
                 "min_branches": min_branches_nc,
                 "width_mm": span_width_mm,
@@ -228,7 +281,7 @@ def build_case_payload_from_form(
                 "from": middle_to,
                 "to": 1.0,
                 "type": "C",
-                "d_mm": d_mm,
+                "d_mm": span_d_mm,
                 "db_bar": db_bar,
                 "min_branches": min_branches_c,
                 "width_mm": span_width_mm,
@@ -240,9 +293,15 @@ def build_case_payload_from_form(
         span_meta: dict[str, Any] | None,
         span_width_mm: float,
         span_height_mm: float,
+        span_d_mm: float,
     ) -> list[dict[str, Any]]:
         if not span_meta:
-            return _build_default_regions(region_c_ratio, span_width_mm, span_height_mm)
+            return _build_default_regions(
+                region_c_ratio,
+                span_width_mm,
+                span_height_mm,
+                span_d_mm,
+            )
 
         configured_regions = span_meta.get("regions")
         if isinstance(configured_regions, list) and configured_regions:
@@ -258,7 +317,7 @@ def build_case_payload_from_form(
                         "from": region["from"],
                         "to": region["to"],
                         "type": region_type,
-                        "d_mm": region.get("d_mm") if region.get("d_mm") is not None else d_mm,
+                        "d_mm": region.get("d_mm") if region.get("d_mm") is not None else span_d_mm,
                         "db_bar": region.get("db_bar") if region.get("db_bar") else db_bar,
                         "min_branches": min_branches_value,
                         "width_mm": (
@@ -278,7 +337,12 @@ def build_case_payload_from_form(
         ratio = span_meta.get("c_ratio_extremos")
         if ratio is None:
             ratio = region_c_ratio
-        return _build_default_regions(float(ratio), span_width_mm, span_height_mm)
+        return _build_default_regions(
+            float(ratio),
+            span_width_mm,
+            span_height_mm,
+            span_d_mm,
+        )
 
     for index, pair in enumerate(span_pairs, start=1):
         span_meta = span_layout_by_id.get(pair.get("id", ""))
@@ -286,8 +350,8 @@ def build_case_payload_from_form(
             str(pair.get("id", "")).strip() if span_layout else f"{beam_id}.{index}"
         ) or f"{beam_id}.{index}"
 
-        span_width_mm = width_mm
-        span_height_mm = height_mm
+        span_width_mm = float(width_mm)
+        span_height_mm = float(height_mm)
         if geometry_sections:
             span_width_mm, span_height_mm = _resolve_span_dimensions(
                 pair=pair,
@@ -295,6 +359,13 @@ def build_case_payload_from_form(
                 gravity_design_sections=gravity_design_sections,
                 geometry_sections=geometry_sections,
             )
+
+        span_d_ratio_raw = span_meta.get("d_ratio") if span_meta else None
+        span_d_ratio = _to_positive_ratio(
+            default_d_ratio if span_d_ratio_raw is None else span_d_ratio_raw,
+            field_name=f"d_ratio vano {span_id}",
+        )
+        span_d_mm = span_height_mm * span_d_ratio
 
         span_payload: dict[str, Any] = {
             "id": span_id,
@@ -304,6 +375,7 @@ def build_case_payload_from_form(
                 span_meta,
                 span_width_mm,
                 span_height_mm,
+                span_d_mm,
             ),
         }
         if span_meta:

@@ -205,6 +205,9 @@ def _build_span_preview(
     region_rows: list[dict[str, Any]] = []
     region_lengths: list[float] = []
     any_estimated = False
+    span_width_mm: float | None = None
+    span_height_mm: float | None = None
+    span_d_mm: float | None = None
 
     for index, region in enumerate(regions, start=1):
         region_id = _as_text(region.get("id")) or f"R{index}"
@@ -235,6 +238,16 @@ def _build_span_preview(
         transverse_label = (optimized or {}).get("transverse_label") or f"{region_type.upper()} @ {spacing_mm} mm est."
         longitudinal_label = (optimized or {}).get("longitudinal_label") or "long. n/d"
 
+        region_width_mm = _as_float(region.get("width_mm"))
+        region_height_mm = _as_float(region.get("height_mm"))
+        region_d_mm = _as_float(region.get("d_mm"))
+        if region_width_mm is not None:
+            span_width_mm = max(span_width_mm or 0.0, region_width_mm)
+        if region_height_mm is not None:
+            span_height_mm = max(span_height_mm or 0.0, region_height_mm)
+        if region_d_mm is not None:
+            span_d_mm = max(span_d_mm or 0.0, region_d_mm)
+
         region_rows.append(
             {
                 "region_id": region_id,
@@ -262,6 +275,9 @@ def _build_span_preview(
         "support_right_mm": int(round(support_right_mm)) if support_right_mm is not None else None,
         "length_mm": span_length_mm,
         "length_estimated": any_estimated,
+        "width_mm": int(round(span_width_mm)) if span_width_mm is not None else None,
+        "height_mm": int(round(span_height_mm)) if span_height_mm is not None else None,
+        "d_mm": int(round(span_d_mm)) if span_d_mm is not None else None,
         "regions": region_rows,
     }
 
@@ -296,6 +312,15 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
     if total_span_mm <= 0:
         total_span_mm = 6000
 
+    beam_width_from_spans = max(
+        (int(span_row.get("width_mm", 0) or 0) for span_row in span_rows),
+        default=0,
+    )
+    beam_height_from_spans = max(
+        (int(span_row.get("height_mm", 0) or 0) for span_row in span_rows),
+        default=0,
+    )
+
     return {
         "job_id": job_id,
         "status": meta.get("status"),
@@ -304,8 +329,8 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
             "detailing": beam.get("detailing"),
             "fc_mpa": beam.get("fc_mpa"),
             "fy_mpa": beam.get("fy_mpa"),
-            "width_mm": beam.get("width_mm"),
-            "height_mm": beam.get("height_mm"),
+            "width_mm": beam.get("width_mm") or (beam_width_from_spans or None),
+            "height_mm": beam.get("height_mm") or (beam_height_from_spans or None),
         },
         "spans": span_rows,
         "total_span_mm": int(round(total_span_mm)),

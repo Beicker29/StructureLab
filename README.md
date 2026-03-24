@@ -105,17 +105,20 @@ Campos principales:
 - Archivos: `seismic_excel`, `gravity_excel`, `geometry_excel` (opcional)
 - Caso: `case_name`, `sheet_name`, `units_rebar_per_length`
 - Viga: `beam_id`, `detailing`, recubrimientos, `fc_mpa`, `fy_mpa`
-- Geometria/regiones base: `width_mm`, `height_mm`, `d_mm`, `db_bar`, `min_branches_c`, `min_branches_nc`, `region_c_ratio`
+- Geometria/regiones base: `db_bar`, `min_branches_c`, `min_branches_nc`, `region_c_ratio`
+- Geometria ETABS: `geometry_excel` (opcional) y `geometry_units` (`mm|cm|m|in`) para convertir Width/Depth a mm
 - Vanos:
   - `frame_names_csv` (opcional, lista de `UniqueName` comunes), o
   - `frame_pairs_json` (opcional, mapeo avanzado `seismic/gravity`)
-  - `span_layout_json` (opcional, configuracion detallada por vano)
-  - En `span_layout_json` cada vano debe incluir `support_left_mm` y `support_right_mm`
+  - `span_layout_json` (opcional, configuracion detallada por vano; incluye `d_ratio` por vano)
+  - En `span_layout_json` cada vano debe incluir `support_left_mm`, `support_right_mm` y puede incluir `d_ratio` (0,1]
   - Si hay incompatibilidad entre apoyo compartido (`der` del vano i vs `izq` del vano i+1), el sistema toma el mayor
 
 Si no defines vanos manualmente, la API usa automaticamente la interseccion de `UniqueName` entre ambos Excel.
 
 Si subes `geometry_excel`, el backend cruza `DesignSect` (sismo/gravedad) contra `Name` (geometria) y asigna `height_mm=Depth` y `width_mm=Width` por vano.
+
+`d_mm` se calcula por vano como `d_ratio * height_mm`.
 
 ### GET `/v1/jobs/{job_id}`
 
@@ -184,9 +187,8 @@ curl -X POST "http://127.0.0.1:10000/v1/jobs/from-form" \
   -F "cover_bottom_mm=40" \
   -F "fc_mpa=28" \
   -F "fy_mpa=420" \
-  -F "width_mm=300" \
-  -F "height_mm=600" \
-  -F "d_mm=600" \
+  -F "geometry_units=mm" \
+  -F "d_ratio_default=0.9" \
   -F "db_bar=#6" \
   -F "min_branches_c=4" \
   -F "min_branches_nc=2" \

@@ -195,6 +195,20 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
                 f"span_layout_json[{span_index}].c_ratio_extremos debe estar entre 0 y 0.5"
             )
 
+        d_ratio_raw = (
+            item.get("d_ratio")
+            if item.get("d_ratio") is not None
+            else item.get("fraccion_d")
+        )
+        d_ratio = _parse_optional_float(
+            d_ratio_raw,
+            f"span_layout_json[{span_index}].d_ratio",
+        )
+        if d_ratio is not None and not (0.0 < d_ratio <= 1.0):
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].d_ratio debe estar en (0, 1]"
+            )
+
         support_left_mm = _parse_optional_float(
             item.get("support_left_mm")
             if item.get("support_left_mm") is not None
@@ -369,6 +383,7 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
                 "seismic": seismic,
                 "gravity": gravity,
                 "c_ratio_extremos": c_ratio_extremos,
+                "d_ratio": d_ratio,
                 "support_left_mm": support_left_mm,
                 "support_right_mm": support_right_mm,
                 "regions": regions,
