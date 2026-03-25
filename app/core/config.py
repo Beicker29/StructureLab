@@ -48,6 +48,7 @@ def get_settings() -> Settings:
         api_key=api_key,
         max_upload_mb=max_upload_mb,
         log_level=log_level,
-        service_name="ShearTors_RC API",
+        service_name="StructureLab API",
     )
+
 

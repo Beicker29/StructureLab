@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       base_url:
-        description: "URL base del servicio desplegado en Render (ej: https://sheartors-rc-api.onrender.com)"
+        description: "URL base del servicio desplegado en Render (ej: https://structurelab-api.onrender.com)"
         required: true
         type: string
       timeout_seconds:
@@ -44,3 +44,4 @@ jobs:
             ARGS+=(--api-key "$RENDER_API_KEY")
           fi
           python scripts/smoke_api.py "${ARGS[@]}"
+

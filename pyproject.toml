@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ShearTors_RC"
+name = "StructureLab"
 version = "0.1.0"
 description = "RC beam shear and torsion design and optimization using ETABS exports."
 readme = "README.md"
@@ -19,4 +19,5 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
 

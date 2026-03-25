@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sheartors-rc-api
+    name: structurelab-api
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt && pip install .
@@ -16,3 +16,4 @@ services:
         value: "25"
       - key: APP_LOG_LEVEL
         value: INFO
+

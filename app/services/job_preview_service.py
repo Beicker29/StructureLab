@@ -149,6 +149,7 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
     weight_trans_col = _find_col(columns, "peso_transversal_region_kg", "transverse_weight_region_kg")
     weight_long_col = _find_col(columns, "peso_longitudinal_region_kg", "longitudinal_weight_region_kg")
     weight_total_col = _find_col(columns, "peso_total_region_kg", "total_weight_region_kg")
+    status_col = _find_col(columns, "estado", "status")
     if span_col is None or region_col is None or length_col is None:
         return {}
 
@@ -160,6 +161,9 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
             continue
         length_mm = _as_float(row[length_col])
         if length_mm is None:
+            continue
+        status = _as_text(row[status_col]).lower() if status_col is not None else ""
+        if status and status not in {"cumple", "ok"}:
             continue
         option = _as_int(row[option_col]) if option_col is not None else None
         transverse = _as_text(row[trans_col]) if trans_col is not None else ""

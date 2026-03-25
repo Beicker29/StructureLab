@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import itertools
 import math
 import random
@@ -1045,6 +1044,9 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
     def create_individual() -> list[int]:
         return [rng.randrange(size) for size in domain_sizes]
 
+    def clone_individual(individual: list[int]) -> list[int]:
+        return individual_cls(individual)
+
     def decode(individual: list[int]) -> tuple[str, str, int, int]:
         return (
             str(domain[0][individual[0]]),
@@ -1053,7 +1055,14 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
             int(domain[3][individual[3]]),
         )
 
+    evaluation_cache: dict[tuple[int, ...], Candidate] = {}
+
     def evaluate_individual(individual: list[int]) -> Candidate:
+        key = tuple(int(gene) for gene in individual)
+        cached = evaluation_cache.get(key)
+        if cached is not None:
+            return cached
+
         e_bar, g_bar, g_count, spacing_mm = decode(individual)
         candidate = evaluate_candidate(
             region,
@@ -1064,7 +1073,9 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
             long_bar=default_long_bar,
             long_count=default_long_count,
         )
-        return attach_independent_longitudinal(candidate, region, variables)
+        resolved = attach_independent_longitudinal(candidate, region, variables)
+        evaluation_cache[key] = resolved
+        return resolved
 
     def mate(ind_a: list[int], ind_b: list[int]) -> tuple[list[int], list[int]]:
         for idx in range(len(ind_a)):
@@ -1084,7 +1095,7 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
 
     toolbox.register("individual", tools.initIterate, individual_cls, create_individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("clone", copy.deepcopy)
+    toolbox.register("clone", clone_individual)
     toolbox.register("mate", mate)
     toolbox.register("mutate", mutate)
 
@@ -1137,7 +1148,6 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
         method="genetic",
         failure_counts=failure_counts,
     )
-
 
 def _ensure_deap_types() -> None:
     if not hasattr(creator, DEAP_FITNESS_CLASS):

@@ -1,4 +1,4 @@
-# ShearTors_RC
+# StructureLab
 
 API (FastAPI) + motor de calculo para diseno/optimizacion de refuerzo en vigas RC por cortante y torsion usando exportes ETABS.
 
@@ -105,4 +105,5 @@ curl -X POST "http://127.0.0.1:10000/v1/jobs" \
 curl "http://127.0.0.1:10000/v1/jobs/<job_id>"
 curl -L "http://127.0.0.1:10000/v1/jobs/<job_id>/download" -o reports.zip
 ```
+
 

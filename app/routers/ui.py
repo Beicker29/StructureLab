@@ -10,7 +10,7 @@ UI_HTML = """<!doctype html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ShearTors RC - UI</title>
+<title>StructureLab - UI</title>
 <style>
 :root{--bg:#eef3f9;--surface:#fff;--line:#c9d6e5;--text:#13243a;--muted:#5a6f8a;--brand:#112d49;--brand2:#0b2239;--accent:#0f5f79;--accent2:#0b4d62;--ok:#1f6b43;--warn:#8c5a00;--err:#a12821}
 *{box-sizing:border-box}html,body{height:100%}
@@ -112,7 +112,7 @@ body{margin:0;background:linear-gradient(160deg,#e8eff8 0%,var(--bg) 56%,#f6f9fd
 <div class="field"><label for="opt_long_counts">Cantidades posibles de barras longitudinales</label><input id="opt_long_counts" type="text" placeholder="Ej: 2, 4, 6, 8" /><p class="help">Enteros positivos separados por coma.</p></div>
 </div></div>
 </div></details></section></section>
-<section id="view-import" class="view"><section class="card"><h2>Importacion ETABS y ejecucion</h2><p class="note">Carga sismo/gravedad y, opcionalmente, geometria para mapear Width/Depth por vano desde DesignSect.</p><div class="grid g3"><div class="field"><label for="seismic_excel">Excel sismico</label><input id="seismic_excel" name="seismic_excel" type="file" accept=".xlsx" required /></div><div class="field"><label for="gravity_excel">Excel gravedad</label><input id="gravity_excel" name="gravity_excel" type="file" accept=".xlsx" required /></div><div class="field"><label for="geometry_excel">Excel geometria (opcional)</label><input id="geometry_excel" name="geometry_excel" type="file" accept=".xlsx" /></div></div><div class="actions"><button type="submit" class="btn btn-primary" id="btn-submit"><span class="spinner" aria-hidden="true"></span><span id="btn-submit-label">Crear y ejecutar job</span></button><button type="button" class="btn btn-secondary" id="btn-clear">Limpiar estado</button></div></section></section>
+<section id="view-import" class="view"><section class="card"><h2>Importacion ETABS y ejecucion</h2><p class="note">Carga sismo/gravedad y, opcionalmente, geometria para mapear Width/Depth por vano desde DesignSect.</p><div class="grid g3"><div class="field"><label for="seismic_excel">Excel sismico</label><input id="seismic_excel" name="seismic_excel" type="file" accept=".xlsx" required /></div><div class="field"><label for="gravity_excel">Excel gravedad</label><input id="gravity_excel" name="gravity_excel" type="file" accept=".xlsx" required /></div><div class="field"><label for="geometry_excel">Excel geometria</label><input id="geometry_excel" name="geometry_excel" type="file" accept=".xlsx" /></div></div><div class="actions"><button type="submit" class="btn btn-primary" id="btn-submit"><span class="spinner" aria-hidden="true"></span><span id="btn-submit-label">Crear y ejecutar job</span></button><button type="button" class="btn btn-secondary" id="btn-clear">Limpiar estado</button></div></section></section>
 <section id="view-results" class="view"><div class="results"><section class="card"><h2>Resultados - Vista en alzado de la viga</h2><p class="note">Preview SVG con vanos, apoyos, regiones, espaciamientos y arreglo transversal/longitudinal.</p><div id="beam-elevation-container" class="svg-wrap" aria-live="polite"></div><p id="beam-elevation-legend" class="legend">El SVG usa datos reales del case/job cuando existen, y fallback tecnico cuando faltan.</p><section class="card" style="margin-top:10px"><h2>Alternativas por region</h2><p class="note">Puedes escoger un arreglo diferente por region (top 10), con comparativo de peso vs la opcion mas optima.</p><div id="region-options" class="region-opt-grid"><p class="help">Ejecuta un job para habilitar opciones de seleccion por region.</p></div><div class="actions"><button type="button" class="btn btn-secondary" id="btn-save-selection" disabled>Guardar seleccion y generar reporte</button></div><p id="selection-save-msg" class="help"></p></section></section><div class="grid"><section class="card"><h2>Estado del job</h2><p class="note">Monitoreo en tiempo real, errores y trazabilidad.</p><span id="status" class="status">Esperando ejecucion</span><div id="error-box" class="alert hidden" role="alert" aria-live="assertive"></div><details style="margin-top:10px"><summary style="cursor:pointer;font-size:.82rem;color:#315171;font-weight:620">Ver detalle de respuesta</summary><pre id="details" class="log hidden"></pre></details></section><section class="card"><h2>Resumen tecnico</h2><ul id="summary-list" class="list"></ul></section><section class="card"><h2>Checks visuales</h2><ul id="checks-list" class="list"></ul></section></div></div></section>
 <section id="view-reports" class="view"><div class="grid g2"><section class="card"><h2>Export y accesos rapidos</h2><p class="note">Enlaces de estado y case generado.</p><div id="results-links" class="links"></div></section><section class="card"><h2>Artefactos detectados</h2><ul id="artifacts-list" class="list"></ul></section></div></section>
 </form></main></div>
@@ -120,7 +120,7 @@ body{margin:0;background:linear-gradient(160deg,#e8eff8 0%,var(--bg) 56%,#f6f9fd
 (() => {
 const form=document.getElementById('job-form'),submitBtn=document.getElementById('btn-submit'),submitLabel=document.getElementById('btn-submit-label'),clearBtn=document.getElementById('btn-clear'),globalStatusEl=document.getElementById('global-status'),statusEl=document.getElementById('status'),resultsLinksEl=document.getElementById('results-links'),detailsEl=document.getElementById('details'),errorBoxEl=document.getElementById('error-box'),summaryListEl=document.getElementById('summary-list'),checksListEl=document.getElementById('checks-list'),artifactsListEl=document.getElementById('artifacts-list'),beamElevationContainer=document.getElementById('beam-elevation-container'),beamElevationLegend=document.getElementById('beam-elevation-legend'),regionOptionsEl=document.getElementById('region-options'),saveSelectionBtn=document.getElementById('btn-save-selection'),selectionSaveMsg=document.getElementById('selection-save-msg'),hiddenFramePairsInput=document.getElementById('frame_pairs_json'),hiddenOptimizationInput=document.getElementById('optimization_overrides_json'),hiddenSpanLayoutInput=document.getElementById('span_layout_json'),enableSpanLayout=document.getElementById('enable_span_layout'),spanLayoutFields=document.getElementById('span-layout-fields'),spanLayoutList=document.getElementById('span-layout-list'),addSpanBtn=document.getElementById('btn-add-span'),enableOptimizationOverrides=document.getElementById('enable_optimization_overrides'),optimizationFields=document.getElementById('optimization-fields'),optGenerations=document.getElementById('opt_generations'),optEBars=document.getElementById('opt_e_bars'),optGBars=document.getElementById('opt_g_bars'),optLongBars=document.getElementById('opt_long_bars'),optSpacing=document.getElementById('opt_spacing'),optLongCounts=document.getElementById('opt_long_counts');
 const navButtons=Array.from(document.querySelectorAll('[data-view]')),views=Array.from(document.querySelectorAll('.view'));
-let currentJobId=null,currentPreviewPayload=null,pollTimer=null,isSubmitting=false,regionOptionSelections={};
+let currentJobId=null,currentPreviewPayload=null,pollTimer=null,isSubmitting=false,regionOptionSelections={},spanLongSelections={};
 const parseNum=v=>{const p=Number(v);return Number.isFinite(p)?p:null},clamp=(v,mx,mn)=>Math.max(mx,Math.min(mn,v));const DEFAULT_C_RATIO=0.2,DEFAULT_MIN_BRANCHES_C=4,DEFAULT_MIN_BRANCHES_NC=2;
 function parseCsvTokens(raw){return String(raw||'').split(',').map(v=>v.trim()).filter(v=>v.length>0)}
 function parsePositiveIntList(raw){const t=parseCsvTokens(raw);if(!t.length)return{ok:false,values:[],message:'La lista no puede estar vacia.'};const values=[];for(const token of t){const p=Number(token);if(!Number.isInteger(p)||p<=0)return{ok:false,values:[],message:`Valor invalido: ${token}. Usa enteros positivos.`};values.push(p)}return{ok:true,values,message:''}}
@@ -223,8 +223,15 @@ support_left_mm:parseNum(sp.support_left_mm)||0,
 support_right_mm:parseNum(sp.support_right_mm)||0,
 length_mm:parseNum(sp.length_mm)||6000,
 length_estimated:!!sp.length_estimated,
-regions:Array.isArray(sp.regions)?sp.regions.map((rg,j)=>({
-region_id:rg.region_id||`R${j+1}`,
+regions:Array.isArray(sp.regions)?sp.regions.map((rg,j)=>{
+const regionId=rg.region_id||`R${j+1}`;
+const spanId=sp.span_id||`S${i+1}`;
+const key=`${spanId}__${regionId}`;
+const saved=regionOptionSelections[key]||{};
+const transverseLabel=saved.transverse_label||rg.transverse_label||`${String(rg.type||'NC').toUpperCase()} @ ${parseNum(rg.spacing_mm)||defaultSpacing(rg.type)} mm`;
+const longitudinalLabel=saved.longitudinal_label||rg.longitudinal_label||'long. n/d';
+return({
+region_id:regionId,
 type:String(rg.type||'NC').toUpperCase(),
 from:parseNum(rg.from),
 to:parseNum(rg.to),
@@ -232,13 +239,14 @@ length_mm:parseNum(rg.length_mm)||1,
 length_estimated:!!rg.length_estimated,
 spacing_mm:parseNum(rg.spacing_mm)||defaultSpacing(rg.type),
 spacing_estimated:!!rg.spacing_estimated,
-transverse_label:rg.transverse_label||`${String(rg.type||'NC').toUpperCase()} @ ${parseNum(rg.spacing_mm)||defaultSpacing(rg.type)} mm`,
-longitudinal_label:rg.longitudinal_label||'long. n/d',
+transverse_label:transverseLabel,
+longitudinal_label:longitudinalLabel,
 selected_option:parseNum(rg.selected_option),
 best_option:parseNum(rg.best_option),
 best_weight_kg:parseNum(rg.best_weight_kg),
 selected_weight_kg:parseNum(rg.selected_weight_kg),
-options:Array.isArray(rg.options)?rg.options.map((opt,k)=>({
+options:Array.isArray(rg.options)?rg.options.map((opt,k)=>(
+{
 option:parseNum(opt.option)||k+1,
 transverse_label:String(opt.transverse_label||''),
 longitudinal_label:String(opt.longitudinal_label||''),
@@ -246,7 +254,8 @@ weight_transverse_kg:parseNum(opt.weight_transverse_kg),
 weight_longitudinal_kg:parseNum(opt.weight_longitudinal_kg),
 weight_total_kg:parseNum(opt.weight_total_kg),
 })):[],
-})):[],
+});
+}):[],
 }));
 const total=spans.reduce((a,s)=>a+(parseNum(s.length_mm)||0),0),supp=spans.reduce((a,s)=>a+(parseNum(s.support_right_mm)||0),0),maxHeight=spans.reduce((m,s)=>Math.max(m,parseNum(s.height_mm)||0),0),maxWidth=spans.reduce((m,s)=>Math.max(m,parseNum(s.width_mm)||0),0);
 return{totalSpanMm:parseNum(pp.total_span_mm)||total||fb.totalSpanMm,totalSupportMm:parseNum(pp.total_support_mm)||supp,totalSystemMm:parseNum(pp.total_system_mm)||((parseNum(pp.total_span_mm)||total||fb.totalSpanMm)+(parseNum(pp.total_support_mm)||supp)),totalSpanEstimated:!!pp.total_span_estimated,beamDepthMm:parseNum(beam.height_mm)||maxHeight||fb.beamDepthMm,beamWidthMm:parseNum(beam.width_mm)||maxWidth||fb.beamWidthMm,beamId:beam.beam_id||fb.beamId,detailing:beam.detailing||fb.detailing,fcMpa:parseNum(beam.fc_mpa)||fb.fcMpa,fyMpa:parseNum(beam.fy_mpa)||fb.fyMpa,spans,dataSource:'preview'}
@@ -329,6 +338,10 @@ const endX=cursor,totalText=`${Math.round(totalSystem)} mm${d.totalSpanEstimated
 return `<svg id="beam-elevation" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista en alzado de la viga"><defs><marker id="arrow-total" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#1e334a" /></marker><marker id="arrow-span" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#1e5a8a" /></marker><marker id="arrow-support" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4e545c" /></marker></defs><rect x="12" y="12" width="${W-24}" height="${H-24}" rx="8" fill="#f8fbff" stroke="#d0dcea" /><line x1="${startX}" y1="80" x2="${endX.toFixed(2)}" y2="80" stroke="#1e334a" stroke-width="1.4" marker-start="url(#arrow-total)" marker-end="url(#arrow-total)" /><text x="${((startX+endX)/2).toFixed(2)}" y="64" text-anchor="middle" font-size="16" fill="#16304a" font-weight="700">Longitud total sistema: ${totalText}</text><line x1="${startX-36}" y1="${topY}" x2="${startX-36}" y2="${bottomY}" stroke="#1e334a" stroke-width="1.2" marker-start="url(#arrow-total)" marker-end="url(#arrow-total)" /><text x="${startX-48}" y="${topY+beamH/2}" transform="rotate(-90 ${startX-48} ${topY+beamH/2})" text-anchor="middle" font-size="13" fill="#183753" font-weight="620">h = ${Math.round(d.beamDepthMm||600)} mm</text>${zoneRects}${supportBands}<rect x="${startX}" y="${topY}" width="${Math.max(endX-startX,2).toFixed(2)}" height="${beamH}" fill="none" stroke="#2b4f73" stroke-width="2.1" rx="4" />${spanMarkers}${zoneLines}${stirrups}${spanLabels}${spanCotas}${supportCotas}${labels}<line x1="${startX}" y1="${bottomY+2}" x2="${endX.toFixed(2)}" y2="${bottomY+2}" stroke="#3f5f7f" stroke-width="1.1" /></svg>`;
 }
 function renderBeam(container,data){container.innerHTML=buildBeamElevationSvg(data);beamElevationLegend.textContent=data.dataSource==='preview'?'Dibujo alimentado por datos reales de job/optimizacion.':'Se usan datos de fallback (estimados) hasta obtener preview del job.'}
+function syncBeamPreviewWithSelections(){
+const data=buildBeamData({previewPayload:currentPreviewPayload});
+renderBeam(beamElevationContainer,data);
+}
 function fmtKg(value){const num=Number(value);return Number.isFinite(num)?`${num.toFixed(2)} kg`:'n/d'}
 function fmtPct(value){const num=Number(value);return Number.isFinite(num)?`${num.toFixed(2)} %`:'n/d'}
 function uniqueLabelOptions(options,labelKey,weightKey){const map={};(options||[]).forEach(opt=>{const label=String(opt&&opt[labelKey]||'').trim();if(!label)return;const raw=Number(opt&&opt[weightKey]);const weight=Number.isFinite(raw)?raw:0;const current=map[label];if(!current||weight<current.weight_kg)map[label]={label,weight_kg:weight}});return Object.values(map).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10)}
@@ -367,8 +380,9 @@ weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,
 const transOptions=transOptionsSource.length?transOptionsSource:uniqueLabelOptions(options,'transverse_label','weight_transverse_kg');
 const longOptions=longOptionsSource.length?longOptionsSource:uniqueLabelOptions(options,'longitudinal_label','weight_longitudinal_kg');
 if(!transOptions.length||!longOptions.length)return;
+const longLookup={};
+longOptions.forEach(opt=>{longLookup[opt.label]=opt});
 const defaultTrans=best.transverse_label||transOptions[0].label;
-const defaultLong=best.longitudinal_label||longOptions[0].label;
 regionRows.push({
 key:`${spanId}__${regionId}`,
 spanId,
@@ -377,13 +391,19 @@ bestOption:best.option,
 bestWeight:Number(best.weight_total_kg)||0,
 transOptions,
 longOptions,
+longLookup,
 defaultTrans,
-defaultLong,
 });
 });
-if(regionRows.length)spanBuckets.push({spanId,regions:regionRows});
+if(!regionRows.length)return;
+let commonLongLabels=regionRows[0].longOptions.map(opt=>opt.label);
+for(let i=1;i<regionRows.length;i+=1){const labels=new Set(regionRows[i].longOptions.map(opt=>opt.label));commonLongLabels=commonLongLabels.filter(label=>labels.has(label))}
+if(!commonLongLabels.length)return;
+const spanLongOptions=commonLongLabels.map(label=>({label,weight_kg:regionRows.reduce((acc,region)=>acc+(Number((region.longLookup[label]||{}).weight_kg)||0),0)})).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10);
+if(!spanLongOptions.length)return;
+spanBuckets.push({spanId,regions:regionRows,spanLongOptions,defaultSpanLong:spanLongOptions[0].label});
 });
-if(!spanBuckets.length){regionOptionsEl.innerHTML='<p class="help">Sin alternativas por region aun. Ejecuta un job completo para habilitar el selector.</p>';return}
+if(!spanBuckets.length){regionOptionsEl.innerHTML='<p class="help">No hay opciones longitudinales comunes por vano que cumplan en todas sus regiones.</p>';return}
 regionOptionsEl.innerHTML='';
 const summary=document.createElement('div');
 summary.className='region-opt-summary';
@@ -396,32 +416,55 @@ details.className='span-row region-opt-span';
 details.open=bIndex===0;
 details.innerHTML=`<summary class="span-summary"><span class="span-summary-title">Vano ${bucket.spanId}</span><span class="span-summary-meta">${bucket.regions.length} regiones con alternativas</span></summary><div class="span-body"></div>`;
 const body=details.querySelector('.span-body');
+const spanCard=document.createElement('div');
+spanCard.className='region-opt-card';
+spanCard.innerHTML=`<div class="region-opt-head"><strong>Vano ${bucket.spanId}</strong><span>Longitudinal comun para todas las regiones</span></div><div class="field"><label>Refuerzo longitudinal del vano</label><select class="span-opt-longitudinal"></select></div><p class="help">Solo se muestran opciones que cumplen en todas las regiones del vano.</p>`;
+const spanLongSelect=spanCard.querySelector('.span-opt-longitudinal');
+bucket.spanLongOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)} (vano)`;spanLongSelect.appendChild(el)});
+const savedSpan=spanLongSelections[bucket.spanId];
+const initialSpanLong=bucket.spanLongOptions.some(opt=>opt.label===savedSpan)?savedSpan:bucket.defaultSpanLong;
+spanLongSelect.value=initialSpanLong;
+spanLongSelections[bucket.spanId]=initialSpanLong;
+body.appendChild(spanCard);
+const regionSyncFns=[];
 bucket.regions.forEach(region=>{
 const card=document.createElement('div');
 card.className='region-opt-card';
-card.innerHTML=`<div class="region-opt-head"><strong>Region ${region.regionId}</strong><span>Opcion optima base: ${region.bestOption}</span></div><div class="region-opt-two"><div class="field"><label>Refuerzo transversal</label><select class="region-opt-transverse"></select></div><div class="field"><label>Refuerzo longitudinal</label><select class="region-opt-longitudinal"></select></div></div><p class="help region-opt-region-weight"></p>`;
+card.innerHTML=`<div class="region-opt-head"><strong>Region ${region.regionId}</strong><span>Opcion optima base: ${region.bestOption}</span></div><div class="field"><label>Refuerzo transversal</label><select class="region-opt-transverse"></select></div><p class="help region-opt-region-weight"></p>`;
 const transSelect=card.querySelector('.region-opt-transverse');
-const longSelect=card.querySelector('.region-opt-longitudinal');
 const weightLine=card.querySelector('.region-opt-region-weight');
 region.transOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}`;transSelect.appendChild(el)});
-region.longOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}`;longSelect.appendChild(el)});
 const saved=regionOptionSelections[region.key]||{};
 const initialTrans=region.transOptions.some(opt=>opt.label===saved.transverse_label)?saved.transverse_label:region.defaultTrans;
-const initialLong=region.longOptions.some(opt=>opt.label===saved.longitudinal_label)?saved.longitudinal_label:region.defaultLong;
 transSelect.value=initialTrans;
-longSelect.value=initialLong;
-const state={best:region.bestWeight,selected:region.bestWeight};
+const state={best:0,selected:0};
 states.push(state);
-const sync=()=>{const trans=region.transOptions.find(opt=>opt.label===transSelect.value)||region.transOptions[0];const long=region.longOptions.find(opt=>opt.label===longSelect.value)||region.longOptions[0];const selectedWeight=(Number(trans.weight_kg)||0)+(Number(long.weight_kg)||0);regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:long.label};state.selected=selectedWeight;weightLine.textContent=`Peso region seleccionado: ${fmtKg(selectedWeight)} | Peso region optimo base: ${fmtKg(region.bestWeight)}`;updateSummary()};
-transSelect.addEventListener('change',sync);
-longSelect.addEventListener('change',sync);
-sync();
+const syncRegion=()=>{
+const currentLongLabel=spanLongSelect.value;
+const trans=region.transOptions.find(opt=>opt.label===transSelect.value)||region.transOptions[0];
+const long=region.longLookup[currentLongLabel]||region.longOptions[0];
+const baseTrans=region.transOptions.find(opt=>opt.label===region.defaultTrans)||region.transOptions[0];
+const baseLong=region.longLookup[bucket.defaultSpanLong]||region.longOptions[0];
+const selectedWeight=(Number(trans.weight_kg)||0)+(Number(long.weight_kg)||0);
+const bestWeight=(Number(baseTrans.weight_kg)||0)+(Number(baseLong.weight_kg)||0);
+regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:long.label};
+state.best=bestWeight;
+state.selected=selectedWeight;
+weightLine.textContent=`Peso region seleccionado: ${fmtKg(selectedWeight)} | Peso region optimo base (vano): ${fmtKg(bestWeight)}`;
+};
+transSelect.addEventListener('change',()=>{syncRegion();updateSummary();syncBeamPreviewWithSelections()});
+regionSyncFns.push(syncRegion);
+syncRegion();
 body.appendChild(card);
 });
+spanLongSelect.addEventListener('change',()=>{spanLongSelections[bucket.spanId]=spanLongSelect.value;regionSyncFns.forEach(fn=>fn());updateSummary();syncBeamPreviewWithSelections()});
+regionSyncFns.forEach(fn=>fn());
+updateSummary();
 regionOptionsEl.appendChild(details);
 });
 if(saveSelectionBtn)saveSelectionBtn.disabled=!currentJobId;
 updateSummary();
+syncBeamPreviewWithSelections();
 }
 function buildSelectionPayload(previewPayload){const spans=previewPayload&&Array.isArray(previewPayload.spans)?previewPayload.spans:[];const selections=[];spans.forEach((sp,sIndex)=>{const spanId=sp.span_id||`S${sIndex+1}`;(Array.isArray(sp.regions)?sp.regions:[]).forEach((rg,rIndex)=>{const regionId=rg.region_id||`R${rIndex+1}`;const options=Array.isArray(rg.options)?rg.options:[];if(!options.length)return;const fallback=options[0]||{};const key=`${spanId}__${regionId}`;const saved=regionOptionSelections[key]||{};const transverse_label=saved.transverse_label||String(fallback.transverse_label||'');const longitudinal_label=saved.longitudinal_label||String(fallback.longitudinal_label||'');selections.push({span_id:spanId,region_id:regionId,transverse_label,longitudinal_label})})});return{selections}}
 function renderSummary(data,st){summaryListEl.innerHTML=[`<li><strong>Viga:</strong> ${data.beamId} | Detallado ${data.detailing}</li>`,`<li><strong>Material:</strong> f'c ${Math.round(data.fcMpa)} MPa | fy ${Math.round(data.fyMpa)} MPa</li>`,`<li><strong>Vanos:</strong> ${Array.isArray(data.spans)?data.spans.length:0}</li>`,`<li><strong>Longitud neta vanos:</strong> ${Math.round(data.totalSpanMm)} mm${data.totalSpanEstimated?' (estimado)':''}</li>`,`<li><strong>Longitud apoyos:</strong> ${Math.round(data.totalSupportMm||0)} mm</li>`,`<li><strong>Longitud total sistema:</strong> ${Math.round(data.totalSystemMm||data.totalSpanMm)} mm</li>`,`<li><strong>Estado job:</strong> ${(st&&st.status)||'sin job'}</li>`].join('')}
@@ -431,8 +474,8 @@ async function refreshPreviewFromJob(jobId,statusPayload){let preview=null;try{c
 function refreshPreview(statusPayload=null){const data=buildBeamData({previewPayload:currentPreviewPayload});renderBeam(beamElevationContainer,data);renderSummary(data,statusPayload);renderChecks(statusPayload);renderRegionOptions(currentPreviewPayload)}
 async function refreshStatus(jobId){const response=await fetch(`/v1/jobs/${jobId}`,{headers:headersWithApiKey()}),payload=await response.json().catch(()=>({}));if(!response.ok){renderError(normalizeErrorPayload(payload,response.status));stopPolling();setSubmitting(false);return}showStatusPayload(payload);renderArtifacts(payload.artifacts);refreshPreview(payload);if(payload.status==='completed'){setStatus('Job completado. Puedes descargar resultados.','ok');await refreshPreviewFromJob(jobId,payload);stopPolling();setSubmitting(false);switchView('view-results');return}if(payload.status==='failed'){renderError({error:'job_failed',message:`El job termino en estado failed${payload.error?`: ${payload.error}`:''}`,details:[]});stopPolling();setSubmitting(false);return}setStatus(`Job en progreso: ${payload.status}`,'running')}
 addSpanBtn.addEventListener('click',()=>{spanLayoutList.appendChild(createSpanRow({}));currentPreviewPayload=null;refreshPreview()});enableSpanLayout.addEventListener('change',()=>{syncAdvancedSections();currentPreviewPayload=null;refreshPreview()});enableOptimizationOverrides.addEventListener('change',syncAdvancedSections);spanLayoutList.addEventListener('input',()=>{currentPreviewPayload=null;refreshPreview()});spanLayoutList.addEventListener('change',()=>{currentPreviewPayload=null;refreshPreview()});['beam_id','detailing','fc_mpa','fy_mpa','db_bar'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',()=>{currentPreviewPayload=null;refreshPreview()})});syncAdvancedSections();
-form.addEventListener('submit',async(event)=>{event.preventDefault();if(isSubmitting)return;stopPolling();clearErrorBox();clearFieldErrors();detailsEl.classList.add('hidden');detailsEl.textContent='';setSubmitting(true);setStatus('Validando datos y creando job...','running');switchView('view-results');if(!buildAdvancedPayload()){setSubmitting(false);return}const formData=new FormData(form);if(!formData.get('frame_pairs_json'))formData.delete('frame_pairs_json');if(!formData.get('optimization_overrides_json'))formData.delete('optimization_overrides_json');if(!formData.get('span_layout_json'))formData.delete('span_layout_json');try{const response=await fetch('/v1/jobs/from-form',{method:'POST',body:formData,headers:headersWithApiKey()}),payload=await response.json().catch(()=>({}));if(!response.ok){renderError(normalizeErrorPayload(payload,response.status));setSubmitting(false);return}currentJobId=payload.job_id;currentPreviewPayload=null;regionOptionSelections={};setLinks(currentJobId,payload);renderArtifacts([]);setStatus(`Job ${currentJobId} creado. Iniciando monitoreo...`,'running');await refreshStatus(currentJobId);if(!pollTimer&&isSubmitting){pollTimer=setInterval(()=>{refreshStatus(currentJobId).catch((error)=>{renderError({error:'network_error',message:error?.message||'No fue posible consultar el estado del job',details:[]});stopPolling();setSubmitting(false)})},2500)}}catch(error){renderError({error:'network_error',message:error?.message||'No fue posible enviar la solicitud',details:[]});setSubmitting(false)}});
-clearBtn.addEventListener('click',()=>{stopPolling();currentJobId=null;currentPreviewPayload=null;regionOptionSelections={};if(saveSelectionBtn)saveSelectionBtn.disabled=true;if(selectionSaveMsg)selectionSaveMsg.textContent='';setSubmitting(false);setStatus('Esperando ejecucion');resultsLinksEl.innerHTML='';detailsEl.textContent='';detailsEl.classList.add('hidden');clearErrorBox();clearFieldErrors();renderArtifacts([]);refreshPreview()});
+form.addEventListener('submit',async(event)=>{event.preventDefault();if(isSubmitting)return;stopPolling();clearErrorBox();clearFieldErrors();detailsEl.classList.add('hidden');detailsEl.textContent='';setSubmitting(true);setStatus('Validando datos y creando job...','running');switchView('view-results');if(!buildAdvancedPayload()){setSubmitting(false);return}const formData=new FormData(form);if(!formData.get('frame_pairs_json'))formData.delete('frame_pairs_json');if(!formData.get('optimization_overrides_json'))formData.delete('optimization_overrides_json');if(!formData.get('span_layout_json'))formData.delete('span_layout_json');try{const response=await fetch('/v1/jobs/from-form',{method:'POST',body:formData,headers:headersWithApiKey()}),payload=await response.json().catch(()=>({}));if(!response.ok){renderError(normalizeErrorPayload(payload,response.status));setSubmitting(false);return}currentJobId=payload.job_id;currentPreviewPayload=null;regionOptionSelections={};spanLongSelections={};setLinks(currentJobId,payload);renderArtifacts([]);setStatus(`Job ${currentJobId} creado. Iniciando monitoreo...`,'running');await refreshStatus(currentJobId);if(!pollTimer&&isSubmitting){pollTimer=setInterval(()=>{refreshStatus(currentJobId).catch((error)=>{renderError({error:'network_error',message:error?.message||'No fue posible consultar el estado del job',details:[]});stopPolling();setSubmitting(false)})},2500)}}catch(error){renderError({error:'network_error',message:error?.message||'No fue posible enviar la solicitud',details:[]});setSubmitting(false)}});
+clearBtn.addEventListener('click',()=>{stopPolling();currentJobId=null;currentPreviewPayload=null;regionOptionSelections={};spanLongSelections={};if(saveSelectionBtn)saveSelectionBtn.disabled=true;if(selectionSaveMsg)selectionSaveMsg.textContent='';setSubmitting(false);setStatus('Esperando ejecucion');resultsLinksEl.innerHTML='';detailsEl.textContent='';detailsEl.classList.add('hidden');clearErrorBox();clearFieldErrors();renderArtifacts([]);refreshPreview()});
 if(saveSelectionBtn)saveSelectionBtn.addEventListener('click',saveSelectionReport);renderArtifacts([]);refreshPreview();
 })();
 </script>
@@ -444,6 +487,13 @@ if(saveSelectionBtn)saveSelectionBtn.addEventListener('click',saveSelectionRepor
 @router.get('/ui', response_class=HTMLResponse)
 def ui_page() -> HTMLResponse:
     return HTMLResponse(content=UI_HTML)
+
+
+
+
+
+
+
 
 
 

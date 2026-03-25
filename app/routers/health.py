@@ -15,9 +15,12 @@ router = APIRouter(tags=["health"])
 def root_healthcheck() -> HealthResponse:
     settings = get_settings()
     try:
-        app_version = version("ShearTors_RC")
+        app_version = version("StructureLab")
     except PackageNotFoundError:
-        app_version = "0.1.0"
+        try:
+            app_version = version("ShearTors_RC")
+        except PackageNotFoundError:
+            app_version = "0.1.0"
     return HealthResponse(
         status="ok",
         service=settings.service_name,
