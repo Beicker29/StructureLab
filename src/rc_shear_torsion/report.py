@@ -6,7 +6,8 @@ from typing import Iterable
 
 from openpyxl import Workbook
 
-from .design import BAR_AREAS_MM2, BeamSummary, RegionDesignResult, SpanSummary
+from .design import BeamSummary, RegionDesignResult, SpanSummary
+from .results_model import to_canonical_region_result
 
 
 DESIGN_COLUMNS = [
@@ -46,18 +47,6 @@ DESIGN_COLUMNS = [
 ]
 
 
-def _longitudinal_provided_mm2(result: RegionDesignResult) -> float:
-    return BAR_AREAS_MM2.get(result.long_bar, 0.0) * result.long_count
-
-
-def _check_flags(result: RegionDesignResult) -> tuple[bool, bool, bool, bool]:
-    long_provided = _longitudinal_provided_mm2(result)
-    check_torsion = result.at_over_s >= result.t_req
-    check_shear = result.av_over_s >= result.v_req
-    check_longitudinal = long_provided >= result.l_req
-    check_detailing = result.failure_mode != "region_detail_fail"
-    return check_torsion, check_shear, check_longitudinal, check_detailing
-
 
 def ensure_output_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
@@ -69,43 +58,42 @@ def write_design_results(path: Path, region_results: Iterable[RegionDesignResult
     sheet.title = "design_results"
     sheet.append(DESIGN_COLUMNS)
     for result in region_results:
-        long_provided = _longitudinal_provided_mm2(result)
-        check_torsion, check_shear, check_longitudinal, check_detailing = _check_flags(result)
+        canonical = to_canonical_region_result(result)
         sheet.append(
             [
-                result.beam_id,
-                result.span_id,
-                result.region_id,
-                result.region_type,
-                result.source_control,
-                result.governing_station,
-                result.v_req,
+                canonical.beam_id,
+                canonical.span_id,
+                canonical.region_id,
+                canonical.region_type,
+                canonical.source_control,
+                canonical.governing_station,
+                canonical.v_req,
                 "mm2/m",
-                result.t_req,
+                canonical.t_req,
                 "mm2/m",
-                result.l_req,
+                canonical.l_req,
                 "mm2",
-                result.e_bar,
-                result.g_bar,
-                result.g_count,
-                result.spacing_mm,
-                result.controlling_limit,
-                result.av1,
-                result.av2,
-                result.av_total,
-                result.at,
-                result.at_over_s,
-                result.av_over_s,
-                result.long_bar,
-                result.long_count,
-                long_provided,
-                check_torsion,
-                check_shear,
-                check_longitudinal,
-                check_detailing,
-                result.failure_mode,
-                result.status,
-                result.message,
+                canonical.e_bar,
+                canonical.g_bar,
+                canonical.g_count,
+                canonical.spacing_mm,
+                canonical.controlling_limit,
+                canonical.av1,
+                canonical.av2,
+                canonical.av_total,
+                canonical.at,
+                canonical.at_over_s,
+                canonical.av_over_s,
+                canonical.long_bar,
+                canonical.long_count,
+                canonical.long_provided_mm2,
+                canonical.checks.torsion,
+                canonical.checks.shear,
+                canonical.checks.longitudinal,
+                canonical.checks.detailing,
+                canonical.failure_mode,
+                canonical.status,
+                canonical.message,
             ]
         )
     workbook.save(path)
@@ -182,42 +170,41 @@ def write_optimized_results(path: Path, region_results: Iterable[RegionDesignRes
         ]
     )
     for result in region_results:
-        long_provided = _longitudinal_provided_mm2(result)
-        check_torsion, check_shear, check_longitudinal, check_detailing = _check_flags(result)
+        canonical = to_canonical_region_result(result)
         sheet.append(
             [
-                result.beam_id,
-                result.span_id,
-                result.region_id,
-                result.method,
-                result.status,
-                result.failure_mode,
-                result.objective,
-                result.source_control,
-                result.governing_station,
-                result.e_bar,
-                result.g_bar,
-                result.g_count,
-                result.spacing_mm,
-                result.controlling_limit,
-                result.long_bar,
-                result.long_count,
-                long_provided,
-                result.v_req,
-                result.t_req,
-                result.l_req,
+                canonical.beam_id,
+                canonical.span_id,
+                canonical.region_id,
+                canonical.method,
+                canonical.status,
+                canonical.failure_mode,
+                canonical.objective,
+                canonical.source_control,
+                canonical.governing_station,
+                canonical.e_bar,
+                canonical.g_bar,
+                canonical.g_count,
+                canonical.spacing_mm,
+                canonical.controlling_limit,
+                canonical.long_bar,
+                canonical.long_count,
+                canonical.long_provided_mm2,
+                canonical.v_req,
+                canonical.t_req,
+                canonical.l_req,
                 "mm2/m",
                 "mm2/m",
                 "mm2",
-                check_torsion,
-                check_shear,
-                check_longitudinal,
-                check_detailing,
-                result.transverse_weight_kg_per_m,
-                result.longitudinal_weight_kg_per_m,
-                result.transverse_weight_kg_per_m + result.longitudinal_weight_kg_per_m,
-                result.evaluated_candidates,
-                result.feasible_candidates,
+                canonical.checks.torsion,
+                canonical.checks.shear,
+                canonical.checks.longitudinal,
+                canonical.checks.detailing,
+                canonical.transverse_weight_kg_per_m,
+                canonical.longitudinal_weight_kg_per_m,
+                canonical.total_weight_kg_per_m,
+                canonical.evaluated_candidates,
+                canonical.feasible_candidates,
             ]
         )
     workbook.save(path)

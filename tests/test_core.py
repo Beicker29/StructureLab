@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import os
@@ -13,8 +13,17 @@ from openpyxl import load_workbook
 
 from rc_shear_torsion.domain.errors import DomainValidationError
 from rc_shear_torsion.domain.validation import validate_case_payload
-from rc_shear_torsion.design import RegionDemand, evaluate_candidate, optimize_region_exhaustive
-from rc_shear_torsion.models import CaseConfig, VariablesConfig, resolve_path
+from rc_shear_torsion.design import (
+    RegionDemand,
+    RegionDesignResult,
+    build_region_demands,
+    evaluate_candidate,
+    optimize_region_exhaustive,
+    top_region_alternatives,
+)
+from rc_shear_torsion.io import EtabsFrameData, EtabsStationRow
+from rc_shear_torsion.models import CaseConfig, SpanConfig, VariablesConfig, resolve_path
+from rc_shear_torsion.results_model import to_canonical_region_result
 from rc_shear_torsion.run import run_case
 
 TMP_TEST_ROOT = Path(__file__).resolve().parents[1] / ".tmp_test_runtime"
@@ -76,6 +85,50 @@ class CoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             CaseConfig.model_validate(payload)
 
+    def test_canonical_result_model_computes_checks_and_weights(self) -> None:
+        result = RegionDesignResult(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="C",
+            source_control="gravity",
+            governing_station=1.0,
+            v_req=100.0,
+            t_req=70.0,
+            l_req=500.0,
+            e_bar="#4",
+            g_bar="#3",
+            g_count=2,
+            spacing_mm=100,
+            av1=200.0,
+            av2=142.0,
+            av_total=342.0,
+            at=129.0,
+            at_over_s=1290.0,
+            av_over_s=3420.0,
+            long_bar="#5",
+            long_count=4,
+            controlling_limit="d/4",
+            failure_mode="ok",
+            status="ok",
+            message="ok",
+            objective=1.5,
+            method="genetic",
+            evaluated_candidates=20,
+            feasible_candidates=8,
+            transverse_weight_kg_per_m=12.3,
+            longitudinal_weight_kg_per_m=4.5,
+            stirrup_unit_weight_kg=0.98,
+        )
+
+        canonical = to_canonical_region_result(result)
+        self.assertEqual(canonical.long_provided_mm2, 796.0)
+        self.assertTrue(canonical.checks.torsion)
+        self.assertTrue(canonical.checks.shear)
+        self.assertTrue(canonical.checks.longitudinal)
+        self.assertTrue(canonical.checks.detailing)
+        self.assertAlmostEqual(canonical.total_weight_kg_per_m, 16.8)
+
     def test_candidate_formula(self) -> None:
         region = RegionDemand(
             beam_id="B1",
@@ -111,6 +164,110 @@ class CoreTests(unittest.TestCase):
         self.assertGreaterEqual(candidate.at_over_s, region.t_req)
         self.assertGreaterEqual(candidate.av_over_s, region.v_req)
         self.assertGreaterEqual(candidate.long_provided, region.l_req)
+
+    def test_top_region_alternatives_returns_top_feasible_sorted(self) -> None:
+        region = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="NC",
+            beam_detailing="DES",
+            d_mm=600.0,
+            db_bar="#6",
+            min_branches=2,
+            width_mm=300.0,
+            height_mm=600.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            source_control="mixed",
+            governing_station=0.0,
+            v_req=1.0,
+            t_req=0.0,
+            l_req=1.0,
+            station_count=5,
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+            region_length_mm=1000.0,
+        )
+        variables = VariablesConfig(
+            E_bars=["#3"],
+            G_bars=["#3"],
+            G_counts=[0, 1, 2],
+            stirrup_spacing_mm=[80, 90, 100, 110, 120, 130],
+            longitudinal_bars=["#4"],
+            longitudinal_bar_counts=[2, 3],
+        )
+
+        alternatives = top_region_alternatives(region, variables, top_n=10)
+
+        self.assertEqual(len(alternatives), 10)
+        self.assertTrue(all(item.status == "ok" for item in alternatives))
+        self.assertGreaterEqual(alternatives[0].feasible_candidates, 10)
+
+        objectives = [item.objective for item in alternatives]
+        self.assertEqual(objectives, sorted(objectives))
+
+    def test_build_region_demands_reports_station_sequence_mismatch(self) -> None:
+        span = SpanConfig.model_validate(
+            {
+                "id": "S1",
+                "seismic": "190",
+                "gravity": "190",
+                "regions": [
+                    {
+                        "id": "R1",
+                        "from": 0.0,
+                        "to": 1.0,
+                        "type": "NC",
+                        "d_mm": 600.0,
+                        "db_bar": "#6",
+                        "width_mm": 300.0,
+                        "height_mm": 600.0,
+                    }
+                ],
+            }
+        )
+
+        def make_station(station: float) -> EtabsStationRow:
+            return EtabsStationRow(
+                story="L1",
+                label="B1",
+                unique_name="190",
+                design_sect="B300x600",
+                station=station,
+                as_top=0.0,
+                as_bot=0.0,
+                v_rebar_req=10.0,
+                t_lng_req=5.0,
+                t_trn_req=2.0,
+            )
+
+        seismic_frame = EtabsFrameData(
+            unique_name="190",
+            stations=(make_station(0.0), make_station(1500.0), make_station(3000.0)),
+        )
+        gravity_frame = EtabsFrameData(
+            unique_name="190",
+            stations=(make_station(0.0), make_station(1400.0), make_station(3000.0)),
+        )
+
+        demands, errors = build_region_demands(
+            beam_id="B1",
+            beam_detailing="DES",
+            beam_cover_side_mm=40.0,
+            beam_cover_top_mm=40.0,
+            beam_cover_bottom_mm=40.0,
+            beam_fc_mpa=28.0,
+            beam_fy_mpa=420.0,
+            span=span,
+            seismic_frame=seismic_frame,
+            gravity_frame=gravity_frame,
+        )
+
+        self.assertEqual(demands, [])
+        self.assertTrue(errors)
+        self.assertIn("station sequence mismatch", errors[0])
 
     def test_dmo_requires_detail_inputs_in_confined_region(self) -> None:
         payload = {
@@ -496,7 +653,7 @@ class CoreTests(unittest.TestCase):
             station_count=3,
         )
         # #3 -> dest=9.5 mm; 24*dest=228 mm. En este dominio de barras, 150 mm suele controlar.
-        # Esta prueba valida que 24*dest quede incluido explÃ­citamente en la expresiÃ³n de restricciÃ³n.
+        # Esta prueba valida que 24*dest quede incluido explÃƒÂ­citamente en la expresiÃƒÂ³n de restricciÃƒÂ³n.
         candidate = evaluate_candidate(
             region,
             e_bar="#3",
@@ -1232,4 +1389,10 @@ class CoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+
+
+
 

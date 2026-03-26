@@ -122,6 +122,27 @@ class ApiTests(unittest.TestCase):
         self.assertIn("Crear y ejecutar job", response.text)
         self.assertIn("Refuerzo transversal", response.text)
 
+    def test_ui_static_assets_available(self) -> None:
+        css_response = self.client.get("/ui/static/ui.css")
+        self.assertEqual(css_response.status_code, 200, css_response.text)
+        self.assertIn("text/css", css_response.headers.get("content-type", ""))
+
+        js_response = self.client.get("/ui/static/ui.js")
+        self.assertEqual(js_response.status_code, 200, js_response.text)
+        self.assertIn("javascript", js_response.headers.get("content-type", ""))
+
+        payload_response = self.client.get("/ui/static/ui_payload.js")
+        self.assertEqual(payload_response.status_code, 200, payload_response.text)
+        self.assertIn("javascript", payload_response.headers.get("content-type", ""))
+
+        status_response = self.client.get("/ui/static/ui_status.js")
+        self.assertEqual(status_response.status_code, 200, status_response.text)
+        self.assertIn("javascript", status_response.headers.get("content-type", ""))
+
+        svg_response = self.client.get("/ui/static/ui_svg.js")
+        self.assertEqual(svg_response.status_code, 200, svg_response.text)
+        self.assertIn("javascript", svg_response.headers.get("content-type", ""))
+
     def test_job_flow_success_and_download(self) -> None:
         job_id = self._create_job()
         final_status = self._wait_terminal_status(job_id)

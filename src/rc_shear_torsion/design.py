@@ -1,15 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import itertools
 import math
-import random
 from dataclasses import dataclass
 from typing import Literal
 
-from deap import base, creator, tools
-
 from .io import EtabsFrameData, EtabsStationRow
 from .models import OptimizationConfig, RegionConfig, SpanConfig, VariablesConfig
+from .optimization import SearchHooks, run_exhaustive_search, run_genetic_search
 
 FailureMode = Literal[
     "torsion_fail",
@@ -952,56 +950,59 @@ def optimize_region_exhaustive(region: RegionDemand, variables: VariablesConfig)
             failure_counts={"input_fail": 1},
         )
 
-    evaluated = 0
-    feasible = 0
-    failure_counts: dict[str, int] = {}
-    best: Candidate | None = None
-    best_feasible: Candidate | None = None
-    default_long_bar = variables.longitudinal_bars[0]
-    default_long_count = variables.longitudinal_bar_counts[0]
-
-    for e_bar, g_bar, g_count, spacing in itertools.product(
+    domain: list[list[str | int]] = [
         variables.E_bars,
         variables.G_bars,
         allowed_g_counts,
         variables.stirrup_spacing_mm,
-    ):
-        evaluated += 1
+    ]
+    default_long_bar = variables.longitudinal_bars[0]
+    default_long_count = variables.longitudinal_bar_counts[0]
+
+    def decode(individual: list[int]) -> tuple[str, str, int, int]:
+        return (
+            str(domain[0][individual[0]]),
+            str(domain[1][individual[1]]),
+            int(domain[2][individual[2]]),
+            int(domain[3][individual[3]]),
+        )
+
+    def evaluate_individual(individual: list[int]) -> Candidate:
+        e_bar, g_bar, g_count, spacing_mm = decode(individual)
         candidate = evaluate_candidate(
             region,
             e_bar=e_bar,
             g_bar=g_bar,
             g_count=g_count,
-            spacing_mm=spacing,
+            spacing_mm=spacing_mm,
             long_bar=default_long_bar,
             long_count=default_long_count,
         )
-        candidate = attach_independent_longitudinal(candidate, region, variables)
-        failure_counts[candidate.failure_mode] = failure_counts.get(candidate.failure_mode, 0) + 1
-        if candidate.status == "ok":
-            feasible += 1
-            if best_feasible is None or candidate.objective < best_feasible.objective:
-                best_feasible = candidate
-        if best is None or candidate.score < best.score:
-            best = candidate
+        return attach_independent_longitudinal(candidate, region, variables)
 
-    selected = best_feasible if best_feasible is not None else best
-    if selected is None:
-        raise RuntimeError("No candidate was evaluated in exhaustive mode")
-
+    hooks = SearchHooks[Candidate](
+        evaluate=evaluate_individual,
+        score=lambda candidate: candidate.score,
+        objective=lambda candidate: candidate.objective,
+        is_feasible=lambda candidate: candidate.status == "ok",
+        failure_mode=lambda candidate: candidate.failure_mode,
+    )
+    outcome = run_exhaustive_search(
+        domain_sizes=[len(values) for values in domain],
+        hooks=hooks,
+    )
     return OptimizationOutcome(
-        selected=selected,
-        evaluated_candidates=evaluated,
-        feasible_candidates=feasible,
+        selected=outcome.selected,
+        evaluated_candidates=outcome.evaluated_candidates,
+        feasible_candidates=outcome.feasible_candidates,
         method="exhaustive",
-        failure_counts=failure_counts,
+        failure_counts=outcome.failure_counts,
     )
 
 
 def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -> OptimizationOutcome:
     variables = optimization.variables
     ga = optimization.genetic_algorithm
-    rng = random.Random(42)
     allowed_g_counts, min_required_g = g_count_domain_for_region(region, variables.G_counts)
     if not allowed_g_counts:
         selected = failed_candidate(
@@ -1034,18 +1035,8 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
         variables.stirrup_spacing_mm,
     ]
     domain_sizes = [len(values) for values in domain]
-    _ensure_deap_types()
     default_long_bar = variables.longitudinal_bars[0]
     default_long_count = variables.longitudinal_bar_counts[0]
-
-    toolbox = base.Toolbox()
-    individual_cls = getattr(creator, DEAP_INDIVIDUAL_CLASS)
-
-    def create_individual() -> list[int]:
-        return [rng.randrange(size) for size in domain_sizes]
-
-    def clone_individual(individual: list[int]) -> list[int]:
-        return individual_cls(individual)
 
     def decode(individual: list[int]) -> tuple[str, str, int, int]:
         return (
@@ -1077,84 +1068,32 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
         evaluation_cache[key] = resolved
         return resolved
 
-    def mate(ind_a: list[int], ind_b: list[int]) -> tuple[list[int], list[int]]:
-        for idx in range(len(ind_a)):
-            if rng.random() < 0.5:
-                ind_a[idx], ind_b[idx] = ind_b[idx], ind_a[idx]
-        return ind_a, ind_b
-
-    def mutate(individual: list[int]) -> tuple[list[int]]:
-        for idx, size in enumerate(domain_sizes):
-            if rng.random() < ga.mutation_rate:
-                individual[idx] = rng.randrange(size)
-        return (individual,)
-
-    def tournament_pick(population: list[list[int]], k: int = 3) -> list[int]:
-        pool = [rng.choice(population) for _ in range(k)]
-        return min(pool, key=lambda item: item.fitness.values[0])
-
-    toolbox.register("individual", tools.initIterate, individual_cls, create_individual)
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("clone", clone_individual)
-    toolbox.register("mate", mate)
-    toolbox.register("mutate", mutate)
-
-    population = toolbox.population(n=ga.population_size)
-    evaluated = 0
-    feasible = 0
-    failure_counts: dict[str, int] = {}
-    best_seen: Candidate | None = None
-    best_feasible: Candidate | None = None
-
-    for _ in range(ga.generations):
-        for individual in population:
-            candidate = evaluate_individual(individual)
-            evaluated += 1
-            individual.fitness.values = (candidate.score,)
-            failure_counts[candidate.failure_mode] = failure_counts.get(candidate.failure_mode, 0) + 1
-            if candidate.status == "ok":
-                feasible += 1
-                if best_feasible is None or candidate.objective < best_feasible.objective:
-                    best_feasible = candidate
-            if best_seen is None or candidate.score < best_seen.score:
-                best_seen = candidate
-
-        elites = [toolbox.clone(ind) for ind in tools.selBest(population, ga.elite_count)]
-        next_population = elites
-        while len(next_population) < ga.population_size:
-            parent_a = toolbox.clone(tournament_pick(population))
-            parent_b = toolbox.clone(tournament_pick(population))
-            if rng.random() < ga.crossover_rate:
-                parent_a, parent_b = toolbox.mate(parent_a, parent_b)
-            parent_a, = toolbox.mutate(parent_a)
-            parent_b, = toolbox.mutate(parent_b)
-            if hasattr(parent_a.fitness, "values"):
-                del parent_a.fitness.values
-            if hasattr(parent_b.fitness, "values"):
-                del parent_b.fitness.values
-            next_population.append(parent_a)
-            if len(next_population) < ga.population_size:
-                next_population.append(parent_b)
-        population = next_population
-
-    selected = best_feasible if best_feasible is not None else best_seen
-    if selected is None:
-        raise RuntimeError("GA produced no candidates")
-
-    return OptimizationOutcome(
-        selected=selected,
-        evaluated_candidates=evaluated,
-        feasible_candidates=feasible,
-        method="genetic",
-        failure_counts=failure_counts,
+    hooks = SearchHooks[Candidate](
+        evaluate=evaluate_individual,
+        score=lambda candidate: candidate.score,
+        objective=lambda candidate: candidate.objective,
+        is_feasible=lambda candidate: candidate.status == "ok",
+        failure_mode=lambda candidate: candidate.failure_mode,
     )
-
-def _ensure_deap_types() -> None:
-    if not hasattr(creator, DEAP_FITNESS_CLASS):
-        creator.create(DEAP_FITNESS_CLASS, base.Fitness, weights=(-1.0,))
-    if not hasattr(creator, DEAP_INDIVIDUAL_CLASS):
-        fitness_cls = getattr(creator, DEAP_FITNESS_CLASS)
-        creator.create(DEAP_INDIVIDUAL_CLASS, list, fitness=fitness_cls)
+    outcome = run_genetic_search(
+        domain_sizes=domain_sizes,
+        population_size=ga.population_size,
+        generations=ga.generations,
+        crossover_rate=ga.crossover_rate,
+        mutation_rate=ga.mutation_rate,
+        elite_count=ga.elite_count,
+        hooks=hooks,
+        seed=42,
+        fitness_class_name=DEAP_FITNESS_CLASS,
+        individual_class_name=DEAP_INDIVIDUAL_CLASS,
+    )
+    return OptimizationOutcome(
+        selected=outcome.selected,
+        evaluated_candidates=outcome.evaluated_candidates,
+        feasible_candidates=outcome.feasible_candidates,
+        method="genetic",
+        failure_counts=outcome.failure_counts,
+    )
 
 
 def candidate_to_region_result(
@@ -1262,61 +1201,16 @@ def top_region_alternatives(
     )
     feasible_count = len(feasible)
 
-    selected: list[Candidate] = []
-    seen: set[tuple[str, str, int, int, str, int, str]] = set()
-
-    def candidate_key(candidate: Candidate) -> tuple[str, str, int, int, str, int, str]:
-        return (
-            candidate.e_bar,
-            candidate.g_bar,
-            candidate.g_count,
-            candidate.spacing_mm,
-            candidate.long_bar,
-            candidate.long_count,
-            candidate.status,
-        )
-
-    def add_candidate(candidate: Candidate) -> None:
-        key = candidate_key(candidate)
-        if key in seen:
-            return
-        seen.add(key)
-        selected.append(candidate)
-
-    best_by_long: dict[tuple[str, int], Candidate] = {}
-    for candidate in feasible:
-        key = (candidate.long_bar, candidate.long_count)
-        if key not in best_by_long:
-            best_by_long[key] = candidate
-    for candidate in best_by_long.values():
-        add_candidate(candidate)
-        if len(selected) >= top_n:
-            break
-
-    if len(selected) < top_n:
-        best_by_transverse: dict[tuple[str, str, int, int], Candidate] = {}
-        for candidate in feasible:
-            key = (candidate.e_bar, candidate.g_bar, candidate.g_count, candidate.spacing_mm)
-            if key not in best_by_transverse:
-                best_by_transverse[key] = candidate
-        for candidate in best_by_transverse.values():
-            add_candidate(candidate)
-            if len(selected) >= top_n:
-                break
-
-    if len(selected) < top_n:
-        for candidate in feasible:
-            add_candidate(candidate)
-            if len(selected) >= top_n:
-                break
-
+    # Keep alternatives deterministic and aligned with user expectation:
+    # "top N" means top feasible candidates sorted by objective/score.
+    selected: list[Candidate] = list(feasible[:top_n])
     if len(selected) < top_n:
         failed = sorted(
             (candidate for candidate in evaluated if candidate.status != "ok"),
             key=lambda candidate: candidate.score,
         )
         for candidate in failed:
-            add_candidate(candidate)
+            selected.append(candidate)
             if len(selected) >= top_n:
                 break
 
@@ -1392,3 +1286,4 @@ def make_failed_region_result(
         evaluated_candidates=0,
         feasible_candidates=0,
     )
+

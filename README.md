@@ -1,6 +1,12 @@
-# StructureLab
+﻿# Structure Lab
 
 API (FastAPI) + motor de calculo para diseno/optimizacion de refuerzo en vigas RC por cortante y torsion usando exportes ETABS.
+
+## Documentacion de arquitectura
+
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [ENGINEERING_REPO_STANDARD.md](ENGINEERING_REPO_STANDARD.md)
+- [ENGINEERING_REPO_TEMPLATE.md](ENGINEERING_REPO_TEMPLATE.md)
 
 ## Inicio rapido
 
@@ -105,5 +111,6 @@ curl -X POST "http://127.0.0.1:10000/v1/jobs" \
 curl "http://127.0.0.1:10000/v1/jobs/<job_id>"
 curl -L "http://127.0.0.1:10000/v1/jobs/<job_id>/download" -o reports.zip
 ```
+
 
 

@@ -1,0 +1,67 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Structure Lab - UI</title>
+<link rel="stylesheet" href="/ui/static/ui.css" />
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<div class="brand"><div class="brand-top"><svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="slGrad" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="#22bde2"/><stop offset="100%" stop-color="#1f5ec7"/></linearGradient></defs><path d="M10 52V24l16-10 13 8v30H10z" fill="none" stroke="url(#slGrad)" stroke-width="4" stroke-linejoin="round"/><path d="M26 14l10-6 18 11v33H39" fill="none" stroke="url(#slGrad)" stroke-width="4" stroke-linejoin="round"/><path d="M20 34h18M20 44h18M26 24v28M34 24v28" stroke="url(#slGrad)" stroke-width="2.5" opacity=".7"/><path d="M15 57h40" stroke="url(#slGrad)" stroke-width="4"/></svg><p class="brand-word"><span class="structure">Structure</span> <span class="lab">Lab</span></p></div></div>
+<nav id="sidebar-nav" class="nav" aria-label="Navegacion principal">
+<button type="button" class="active" data-view="view-design">Configuracion</button>
+<button type="button" data-view="view-import">Entrada del modelo</button>
+<button type="button" data-view="view-results">Resultados</button>
+<button type="button" data-view="view-reports">Reportes</button>
+</nav>
+<p class="side-foot">Compatibilidad API preservada: /v1/jobs*</p>
+</aside>
+<main class="main">
+<header class="top"><span id="global-status" class="status">Esperando ejecucion</span></header>
+<form id="job-form" novalidate>
+<section id="view-design" class="view active">
+<div class="grid g2">
+<section class="card"><h2>Informacion general</h2><p class="note">Parametros base del caso y configuracion de diseno.</p><div class="grid g3">
+<div class="field"><label for="api_key">API Key (opcional)</label><input id="api_key" name="api_key" autocomplete="off" placeholder="Solo si APP_API_KEY esta activa" /></div>
+<div class="field"><label for="case_name">Nombre del caso</label><input id="case_name" name="case_name" value="case_web" /></div>
+<div class="field"><label for="beam_id">ID de viga</label><input id="beam_id" name="beam_id" value="B1" /></div>
+<div class="field"><label for="sheet_name">Hoja ETABS</label><input id="sheet_name" name="sheet_name" value="Conc Bm Sum - ACI 318-08" /><p class="help">Debe coincidir exactamente en ambos Excel.</p></div>
+<div class="field"><label for="detailing">Detallado</label><select id="detailing" name="detailing"><option value="DMO" selected>DMO</option><option value="DES">DES</option></select></div>
+<div class="field"><label for="units_rebar_per_length">Unidad VRebar/TTrnRebar</label><select id="units_rebar_per_length" name="units_rebar_per_length"><option value="mm2/m" selected>mm2/m</option><option value="cm2/m">cm2/m</option></select></div><div class="field"><label for="geometry_units">Unidad de Width/Depth (Geometria)</label><select id="geometry_units" name="geometry_units"><option value="mm" selected>mm</option><option value="cm">cm</option><option value="m">m</option><option value="in">in</option></select><p class="help">Se aplica a columnas Width y Depth del archivo Geometria.</p></div>
+</div></section>
+<section class="card"><h2>Materiales y geometria</h2><p class="note">Propiedades y dimensiones principales de la viga.</p><div class="grid g2">
+<div class="field"><label for="fc_mpa">f'c (MPa)</label><input id="fc_mpa" name="fc_mpa" type="number" value="28" step="0.1" /></div>
+<div class="field"><label for="fy_mpa">fy (MPa)</label><input id="fy_mpa" name="fy_mpa" type="number" value="420" step="0.1" /></div>
+<div class="field"><label for="db_bar">Barra longitudinal de referencia (db_bar)</label><select id="db_bar" name="db_bar"><option>#3</option><option>#4</option><option>#5</option><option selected>#6</option><option>#7</option><option>#8</option></select></div>
+<div class="field"><label for="cover_side_mm">Recubrimiento lateral (mm)</label><input id="cover_side_mm" name="cover_side_mm" type="number" value="40" step="0.1" /></div>
+<div class="field"><label for="cover_top_mm">Recubrimiento superior (mm)</label><input id="cover_top_mm" name="cover_top_mm" type="number" value="40" step="0.1" /></div>
+<div class="field"><label for="cover_bottom_mm">Recubrimiento inferior (mm)</label><input id="cover_bottom_mm" name="cover_bottom_mm" type="number" value="40" step="0.1" /></div>
+</div></section>
+</div>
+<section class="card"><h2>Refuerzo base y configuracion avanzada</h2><p class="note">Reglas de armado y opciones avanzadas. Todo se envia como payload compatible al backend.</p>
+<input type="hidden" id="min_branches_c" name="min_branches_c" value="4" /><input type="hidden" id="min_branches_nc" name="min_branches_nc" value="2" /><input type="hidden" id="region_c_ratio" name="region_c_ratio" value="0.2" /><input type="hidden" id="width_mm" name="width_mm" value="300" /><input type="hidden" id="height_mm" name="height_mm" value="600" /><input type="hidden" id="d_mm" name="d_mm" value="540" /><input type="hidden" id="d_ratio_default" name="d_ratio_default" value="0.9" />
+<details class="advanced" open><summary>Configuracion avanzada (opcional)</summary><div class="adv-body">
+<input type="hidden" id="frame_pairs_json" name="frame_pairs_json" /><input type="hidden" id="optimization_overrides_json" name="optimization_overrides_json" /><input type="hidden" id="span_layout_json" name="span_layout_json" />
+<div class="adv-block"><div class="toggle"><input type="checkbox" id="enable_span_layout" /><label for="enable_span_layout">Configurar vanos, apoyos y regiones por vano</label></div><p class="help">Permite definir apoyos/separacion entre vanos y multiples regiones con indicador de confinado.</p><div id="span-layout-fields" class="adv-disabled"><div id="span-layout-list" class="span-list"></div><button type="button" class="mini-btn" id="btn-add-span">Agregar vano</button></div></div>
+<div class="adv-block"><div class="toggle"><input type="checkbox" id="enable_optimization_overrides" /><label for="enable_optimization_overrides">Personalizar optimizacion</label></div><p class="help">La UI construye internamente JSON compatible con backend.</p><div id="optimization-fields" class="grid g2 adv-disabled">
+<div class="field"><label for="opt_generations">Cantidad de generaciones</label><input id="opt_generations" type="number" min="1" step="1" placeholder="Ej: 80" /><p class="help">Entero >= 1.</p></div>
+<div class="field"><label for="opt_e_bars">Diametros para estribos cerrados</label><input id="opt_e_bars" type="text" placeholder="Ej: #3, #4, #6" /><p class="help">Separados por coma.</p></div>
+<div class="field"><label for="opt_g_bars">Diametros para ramas simples</label><input id="opt_g_bars" type="text" placeholder="Ej: #3, #4, #6" /><p class="help">Separados por coma.</p></div>
+<div class="field"><label for="opt_long_bars">Diametros para refuerzo longitudinal</label><input id="opt_long_bars" type="text" placeholder="Ej: #4, #5, #6" /><p class="help">Separados por coma.</p></div>
+<div class="field"><label for="opt_spacing">Espaciamientos posibles de estribos (mm)</label><input id="opt_spacing" type="text" placeholder="Ej: 70, 80, 100" /><p class="help">Enteros positivos separados por coma.</p></div>
+<div class="field"><label for="opt_long_counts">Cantidades posibles de barras longitudinales</label><input id="opt_long_counts" type="text" placeholder="Ej: 2, 4, 6, 8" /><p class="help">Enteros positivos separados por coma.</p></div>
+</div></div>
+</div></details></section></section>
+<section id="view-import" class="view"><section class="card"><h2>Importacion ETABS y ejecucion</h2><p class="note">Carga sismo/gravedad y, opcionalmente, geometria para mapear Width/Depth por vano desde DesignSect.</p><div class="grid g3"><div class="field"><label for="seismic_excel">Excel sismico</label><input id="seismic_excel" name="seismic_excel" type="file" accept=".xlsx" required /></div><div class="field"><label for="gravity_excel">Excel gravedad</label><input id="gravity_excel" name="gravity_excel" type="file" accept=".xlsx" required /></div><div class="field"><label for="geometry_excel">Excel geometria</label><input id="geometry_excel" name="geometry_excel" type="file" accept=".xlsx" /></div></div><div class="actions"><button type="submit" class="btn btn-primary" id="btn-submit"><span class="spinner" aria-hidden="true"></span><span id="btn-submit-label">Crear y ejecutar job</span></button><button type="button" class="btn btn-secondary" id="btn-clear">Limpiar estado</button></div></section></section>
+<section id="view-results" class="view"><div class="results"><section class="card"><h2>Resultados - Vista en alzado de la viga</h2><p class="note">Preview SVG con vanos, apoyos, regiones, espaciamientos y Refuerzo transversal / longitudinal.</p><div id="beam-elevation-container" class="svg-wrap" aria-live="polite"></div><p id="beam-elevation-legend" class="legend">El SVG usa datos reales del case/job cuando existen, y fallback tecnico cuando faltan.</p><section class="card" style="margin-top:10px"><h2>Alternativas por region</h2><p class="note">Puedes escoger un arreglo diferente por region (top 10), con comparativo de peso vs la opcion mas optima.</p><div id="region-options" class="region-opt-grid"><p class="help">Ejecuta un job para habilitar opciones de seleccion por region.</p></div><div class="actions"><button type="button" class="btn btn-secondary" id="btn-save-selection" disabled>Guardar seleccion y generar reporte</button></div><p id="selection-save-msg" class="help"></p></section></section><div class="grid"><section class="card"><h2>Estado del job</h2><p class="note">Monitoreo en tiempo real, errores y trazabilidad.</p><span id="status" class="status">Esperando ejecucion</span><div id="error-box" class="alert hidden" role="alert" aria-live="assertive"></div><details style="margin-top:10px"><summary style="cursor:pointer;font-size:.82rem;color:#315171;font-weight:620">Ver detalle de respuesta</summary><pre id="details" class="log hidden"></pre></details></section><section class="card"><h2>Resumen tecnico</h2><ul id="summary-list" class="list"></ul></section><section class="card"><h2>Checks visuales</h2><ul id="checks-list" class="list"></ul></section></div></div></section>
+<section id="view-reports" class="view"><div class="grid g2"><section class="card"><h2>Export y accesos rapidos</h2><p class="note">Enlaces de estado y case generado.</p><div id="results-links" class="links"></div></section><section class="card"><h2>Artefactos detectados</h2><ul id="artifacts-list" class="list"></ul></section></div></section>
+</form></main></div>
+<script src="/ui/static/ui_payload.js"></script>
+<script src="/ui/static/ui_status.js"></script>
+<script src="/ui/static/ui_svg.js"></script>
+<script src="/ui/static/ui.js"></script>
+</body>
+</html>
+
