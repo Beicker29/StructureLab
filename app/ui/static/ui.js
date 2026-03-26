@@ -1,9 +1,10 @@
 ﻿(() => {
-const form=document.getElementById('job-form'),submitBtn=document.getElementById('btn-submit'),submitLabel=document.getElementById('btn-submit-label'),clearBtn=document.getElementById('btn-clear'),globalStatusEl=document.getElementById('global-status'),statusEl=document.getElementById('status'),resultsLinksEl=document.getElementById('results-links'),detailsEl=document.getElementById('details'),errorBoxEl=document.getElementById('error-box'),summaryListEl=document.getElementById('summary-list'),checksListEl=document.getElementById('checks-list'),artifactsListEl=document.getElementById('artifacts-list'),beamElevationContainer=document.getElementById('beam-elevation-container'),beamElevationLegend=document.getElementById('beam-elevation-legend'),regionOptionsEl=document.getElementById('region-options'),saveSelectionBtn=document.getElementById('btn-save-selection'),selectionSaveMsg=document.getElementById('selection-save-msg'),hiddenFramePairsInput=document.getElementById('frame_pairs_json'),hiddenOptimizationInput=document.getElementById('optimization_overrides_json'),hiddenSpanLayoutInput=document.getElementById('span_layout_json'),enableSpanLayout=document.getElementById('enable_span_layout'),spanLayoutFields=document.getElementById('span-layout-fields'),spanLayoutList=document.getElementById('span-layout-list'),addSpanBtn=document.getElementById('btn-add-span'),enableOptimizationOverrides=document.getElementById('enable_optimization_overrides'),optimizationFields=document.getElementById('optimization-fields'),optGenerations=document.getElementById('opt_generations'),optEBars=document.getElementById('opt_e_bars'),optGBars=document.getElementById('opt_g_bars'),optLongBars=document.getElementById('opt_long_bars'),optSpacing=document.getElementById('opt_spacing'),optLongCounts=document.getElementById('opt_long_counts');
+const form=document.getElementById('job-form'),submitBtn=document.getElementById('btn-submit'),submitLabel=document.getElementById('btn-submit-label'),clearBtn=document.getElementById('btn-clear'),globalStatusEl=document.getElementById('global-status'),statusEl=document.getElementById('status'),resultsLinksEl=document.getElementById('results-links'),detailsEl=document.getElementById('details'),errorBoxEl=document.getElementById('error-box'),summaryListEl=document.getElementById('summary-list'),checksListEl=document.getElementById('checks-list'),artifactsListEl=document.getElementById('artifacts-list'),beamElevationContainer=document.getElementById('beam-elevation-container'),beamElevationLegend=document.getElementById('beam-elevation-legend'),regionOptionsEl=document.getElementById('region-options'),saveSelectionBtn=document.getElementById('btn-save-selection'),selectionSaveMsg=document.getElementById('selection-save-msg'),hiddenFramePairsInput=document.getElementById('frame_pairs_json'),hiddenOptimizationInput=document.getElementById('optimization_overrides_json'),hiddenSpanLayoutInput=document.getElementById('span_layout_json'),enableSpanLayout=document.getElementById('enable_span_layout'),spanLayoutFields=document.getElementById('span-layout-fields'),spanLayoutList=document.getElementById('span-layout-list'),addSpanBtn=document.getElementById('btn-add-span'),enableOptimizationOverrides=document.getElementById('enable_optimization_overrides'),optimizationFields=document.getElementById('optimization-fields'),optGenerations=document.getElementById('opt_generations'),optEBars=document.getElementById('opt_e_bars'),optGBars=document.getElementById('opt_g_bars'),optLongBars=document.getElementById('opt_long_bars'),optSpacing=document.getElementById('opt_spacing'),optLongCounts=document.getElementById('opt_long_counts'),optLongitudinalMode=document.getElementById('opt_longitudinal_mode');
 const navButtons=Array.from(document.querySelectorAll('[data-view]')),views=Array.from(document.querySelectorAll('.view'));
 let currentJobId=null,currentPreviewPayload=null,pollTimer=null,isSubmitting=false,regionOptionSelections={},spanLongSelections={};
 const parseNum=v=>{const p=Number(v);return Number.isFinite(p)?p:null},clamp=(v,mx,mn)=>Math.max(mx,Math.min(mn,v));const DEFAULT_C_RATIO=0.2,DEFAULT_MIN_BRANCHES_C=4,DEFAULT_MIN_BRANCHES_NC=2;
 const payloadModule=window.StructureLabPayload||{},statusModule=window.StructureLabStatus||{},svgModule=window.StructureLabSvg||{};
+if(optLongitudinalMode){optLongitudinalMode.value='span_coupled'}
 function parseCsvTokens(raw){if(payloadModule.parseCsvTokens)return payloadModule.parseCsvTokens(raw);return String(raw||'').split(',').map(v=>v.trim()).filter(v=>v.length>0)}
 function parsePositiveIntList(raw){if(payloadModule.parsePositiveIntList)return payloadModule.parsePositiveIntList(raw);const t=parseCsvTokens(raw);if(!t.length)return{ok:false,values:[],message:'La lista no puede estar vacia.'};const values=[];for(const token of t){const p=Number(token);if(!Number.isInteger(p)||p<=0)return{ok:false,values:[],message:`Valor invalido: ${token}. Usa enteros positivos.`};values.push(p)}return{ok:true,values,message:''}}
 function headersWithApiKey(){const value=(document.getElementById('api_key').value||'').trim();return value?{'X-API-Key':value}:{}}
@@ -16,7 +17,7 @@ function clearErrorBox(){errorBoxEl.classList.add('hidden');errorBoxEl.innerHTML
 function clearFieldErrors(){form.querySelectorAll('[aria-invalid="true"]').forEach(el=>el.removeAttribute('aria-invalid'));form.querySelectorAll('.field-error').forEach(el=>el.remove())}
 function ensureFieldVisible(el){if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'})}
 function markElementError(el,msg){if(!el)return;el.setAttribute('aria-invalid','true');const field=el.closest('.field');if(field){const p=document.createElement('p');p.className='field-error';p.textContent=msg;field.appendChild(p)}ensureFieldVisible(el)}
-function mapBackendField(field){if(payloadModule.mapBackendField)return payloadModule.mapBackendField(field);if(!field)return null;const raw=String(field).toLowerCase();const map=[['sheet_name','sheet_name'],['region_c_ratio','region_c_ratio'],['min_branches','min_branches_c'],['fc_mpa','fc_mpa'],['fy_mpa','fy_mpa'],['width_mm','width_mm'],['height_mm','height_mm'],['d_mm','d_mm'],['d_ratio','enable_span_layout'],['clear_length_mm','enable_span_layout'],['db_bar','db_bar'],['cover_side_mm','cover_side_mm'],['cover_top_mm','cover_top_mm'],['cover_bottom_mm','cover_bottom_mm'],['frame_pairs','enable_span_layout'],['span_layout','enable_span_layout'],['optimization','enable_optimization_overrides'],['seismic_excel','seismic_excel'],['gravity_excel','gravity_excel'],['geometry_excel','geometry_excel']];for(const [t,id] of map){if(raw.includes(t))return id}return null}
+function mapBackendField(field){if(payloadModule.mapBackendField)return payloadModule.mapBackendField(field);if(!field)return null;const raw=String(field).toLowerCase();const map=[['sheet_name','sheet_name'],['region_c_ratio','region_c_ratio'],['min_branches','min_branches_c'],['fc_mpa','fc_mpa'],['fy_mpa','fy_mpa'],['width_mm','width_mm'],['height_mm','height_mm'],['d_mm','d_mm'],['d_ratio','enable_span_layout'],['clear_length_mm','enable_span_layout'],['is_deep_beam','enable_span_layout'],['db_bar','db_bar'],['cover_side_mm','cover_side_mm'],['cover_top_mm','cover_top_mm'],['cover_bottom_mm','cover_bottom_mm'],['frame_pairs','enable_span_layout'],['span_layout','enable_span_layout'],['optimization','enable_optimization_overrides'],['seismic_excel','seismic_excel'],['gravity_excel','gravity_excel'],['geometry_excel','geometry_excel']];for(const [t,id] of map){if(raw.includes(t))return id}return null}
 function normalizeErrorPayload(payload,status){if(payloadModule.normalizeErrorPayload)return payloadModule.normalizeErrorPayload(payload,status);if(!payload||typeof payload!=='object')return{error:'request_error',message:`No fue posible completar la solicitud (HTTP ${status}).`,details:[]};if(Array.isArray(payload.details))return{error:payload.error||'request_error',message:payload.message||'Error de solicitud',details:payload.details};if(Array.isArray(payload.detail))return{error:'validation_error',message:`No fue posible completar la solicitud (HTTP ${status}).`,details:payload.detail.map(it=>({code:it.type||'validation_error',field:Array.isArray(it.loc)?it.loc[it.loc.length-1]:'',message:it.msg||'Entrada invalida',severity:'error'}))};return{error:payload.error||'request_error',message:payload.message||payload.detail||'Error de solicitud',details:[]}}
 function renderError(payload){clearErrorBox();clearFieldErrors();const details=Array.isArray(payload?.details)?payload.details:[];const items=[];for(const d of details){const mapped=mapBackendField(d.field||'');if(mapped)markElementError(document.getElementById(mapped),d.message||'Valor no valido');const pref=d.field?`${d.field}: `:'';const suf=d.code?` [${d.code}]`:'';items.push(`<li>${pref}${d.message||'Detalle de validacion'}${suf}</li>`)}const list=items.length?`<ul>${items.join('')}</ul>`:'';errorBoxEl.innerHTML=`<h4>${payload?.message||'Error de solicitud'}</h4><p>Codigo: <strong>${payload?.error||'request_error'}</strong></p>${list}`;errorBoxEl.classList.remove('hidden');setStatus('Se encontraron errores de validacion','err');switchView('view-results')}
 function renderUiValidationErrors(errors){clearErrorBox();clearFieldErrors();const items=[];for(const e of errors){if(e.element)markElementError(e.element,e.message);items.push(`<li>${e.label}: ${e.message}</li>`)}errorBoxEl.innerHTML=`<h4>Revisa la configuracion avanzada</h4><p>Codigo: <strong>ui_validation_error</strong></p><ul>${items.join('')}</ul>`;errorBoxEl.classList.remove('hidden');setStatus('Corrige errores de configuracion avanzada','err');switchView('view-results')}
@@ -31,11 +32,11 @@ function createSpanRow(initial={}){
 const row=document.createElement('details');
 row.className='span-row';
 row.open=true;
-row.innerHTML='<summary class="span-summary"><span class="span-summary-title">Vano</span><span class="span-summary-meta"></span></summary><div class="span-body"><div class="span-head"><div class="field"><label>ID vano</label><input type="text" class="span-id" placeholder="S1" /></div><div class="field"><label>Vano sismico</label><input type="text" class="span-seismic" placeholder="190" /></div><div class="field"><label>Vano gravedad</label><input type="text" class="span-gravity" placeholder="190" /></div><div class="field"><label>Fraccion d/h</label><input type="number" class="span-d-ratio" step="0.01" min="0.01" max="1" placeholder="0.90" /></div><div class="field"><label>Apoyo izq (mm)</label><input type="number" class="span-support-left" step="1" min="0" placeholder="0" /></div><div class="field"><label>Apoyo der (mm)</label><input type="number" class="span-support-right" step="1" min="0" placeholder="0" /></div><div class="field"><label>L libre real (mm)</label><input type="number" class="span-clear-length" step="1" min="1" placeholder="auto ETABS" /></div><div class="field"><label>Accion</label><button type="button" class="mini-btn mini-btn-danger span-remove">Eliminar vano</button></div></div><div class="region-box"><div class="region-head"><strong>Regiones del vano</strong><div class="region-actions"><button type="button" class="mini-btn btn-regenerate-regions">Regenerar 3 regiones base</button><button type="button" class="mini-btn btn-add-region">Agregar region</button></div></div><p class="help">Las regiones deben cubrir continuo de 0.0 a 1.0.</p><div class="region-list"></div></div></div>';
-const idIn=row.querySelector('.span-id'),sIn=row.querySelector('.span-seismic'),gIn=row.querySelector('.span-gravity'),drIn=row.querySelector('.span-d-ratio'),slIn=row.querySelector('.span-support-left'),srIn=row.querySelector('.span-support-right'),clIn=row.querySelector('.span-clear-length'),removeBtn=row.querySelector('.span-remove'),addRegionBtn=row.querySelector('.btn-add-region'),regenBtn=row.querySelector('.btn-regenerate-regions'),regionList=row.querySelector('.region-list'),summaryTitle=row.querySelector('.span-summary-title'),summaryMeta=row.querySelector('.span-summary-meta');
-idIn.value=initial.id||'';sIn.value=initial.seismic||'';gIn.value=initial.gravity||'';drIn.value=Number.isFinite(initial.d_ratio)?String(initial.d_ratio):'0.90';slIn.value=Number.isFinite(initial.support_left_mm)?String(initial.support_left_mm):'';srIn.value=Number.isFinite(initial.support_right_mm)?String(initial.support_right_mm):'';clIn.value=Number.isFinite(initial.clear_length_mm)?String(initial.clear_length_mm):'';
-const updateSummary=()=>{const id=(idIn.value||'').trim()||'sin ID',s=(sIn.value||'').trim()||'?',g=(gIn.value||'').trim()||'?',dr=(drIn.value||'').trim()||'0.90',sl=(slIn.value||'').trim()||'0',sr=(srIn.value||'').trim()||'0',cl=(clIn.value||'').trim();summaryTitle.textContent=`Vano ${id}`;summaryMeta.textContent=`Sismo:${s} | Gravedad:${g} | d/h:${dr} | Ap.izq:${sl} mm | Ap.der:${sr} mm | L libre real:${cl||'modelo'} mm`};
-[idIn,sIn,gIn,drIn,slIn,srIn,clIn].forEach(input=>input.addEventListener('input',updateSummary));
+row.innerHTML='<summary class="span-summary"><span class="span-summary-title">Vano</span><span class="span-summary-meta"></span></summary><div class="span-body"><div class="span-head"><div class="field"><label>ID vano</label><input type="text" class="span-id" placeholder="S1" /></div><div class="field"><label>Vano sismico</label><input type="text" class="span-seismic" placeholder="190" /></div><div class="field"><label>Vano gravedad</label><input type="text" class="span-gravity" placeholder="190" /></div><div class="field"><label>Fraccion d/h</label><input type="number" class="span-d-ratio" step="0.01" min="0.01" max="1" placeholder="0.90" /></div><div class="field"><label>Apoyo izq (mm)</label><input type="number" class="span-support-left" step="1" min="0" placeholder="0" /></div><div class="field"><label>Apoyo der (mm)</label><input type="number" class="span-support-right" step="1" min="0" placeholder="0" /></div><div class="field"><label>L libre real (mm)</label><input type="number" class="span-clear-length" step="1" min="1" placeholder="auto ETABS" /></div><div class="field field-checkbox"><label>Viga alta</label><input type="checkbox" class="span-is-deep-beam" /></div><div class="field"><label>Accion</label><button type="button" class="mini-btn mini-btn-danger span-remove">Eliminar vano</button></div></div><div class="region-box"><div class="region-head"><strong>Regiones del vano</strong><div class="region-actions"><button type="button" class="mini-btn btn-regenerate-regions">Regenerar 3 regiones base</button><button type="button" class="mini-btn btn-add-region">Agregar region</button></div></div><p class="help">Las regiones deben cubrir continuo de 0.0 a 1.0.</p><div class="region-list"></div></div></div>';
+const idIn=row.querySelector('.span-id'),sIn=row.querySelector('.span-seismic'),gIn=row.querySelector('.span-gravity'),drIn=row.querySelector('.span-d-ratio'),slIn=row.querySelector('.span-support-left'),srIn=row.querySelector('.span-support-right'),clIn=row.querySelector('.span-clear-length'),dbIn=row.querySelector('.span-is-deep-beam'),removeBtn=row.querySelector('.span-remove'),addRegionBtn=row.querySelector('.btn-add-region'),regenBtn=row.querySelector('.btn-regenerate-regions'),regionList=row.querySelector('.region-list'),summaryTitle=row.querySelector('.span-summary-title'),summaryMeta=row.querySelector('.span-summary-meta');
+idIn.value=initial.id||'';sIn.value=initial.seismic||'';gIn.value=initial.gravity||'';drIn.value=Number.isFinite(initial.d_ratio)?String(initial.d_ratio):'0.90';slIn.value=Number.isFinite(initial.support_left_mm)?String(initial.support_left_mm):'';srIn.value=Number.isFinite(initial.support_right_mm)?String(initial.support_right_mm):'';clIn.value=Number.isFinite(initial.clear_length_mm)?String(initial.clear_length_mm):'';dbIn.checked=!!initial.is_deep_beam;
+const updateSummary=()=>{const id=(idIn.value||'').trim()||'sin ID',s=(sIn.value||'').trim()||'?',g=(gIn.value||'').trim()||'?',dr=(drIn.value||'').trim()||'0.90',sl=(slIn.value||'').trim()||'0',sr=(srIn.value||'').trim()||'0',cl=(clIn.value||'').trim(),db=dbIn.checked?'si':'no';summaryTitle.textContent=`Vano ${id}`;summaryMeta.textContent=`Sismo:${s} | Gravedad:${g} | d/h:${dr} | Ap.izq:${sl} mm | Ap.der:${sr} mm | L libre real:${cl||'modelo'} mm | Viga alta:${db}`};
+[idIn,sIn,gIn,drIn,slIn,srIn,clIn,dbIn].forEach(input=>input.addEventListener('input',updateSummary));
 const regions=Array.isArray(initial.regions)&&initial.regions.length?initial.regions:defaultRegionTemplate(DEFAULT_C_RATIO);
 regions.forEach(region=>regionList.appendChild(createRegionRow(region)));
 updateSummary();
@@ -51,7 +52,7 @@ const rows=Array.from(spanLayoutList.querySelectorAll('.span-row'));
 if(!rows.length){errors.push({label:'Vanos',element:enableSpanLayout,message:'Agrega al menos un vano.'});return[]}
 const spans=[];
 rows.forEach((row,index)=>{
-const idIn=row.querySelector('.span-id'),sIn=row.querySelector('.span-seismic'),gIn=row.querySelector('.span-gravity'),drIn=row.querySelector('.span-d-ratio'),slIn=row.querySelector('.span-support-left'),srIn=row.querySelector('.span-support-right'),clIn=row.querySelector('.span-clear-length');
+const idIn=row.querySelector('.span-id'),sIn=row.querySelector('.span-seismic'),gIn=row.querySelector('.span-gravity'),drIn=row.querySelector('.span-d-ratio'),slIn=row.querySelector('.span-support-left'),srIn=row.querySelector('.span-support-right'),clIn=row.querySelector('.span-clear-length'),dbIn=row.querySelector('.span-is-deep-beam');
 const spanId=(idIn.value||'').trim()||`S${index+1}`,s=(sIn.value||'').trim(),g=(gIn.value||'').trim(),drRaw=(drIn.value||'').trim(),dr=drRaw?parseNum(drRaw):null;
 if(!s)errors.push({label:`Vano ${index+1}`,element:sIn,message:'Vano sismico es obligatorio.'});
 if(!g)errors.push({label:`Vano ${index+1}`,element:gIn,message:'Vano gravedad es obligatorio.'});if(!drRaw)errors.push({label:`Vano ${index+1}`,element:drIn,message:'Debes ingresar fraccion d/h.'});if(drRaw&&(dr===null||dr<=0||dr>1))errors.push({label:`Vano ${index+1}`,element:drIn,message:'d/h debe estar en (0,1].'});
@@ -63,15 +64,15 @@ if(slRaw&&(sl===null||sl<0))errors.push({label:`Vano ${index+1}`,element:slIn,me
 if(srRaw&&(sr===null||sr<0))errors.push({label:`Vano ${index+1}`,element:srIn,message:'Apoyo der debe ser >= 0.'});
 if(clRaw&&(cl===null||cl<=0))errors.push({label:`Vano ${index+1}`,element:clIn,message:'L libre real debe ser > 0.'});
 const regions=parseRegionRowsStrict(row,index+1,errors);
-spans.push({id:spanId,seismic:s,gravity:g,d_ratio:dr,support_left_mm:sl,support_right_mm:sr,clear_length_mm:cl,regions})
+spans.push({id:spanId,seismic:s,gravity:g,d_ratio:dr,support_left_mm:sl,support_right_mm:sr,clear_length_mm:cl,is_deep_beam:dbIn.checked,regions})
 });
 return spans
 }
-function collectSpanLayoutPreview(){if(!enableSpanLayout.checked)return[];const rows=Array.from(spanLayoutList.querySelectorAll('.span-row'));if(!rows.length)return[];const minC=DEFAULT_MIN_BRANCHES_C,minNC=DEFAULT_MIN_BRANCHES_NC;return rows.map((row,index)=>{const spanId=(row.querySelector('.span-id').value||'').trim()||`S${index+1}`,s=(row.querySelector('.span-seismic').value||'').trim()||spanId,g=(row.querySelector('.span-gravity').value||'').trim()||s,dr=parseNum(row.querySelector('.span-d-ratio').value),sl=parseNum(row.querySelector('.span-support-left').value),sr=parseNum(row.querySelector('.span-support-right').value),cl=parseNum(row.querySelector('.span-clear-length').value);const regionRows=Array.from(row.querySelectorAll('.region-row')),regions=[];for(let i=0;i<regionRows.length;i++){const rr=regionRows[i],fromV=parseNum(rr.querySelector('.region-from').value),toV=parseNum(rr.querySelector('.region-to').value);if(fromV===null||toV===null||fromV<0||toV>1||fromV>=toV)continue;const type=rr.querySelector('.region-confined').checked?'C':'NC',mbRaw=parseNum(rr.querySelector('.region-min-branches').value);regions.push({id:(rr.querySelector('.region-id').value||'').trim()||`R${i+1}`,from:fromV,to:toV,type,min_branches:Number.isInteger(mbRaw)&&mbRaw>=1?mbRaw:(type==='C'?minC:minNC),spacing_mm:type==='C'?100:200})}const ordered=[...regions].sort((a,b)=>a.from-b.from);let valid=ordered.length>0;if(valid){const tol=1e-9;if(Math.abs(ordered[0].from-0)>tol||Math.abs(ordered[ordered.length-1].to-1)>tol)valid=false;else{let cur=0;for(const rg of ordered){if(Math.abs(rg.from-cur)>tol){valid=false;break}cur=rg.to}}}const effective=valid?ordered:defaultRegionTemplate(DEFAULT_C_RATIO);return{id:spanId,seismic:s,gravity:g,d_ratio:Number.isFinite(dr)&&dr>0&&dr<=1?dr:0.9,support_left_mm:Number.isFinite(sl)&&sl>=0?sl:0,support_right_mm:Number.isFinite(sr)&&sr>=0?sr:0,clear_length_mm:Number.isFinite(cl)&&cl>0?cl:null,regions:effective}})}
+function collectSpanLayoutPreview(){if(!enableSpanLayout.checked)return[];const rows=Array.from(spanLayoutList.querySelectorAll('.span-row'));if(!rows.length)return[];const minC=DEFAULT_MIN_BRANCHES_C,minNC=DEFAULT_MIN_BRANCHES_NC;return rows.map((row,index)=>{const spanId=(row.querySelector('.span-id').value||'').trim()||`S${index+1}`,s=(row.querySelector('.span-seismic').value||'').trim()||spanId,g=(row.querySelector('.span-gravity').value||'').trim()||s,dr=parseNum(row.querySelector('.span-d-ratio').value),sl=parseNum(row.querySelector('.span-support-left').value),sr=parseNum(row.querySelector('.span-support-right').value),cl=parseNum(row.querySelector('.span-clear-length').value),isDeepBeam=!!row.querySelector('.span-is-deep-beam')?.checked;const regionRows=Array.from(row.querySelectorAll('.region-row')),regions=[];for(let i=0;i<regionRows.length;i++){const rr=regionRows[i],fromV=parseNum(rr.querySelector('.region-from').value),toV=parseNum(rr.querySelector('.region-to').value);if(fromV===null||toV===null||fromV<0||toV>1||fromV>=toV)continue;const type=rr.querySelector('.region-confined').checked?'C':'NC',mbRaw=parseNum(rr.querySelector('.region-min-branches').value);regions.push({id:(rr.querySelector('.region-id').value||'').trim()||`R${i+1}`,from:fromV,to:toV,type,min_branches:Number.isInteger(mbRaw)&&mbRaw>=1?mbRaw:(type==='C'?minC:minNC),spacing_mm:type==='C'?100:200})}const ordered=[...regions].sort((a,b)=>a.from-b.from);let valid=ordered.length>0;if(valid){const tol=1e-9;if(Math.abs(ordered[0].from-0)>tol||Math.abs(ordered[ordered.length-1].to-1)>tol)valid=false;else{let cur=0;for(const rg of ordered){if(Math.abs(rg.from-cur)>tol){valid=false;break}cur=rg.to}}}const effective=valid?ordered:defaultRegionTemplate(DEFAULT_C_RATIO);return{id:spanId,seismic:s,gravity:g,d_ratio:Number.isFinite(dr)&&dr>0&&dr<=1?dr:0.9,support_left_mm:Number.isFinite(sl)&&sl>=0?sl:0,support_right_mm:Number.isFinite(sr)&&sr>=0?sr:0,clear_length_mm:Number.isFinite(cl)&&cl>0?cl:null,is_deep_beam:isDeepBeam,regions:effective}})}
 function buildAdvancedPayload(){
 hiddenFramePairsInput.value='';hiddenOptimizationInput.value='';hiddenSpanLayoutInput.value='';const errors=[];
-if(enableSpanLayout.checked){const spans=collectSpanLayoutStrict(errors);if(!errors.length){hiddenSpanLayoutInput.value=JSON.stringify(spans.map(s=>({id:s.id,seismic:s.seismic,gravity:s.gravity,d_ratio:s.d_ratio,support_left_mm:s.support_left_mm,support_right_mm:s.support_right_mm,clear_length_mm:s.clear_length_mm,regions:s.regions})));hiddenFramePairsInput.value=JSON.stringify(spans.map(s=>({id:s.id,seismic:s.seismic,gravity:s.gravity})))}}
-if(enableOptimizationOverrides.checked){const genRaw=(optGenerations.value||'').trim(),gen=Number(genRaw);if(!genRaw)errors.push({label:'Generaciones',element:optGenerations,message:'Indica la cantidad de generaciones.'});else if(!Number.isInteger(gen)||gen<1)errors.push({label:'Generaciones',element:optGenerations,message:'Debe ser un entero >= 1.'});const eb=parseCsvTokens(optEBars.value),gb=parseCsvTokens(optGBars.value),lb=parseCsvTokens(optLongBars.value);if(!eb.length)errors.push({label:'Estribos cerrados',element:optEBars,message:'Define al menos un diametro.'});if(!gb.length)errors.push({label:'Ramas simples',element:optGBars,message:'Define al menos un diametro.'});if(!lb.length)errors.push({label:'Refuerzo longitudinal',element:optLongBars,message:'Define al menos un diametro.'});const sp=parsePositiveIntList(optSpacing.value),lc=parsePositiveIntList(optLongCounts.value);if(!sp.ok)errors.push({label:'Espaciamientos',element:optSpacing,message:sp.message});if(!lc.ok)errors.push({label:'Cantidades longitudinales',element:optLongCounts,message:lc.message});if(!errors.length)hiddenOptimizationInput.value=JSON.stringify({variables:{E_bars:eb,G_bars:gb,stirrup_spacing_mm:sp.values,longitudinal_bars:lb,longitudinal_bar_counts:lc.values},genetic_algorithm:{generations:gen}})}
+if(enableSpanLayout.checked){const spans=collectSpanLayoutStrict(errors);if(!errors.length){hiddenSpanLayoutInput.value=JSON.stringify(spans.map(s=>({id:s.id,seismic:s.seismic,gravity:s.gravity,d_ratio:s.d_ratio,support_left_mm:s.support_left_mm,support_right_mm:s.support_right_mm,clear_length_mm:s.clear_length_mm,is_deep_beam:s.is_deep_beam,regions:s.regions})));hiddenFramePairsInput.value=JSON.stringify(spans.map(s=>({id:s.id,seismic:s.seismic,gravity:s.gravity})))}}
+if(enableOptimizationOverrides.checked){const genRaw=(optGenerations.value||'').trim(),gen=Number(genRaw),longModeRaw=String((optLongitudinalMode&&optLongitudinalMode.value)||'span_coupled').trim(),longMode=longModeRaw||'span_coupled';if(!genRaw)errors.push({label:'Generaciones',element:optGenerations,message:'Indica la cantidad de generaciones.'});else if(!Number.isInteger(gen)||gen<1)errors.push({label:'Generaciones',element:optGenerations,message:'Debe ser un entero >= 1.'});if(!['legacy_region_independent','span_coupled'].includes(longMode))errors.push({label:'Modo longitudinal',element:optLongitudinalMode,message:'Selecciona un modo longitudinal valido.'});const eb=parseCsvTokens(optEBars.value),gb=parseCsvTokens(optGBars.value),lb=parseCsvTokens(optLongBars.value);if(!eb.length)errors.push({label:'Estribos cerrados',element:optEBars,message:'Define al menos un diametro.'});if(!gb.length)errors.push({label:'Ramas simples',element:optGBars,message:'Define al menos un diametro.'});if(!lb.length)errors.push({label:'Refuerzo longitudinal',element:optLongBars,message:'Define al menos un diametro.'});const sp=parsePositiveIntList(optSpacing.value),lc=parsePositiveIntList(optLongCounts.value);if(!sp.ok)errors.push({label:'Espaciamientos',element:optSpacing,message:sp.message});if(!lc.ok)errors.push({label:'Cantidades longitudinales',element:optLongCounts,message:lc.message});if(!errors.length)hiddenOptimizationInput.value=JSON.stringify({longitudinal_mode:longMode,variables:{E_bars:eb,G_bars:gb,stirrup_spacing_mm:sp.values,longitudinal_bars:lb,longitudinal_bar_counts:lc.values},genetic_algorithm:{generations:gen}})}else if(enableSpanLayout.checked){hiddenOptimizationInput.value=JSON.stringify({longitudinal_mode:'span_coupled'})}
 if(errors.length){renderUiValidationErrors(errors);return false}
 return true
 }
@@ -227,6 +228,10 @@ renderBeam(beamElevationContainer,data);
 function fmtKg(value){if(statusModule.fmtKg)return statusModule.fmtKg(value);const num=Number(value);return Number.isFinite(num)?`${num.toFixed(2)} kg`:'n/d'}
 function fmtPct(value){if(statusModule.fmtPct)return statusModule.fmtPct(value);const num=Number(value);return Number.isFinite(num)?`${num.toFixed(2)} %`:'n/d'}
 function uniqueLabelOptions(options,labelKey,weightKey){const map={};(options||[]).forEach(opt=>{const label=String(opt&&opt[labelKey]||'').trim();if(!label)return;const raw=Number(opt&&opt[weightKey]);const weight=Number.isFinite(raw)?raw:0;const current=map[label];if(!current||weight<current.weight_kg)map[label]={label,weight_kg:weight}});return Object.values(map).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10)}
+function buildLongArrangementLabel(bar,count,emptyLabel=''){const b=String(bar||'').trim();const c=Number(count);if(!b||!Number.isFinite(c)||c<=0)return emptyLabel;return `${Math.round(c)} x ${b}`}
+function normalizeAdditionalLabel(value){const label=String(value||'').trim();return label||'no se requiere'}
+function buildAdditionalOptionsByBase(region,baseLabel){const selectedBase=String(baseLabel||'').trim();const rows=(region.options||[]).filter(row=>String(row.base_longitudinal_label||'').trim()===selectedBase).sort((a,b)=>{const aw=Number.isFinite(Number(a.weight_longitudinal_kg))?Number(a.weight_longitudinal_kg):Number.POSITIVE_INFINITY;const bw=Number.isFinite(Number(b.weight_longitudinal_kg))?Number(b.weight_longitudinal_kg):Number.POSITIVE_INFINITY;if(aw!==bw)return aw-bw;const ao=Number.isFinite(Number(a.option))?Number(a.option):Number.MAX_SAFE_INTEGER;const bo=Number.isFinite(Number(b.option))?Number(b.option):Number.MAX_SAFE_INTEGER;return ao-bo});const topRows=rows.slice(0,10);return topRows.map((row,index)=>{const label=normalizeAdditionalLabel(row.additional_longitudinal_label);const longLabel=String(row.longitudinal_label||'').trim()||label;const parsedWeight=Number(row.weight_longitudinal_kg);const weight=label==='no se requiere'?0:(Number.isFinite(parsedWeight)?parsedWeight:0);const option=Number.isFinite(Number(row.option))?Number(row.option):null;const value=`add_${option!==null?option:index}_${label}`;return{value,label,longitudinal_label:longLabel,weight_kg:weight,option}})}
+function buildSpanBaseOptionsForCoupled(regions){if(!regions.length)return[];const optionMaps=regions.map(region=>{const byOption={};(region.options||[]).forEach(row=>{const option=Number.isFinite(Number(row.option))?Number(row.option):null;if(option===null)return;byOption[option]={base_label:String(row.base_longitudinal_label||'').trim()||'no se requiere',weight_kg:Number.isFinite(Number(row.weight_longitudinal_kg))?Number(row.weight_longitudinal_kg):0}});return byOption});let commonOptions=null;optionMaps.forEach(map=>{const keys=new Set(Object.keys(map));commonOptions=commonOptions===null?keys:new Set([...commonOptions].filter(key=>keys.has(key)))});if(!commonOptions||!commonOptions.size)return[];return[...commonOptions].map(key=>{const option=Number(key);let weight=0;let baseLabel='no se requiere';optionMaps.forEach(map=>{const item=map[key];if(item){weight+=Number(item.weight_kg)||0;baseLabel=item.base_label||baseLabel}});return{value:`base_${option}`,base_label:baseLabel,weight_kg:weight,option}}).sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return a.option-b.option}).slice(0,10)}
 function renderRegionOptions(previewPayload){
 if(!regionOptionsEl)return;
 if(selectionSaveMsg)selectionSaveMsg.textContent='';
@@ -240,31 +245,38 @@ const regionRows=[];
 regions.forEach((rg,rIndex)=>{
 const regionId=rg.region_id||`R${rIndex+1}`;
 const optionsRaw=Array.isArray(rg.options)?rg.options:[];
-const options=optionsRaw.map((opt,optIndex)=>(
-{
+const options=optionsRaw.map((opt,optIndex)=>{
+const baseLabel=String(opt.base_longitudinal_label||buildLongArrangementLabel(opt.base_long_bar,opt.base_long_count,'no se requiere')).trim()||'no se requiere';
+const additionalLabel=normalizeAdditionalLabel(opt.additional_longitudinal_label||buildLongArrangementLabel(opt.extra_long_bar,opt.extra_long_count,''));
+return{
 option:Number.isFinite(Number(opt.option))?Number(opt.option):optIndex+1,
 transverse_label:String(opt.transverse_label||'').trim(),
 longitudinal_label:String(opt.longitudinal_label||'').trim(),
+base_longitudinal_label:baseLabel,
+additional_longitudinal_label:additionalLabel,
+base_long_bar:String(opt.base_long_bar||'').trim(),
+base_long_count:Number.isFinite(Number(opt.base_long_count))?Number(opt.base_long_count):null,
+extra_long_bar:String(opt.extra_long_bar||'').trim(),
+extra_long_count:Number.isFinite(Number(opt.extra_long_count))?Number(opt.extra_long_count):null,
 weight_total_kg:Number.isFinite(Number(opt.weight_total_kg))?Number(opt.weight_total_kg):0,
 weight_transverse_kg:Number.isFinite(Number(opt.weight_transverse_kg))?Number(opt.weight_transverse_kg):0,
 weight_longitudinal_kg:Number.isFinite(Number(opt.weight_longitudinal_kg))?Number(opt.weight_longitudinal_kg):0,
-})).sort((a,b)=>a.option-b.option).slice(0,10);
+}
+}).sort((a,b)=>{const aw=Number.isFinite(Number(a.weight_total_kg))?Number(a.weight_total_kg):Number.POSITIVE_INFINITY;const bw=Number.isFinite(Number(b.weight_total_kg))?Number(b.weight_total_kg):Number.POSITIVE_INFINITY;if(aw!==bw)return aw-bw;return (Number(a.option)||0)-(Number(b.option)||0)}).slice(0,10);
 if(!options.length)return;
 const best=options[0];
-const transOptionsSource=(Array.isArray(rg.transverse_options)?rg.transverse_options:[]).map(opt=>({
-label:String(opt&&opt.label||'').trim(),
-weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,
-})).filter(opt=>opt.label).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10);
-const longOptionsSource=(Array.isArray(rg.longitudinal_options)?rg.longitudinal_options:[]).map(opt=>({
-label:String(opt&&opt.label||'').trim(),
-weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,
-})).filter(opt=>opt.label).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10);
+const transOptionsSource=(Array.isArray(rg.transverse_options)?rg.transverse_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})).filter(opt=>opt.label).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10);
+const longOptionsSource=(Array.isArray(rg.longitudinal_options)?rg.longitudinal_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})).filter(opt=>opt.label).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10);
 const transOptions=transOptionsSource.length?transOptionsSource:uniqueLabelOptions(options,'transverse_label','weight_transverse_kg');
 const longOptions=longOptionsSource.length?longOptionsSource:uniqueLabelOptions(options,'longitudinal_label','weight_longitudinal_kg');
 if(!transOptions.length||!longOptions.length)return;
 const longLookup={};
 longOptions.forEach(opt=>{longLookup[opt.label]=opt});
 const defaultTrans=best.transverse_label||transOptions[0].label;
+const optionsByNumber={};
+const optionNumbers=[];
+options.forEach(row=>{optionsByNumber[row.option]=row;optionNumbers.push(row.option)});
+const longMode=String(rg.longitudinal_mode||'').trim().toLowerCase();
 regionRows.push({
 key:`${spanId}__${regionId}`,
 spanId,
@@ -275,16 +287,29 @@ transOptions,
 longOptions,
 longLookup,
 defaultTrans,
+options,
+optionsByNumber,
+optionNumbers,
+longMode,
+defaultLong:String(best.longitudinal_label||longOptions[0].label||'').trim(),
+defaultBaseLong:String(best.base_longitudinal_label||'no se requiere').trim()||'no se requiere',
+defaultAdditionalLong:normalizeAdditionalLabel(best.additional_longitudinal_label),
 });
 });
 if(!regionRows.length)return;
+const isSpanCoupled=regionRows.some(region=>region.longMode==='span_coupled');
+if(isSpanCoupled){
+const spanBaseOptions=buildSpanBaseOptionsForCoupled(regionRows);
+if(!spanBaseOptions.length)return;
+const defaultBase=(regionRows[0]&&regionRows[0].defaultBaseLong)||spanBaseOptions[0].label;
+spanBuckets.push({spanId,regions:regionRows,isSpanCoupled:true,spanBaseOptions,defaultSpanBase:spanBaseOptions.some(opt=>opt.label===defaultBase)?defaultBase:spanBaseOptions[0].label});
+return;
+}
 let commonLongLabels=regionRows[0].longOptions.map(opt=>opt.label);
 for(let i=1;i<regionRows.length;i+=1){const labels=new Set(regionRows[i].longOptions.map(opt=>opt.label));commonLongLabels=commonLongLabels.filter(label=>labels.has(label))}
 let hasCommonLong=commonLongLabels.length>0;
 let spanLongOptions=[];
-if(hasCommonLong){
-spanLongOptions=commonLongLabels.map(label=>({label,weight_kg:regionRows.reduce((acc,region)=>acc+(Number((region.longLookup[label]||{}).weight_kg)||0),0)})).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10);
-}
+if(hasCommonLong){spanLongOptions=commonLongLabels.map(label=>({label,weight_kg:regionRows.reduce((acc,region)=>acc+(Number((region.longLookup[label]||{}).weight_kg)||0),0)})).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10)}
 if(!spanLongOptions.length){
 hasCommonLong=false;
 const unionMap={};
@@ -292,9 +317,9 @@ regionRows.forEach(region=>{region.longOptions.forEach(opt=>{if(!unionMap[opt.la
 spanLongOptions=Object.values(unionMap).sort((a,b)=>{if(b.coverage!==a.coverage)return b.coverage-a.coverage;if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return String(a.label).localeCompare(String(b.label))}).slice(0,10);
 }
 if(!spanLongOptions.length)return;
-spanBuckets.push({spanId,regions:regionRows,spanLongOptions,defaultSpanLong:spanLongOptions[0].label,hasCommonLong});
+spanBuckets.push({spanId,regions:regionRows,spanLongOptions,defaultSpanLong:spanLongOptions[0].label,hasCommonLong,isSpanCoupled:false});
 });
-if(!spanBuckets.length){regionOptionsEl.innerHTML='<p class="help">No hay alternativas de seleccion disponibles por vano/región para este job.</p>';return}
+if(!spanBuckets.length){regionOptionsEl.innerHTML='<p class="help">No hay alternativas de seleccion disponibles por vano/regi?n para este job.</p>';return}
 regionOptionsEl.innerHTML='';
 const summary=document.createElement('div');
 summary.className='region-opt-summary';
@@ -309,28 +334,44 @@ details.innerHTML=`<summary class="span-summary"><span class="span-summary-title
 const body=details.querySelector('.span-body');
 const spanCard=document.createElement('div');
 spanCard.className='region-opt-card';
+let spanLongSelect=null;
+if(bucket.isSpanCoupled){
+spanCard.innerHTML=`<div class="region-opt-head"><strong>Vano ${bucket.spanId}</strong></div><div class="field"><label>Refuerzo longitudinal base del vano</label><select class="span-opt-longitudinal"></select></div>`;
+spanLongSelect=spanCard.querySelector('.span-opt-longitudinal');
+bucket.spanBaseOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`${opt.base_label} | ${fmtKg(opt.weight_kg)} (long. vano)`;spanLongSelect.appendChild(el)});
+const savedSpan=spanLongSelections[bucket.spanId];
+const savedBaseValue=(savedSpan&&savedSpan.mode==='base')?savedSpan.value:null;
+const initialBaseOption=bucket.spanBaseOptions.find(opt=>opt.value===savedBaseValue)||bucket.spanBaseOptions.find(opt=>opt.base_label===bucket.defaultSpanBase)||bucket.spanBaseOptions[0];
+spanLongSelect.value=initialBaseOption.value;
+spanLongSelections[bucket.spanId]={mode:'base',value:initialBaseOption.value,label:initialBaseOption.base_label,option:initialBaseOption.option};
+}else{
 const headText=bucket.hasCommonLong?'Longitudinal comun para todas las regiones':'Sin longitudinal comun global (seleccion por region)';
 const helpText=bucket.hasCommonLong?'Solo se muestran opciones que cumplen en todas las regiones del vano.':'No hay un longitudinal comun entre todas las regiones; ajusta longitudinal por region.';
 const labelText=bucket.hasCommonLong?'Refuerzo longitudinal del vano':'Referencia longitudinal del vano';
 spanCard.innerHTML=`<div class="region-opt-head"><strong>Vano ${bucket.spanId}</strong><span>${headText}</span></div><div class="field"><label>${labelText}</label><select class="span-opt-longitudinal"></select></div><p class="help">${helpText}</p>`;
-const spanLongSelect=spanCard.querySelector('.span-opt-longitudinal');
+spanLongSelect=spanCard.querySelector('.span-opt-longitudinal');
 bucket.spanLongOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}${bucket.hasCommonLong?' (vano)':' (referencia)'}`;spanLongSelect.appendChild(el)});
 const savedSpan=spanLongSelections[bucket.spanId];
-const initialSpanLong=bucket.spanLongOptions.some(opt=>opt.label===savedSpan)?savedSpan:bucket.defaultSpanLong;
+const savedLabel=(savedSpan&&savedSpan.mode==='label')?savedSpan.label:null;
+const initialSpanLong=bucket.spanLongOptions.some(opt=>opt.label===savedLabel)?savedLabel:bucket.defaultSpanLong;
 spanLongSelect.value=initialSpanLong;
-if(bucket.hasCommonLong){spanLongSelections[bucket.spanId]=initialSpanLong}else{delete spanLongSelections[bucket.spanId]}
+if(bucket.hasCommonLong){spanLongSelections[bucket.spanId]={mode:'label',label:initialSpanLong}}else{delete spanLongSelections[bucket.spanId]}
+}
 body.appendChild(spanCard);
 const regionSyncFns=[];
 bucket.regions.forEach(region=>{
 const card=document.createElement('div');
 card.className='region-opt-card';
-if(bucket.hasCommonLong){
+if(bucket.isSpanCoupled){
+card.innerHTML=`<div class="region-opt-head"><strong>Region ${region.regionId}</strong><span>Opcion optima base: ${region.bestOption}</span></div><div class="region-opt-two"><div class="field"><label>Refuerzo transversal</label><select class="region-opt-transverse"></select></div><div class="field"><label>Refuerzo longitudinal adicional</label><select class="region-opt-additional"></select></div></div><p class="help region-opt-region-weight"></p>`;
+}else if(bucket.hasCommonLong){
 card.innerHTML=`<div class="region-opt-head"><strong>Region ${region.regionId}</strong><span>Opcion optima base: ${region.bestOption}</span></div><div class="field"><label>Refuerzo transversal</label><select class="region-opt-transverse"></select></div><p class="help region-opt-region-weight"></p>`;
 }else{
 card.innerHTML=`<div class="region-opt-head"><strong>Region ${region.regionId}</strong><span>Opcion optima base: ${region.bestOption}</span></div><div class="region-opt-two"><div class="field"><label>Refuerzo transversal</label><select class="region-opt-transverse"></select></div><div class="field"><label>Refuerzo longitudinal</label><select class="region-opt-longitudinal"></select></div></div><p class="help region-opt-region-weight"></p>`;
 }
 const transSelect=card.querySelector('.region-opt-transverse');
-const longSelect=bucket.hasCommonLong?null:card.querySelector('.region-opt-longitudinal');
+const addSelect=bucket.isSpanCoupled?card.querySelector('.region-opt-additional'):null;
+const longSelect=(bucket.isSpanCoupled||bucket.hasCommonLong)?null:card.querySelector('.region-opt-longitudinal');
 const weightLine=card.querySelector('.region-opt-region-weight');
 region.transOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}`;transSelect.appendChild(el)});
 if(longSelect){region.longOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}`;longSelect.appendChild(el)})}
@@ -343,34 +384,72 @@ longSelect.value=initialLong;
 }
 const state={best:0,selected:0};
 states.push(state);
+let cachedAdditionalOptions=[];
+const refreshAdditionalChoices=()=>{
+if(!bucket.isSpanCoupled||!addSelect)return[];
+const selectedBase=bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.value)||bucket.spanBaseOptions[0];
+const baseLabel=String((selectedBase&&selectedBase.base_label)||'').trim();
+if(card.dataset.baseLabel!==baseLabel||!cachedAdditionalOptions.length){
+cachedAdditionalOptions=buildAdditionalOptionsByBase(region,baseLabel);
+const keep=(regionOptionSelections[region.key]||{}).additional_value||addSelect.value;
+addSelect.innerHTML='';
+if(!cachedAdditionalOptions.length){addSelect.innerHTML='';const el=document.createElement('option');el.value='';el.textContent='Sin opcion adicional viable para esta base (backend)';addSelect.appendChild(el);addSelect.value='';addSelect.disabled=true;card.dataset.baseLabel=baseLabel;return cachedAdditionalOptions;}
+addSelect.disabled=false;
+cachedAdditionalOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}`;addSelect.appendChild(el)});
+const selectedLabel=cachedAdditionalOptions.some(opt=>opt.value===keep)?keep:cachedAdditionalOptions[0].value;
+addSelect.value=selectedLabel;
+card.dataset.baseLabel=baseLabel;
+}
+return cachedAdditionalOptions;
+};
 const syncRegion=()=>{
 const trans=region.transOptions.find(opt=>opt.label===transSelect.value)||region.transOptions[0];
-let long;
-let baseLong;
-if(bucket.hasCommonLong){
+let selectedLongLabel='';
+let selectedLongWeight=0;
+let selectedAdditionalLabel='no se requiere';
+let reference='region';
+if(bucket.isSpanCoupled){
+const selectedBase=bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.value)||bucket.spanBaseOptions[0]||{base_label:'no se requiere',weight_kg:0};
+const baseLabel=String(selectedBase.base_label||'').trim();
+const addOptions=refreshAdditionalChoices();
+const selectedAdd=addOptions.find(opt=>opt.value===addSelect.value)||addOptions[0]||null;
+if(selectedAdd){selectedAdditionalLabel=selectedAdd.label;selectedLongLabel=String(selectedAdd.longitudinal_label||region.defaultLong).trim()||region.defaultLong;selectedLongWeight=Number(selectedAdd.weight_kg)||0;regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel,base_longitudinal_label:baseLabel,additional_longitudinal_label:selectedAdditionalLabel,additional_value:selectedAdd.value};}
+else{selectedAdditionalLabel='sin opcion viable';selectedLongLabel=String(region.defaultLong||'').trim()||'no se requiere';selectedLongWeight=0;regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel,base_longitudinal_label:baseLabel,additional_longitudinal_label:'',additional_value:''};}
+
+reference='GA';
+}else if(bucket.hasCommonLong){
 const currentLongLabel=spanLongSelect.value;
-long=region.longLookup[currentLongLabel]||region.longOptions[0];
-baseLong=region.longLookup[bucket.defaultSpanLong]||region.longOptions[0];
+const long=region.longLookup[currentLongLabel]||region.longOptions[0];
+selectedLongLabel=String(long.label||'').trim();
+selectedLongWeight=Number(long.weight_kg)||0;
+reference='vano';
+regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel};
 }else{
 const currentLongLabel=longSelect&&longSelect.value?longSelect.value:region.longOptions[0].label;
-long=region.longLookup[currentLongLabel]||region.longOptions[0];
-baseLong=region.longOptions[0];
+const long=region.longLookup[currentLongLabel]||region.longOptions[0];
+selectedLongLabel=String(long.label||'').trim();
+selectedLongWeight=Number(long.weight_kg)||0;
+regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel};
 }
-const baseTrans=region.transOptions.find(opt=>opt.label===region.defaultTrans)||region.transOptions[0];
-const selectedWeight=(Number(trans.weight_kg)||0)+(Number(long.weight_kg)||0);
-const bestWeight=(Number(baseTrans.weight_kg)||0)+(Number(baseLong.weight_kg)||0);
-regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:long.label};
+const selectedWeight=(Number(trans.weight_kg)||0)+selectedLongWeight;
+const bestWeight=Number(region.bestWeight)||0;
+const deltaPct=bestWeight>0?((selectedWeight-bestWeight)/bestWeight)*100:null;
 state.best=bestWeight;
 state.selected=selectedWeight;
-weightLine.textContent=`Peso region seleccionado: ${fmtKg(selectedWeight)} | Peso region optimo base (${bucket.hasCommonLong?'vano':'region'}): ${fmtKg(bestWeight)}`;
+weightLine.textContent=`Peso total region seleccionado: ${fmtKg(selectedWeight)} | Peso total region optimo (${reference}): ${fmtKg(bestWeight)} | Delta: ${fmtPct(deltaPct)}`;
 };
 transSelect.addEventListener('change',()=>{syncRegion();updateSummary();syncBeamPreviewWithSelections()});
+if(addSelect){addSelect.addEventListener('change',()=>{syncRegion();updateSummary();syncBeamPreviewWithSelections()})}
 if(longSelect){longSelect.addEventListener('change',()=>{syncRegion();updateSummary();syncBeamPreviewWithSelections()})}
 regionSyncFns.push(syncRegion);
 syncRegion();
 body.appendChild(card);
 });
-if(bucket.hasCommonLong){spanLongSelect.addEventListener('change',()=>{spanLongSelections[bucket.spanId]=spanLongSelect.value;regionSyncFns.forEach(fn=>fn());updateSummary();syncBeamPreviewWithSelections()})}
+if(bucket.isSpanCoupled){
+spanLongSelect.addEventListener('change',()=>{const selectedBase=bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.value)||bucket.spanBaseOptions[0];spanLongSelections[bucket.spanId]={mode:'base',value:selectedBase.value,label:selectedBase.base_label,option:selectedBase.option};regionSyncFns.forEach(fn=>fn());updateSummary();syncBeamPreviewWithSelections()});
+}else if(bucket.hasCommonLong){
+spanLongSelect.addEventListener('change',()=>{spanLongSelections[bucket.spanId]={mode:'label',label:spanLongSelect.value};regionSyncFns.forEach(fn=>fn());updateSummary();syncBeamPreviewWithSelections()});
+}
 regionSyncFns.forEach(fn=>fn());
 updateSummary();
 regionOptionsEl.appendChild(details);
@@ -379,7 +458,43 @@ if(saveSelectionBtn)saveSelectionBtn.disabled=!currentJobId;
 updateSummary();
 syncBeamPreviewWithSelections();
 }
-function buildSelectionPayload(previewPayload){const spans=previewPayload&&Array.isArray(previewPayload.spans)?previewPayload.spans:[];const selections=[];spans.forEach((sp,sIndex)=>{const spanId=sp.span_id||`S${sIndex+1}`;(Array.isArray(sp.regions)?sp.regions:[]).forEach((rg,rIndex)=>{const regionId=rg.region_id||`R${rIndex+1}`;const options=Array.isArray(rg.options)?rg.options:[];if(!options.length)return;const fallback=options[0]||{};const key=`${spanId}__${regionId}`;const saved=regionOptionSelections[key]||{};const transverse_label=saved.transverse_label||String(fallback.transverse_label||'');const longitudinal_label=saved.longitudinal_label||String(fallback.longitudinal_label||'');selections.push({span_id:spanId,region_id:regionId,transverse_label,longitudinal_label})})});return{selections}}
+
+function buildSelectionPayload(previewPayload){
+const spans=previewPayload&&Array.isArray(previewPayload.spans)?previewPayload.spans:[];
+const selections=[];
+const spanSelections=[];
+spans.forEach((sp,sIndex)=>{
+const spanId=sp.span_id||`S${sIndex+1}`;
+const regions=Array.isArray(sp.regions)?sp.regions:[];
+const isSpanCoupled=regions.some(r=>String(r&&r.longitudinal_mode||'').trim().toLowerCase()==='span_coupled');
+regions.forEach((rg,rIndex)=>{
+const regionId=rg.region_id||`R${rIndex+1}`;
+const options=Array.isArray(rg.options)?rg.options:[];
+if(!options.length)return;
+const fallback=options[0]||{};
+const key=`${spanId}__${regionId}`;
+const saved=regionOptionSelections[key]||{};
+const transverse_label=saved.transverse_label||String(fallback.transverse_label||'');
+const row={span_id:spanId,region_id:regionId,transverse_label};
+row.longitudinal_label=saved.longitudinal_label||String(fallback.longitudinal_label||'');
+selections.push(row);
+});
+const savedSpan=spanLongSelections[spanId];
+if(isSpanCoupled){
+if(savedSpan&&savedSpan.mode==='base'&&Number.isFinite(Number(savedSpan.option))){
+spanSelections.push({span_id:spanId,option:Number(savedSpan.option)});
+}else if(savedSpan&&savedSpan.mode==='option'&&Number.isFinite(Number(savedSpan.option))){
+spanSelections.push({span_id:spanId,option:Number(savedSpan.option)});
+}else if(savedSpan&&savedSpan.label){
+spanSelections.push({span_id:spanId,longitudinal_label:String(savedSpan.label)});
+}
+}else if(savedSpan&&savedSpan.mode==='label'&&savedSpan.label){
+spanSelections.push({span_id:spanId,longitudinal_label:String(savedSpan.label)});
+}
+});
+return{selections,span_selections:spanSelections};
+}
+
 function renderSummary(data,st){if(statusModule.renderSummaryHtml){summaryListEl.innerHTML=statusModule.renderSummaryHtml(data,st);return}summaryListEl.innerHTML=[`<li><strong>Viga:</strong> ${data.beamId} | Detallado ${data.detailing}</li>`,`<li><strong>Material:</strong> f'c ${Math.round(data.fcMpa)} MPa | fy ${Math.round(data.fyMpa)} MPa</li>`,`<li><strong>Vanos:</strong> ${Array.isArray(data.spans)?data.spans.length:0}</li>`,`<li><strong>Longitud neta vanos:</strong> ${Math.round(data.totalSpanMm)} mm${data.totalSpanEstimated?' (estimado)':''}</li>`,`<li><strong>Longitud apoyos:</strong> ${Math.round(data.totalSupportMm||0)} mm</li>`,`<li><strong>Longitud total sistema:</strong> ${Math.round(data.totalSystemMm||data.totalSpanMm)} mm</li>`,`<li><strong>Estado job:</strong> ${(st&&st.status)||'sin job'}</li>`].join('')}
 function renderChecks(st){const rows=statusModule.buildCheckRows?statusModule.buildCheckRows(st):(()=>{const localRows=[],s=st&&st.status?st.status:'idle';if(s==='completed')localRows.push({c:'ok',m:'Job completado correctamente.'});else if(s==='failed')localRows.push({c:'err',m:'Job finalizo en estado failed.'});else if(s==='running'||s==='queued')localRows.push({c:'warn',m:`Job en progreso: ${s}.`});else localRows.push({c:'warn',m:'Aun no se ha ejecutado un job en esta sesion.'});localRows.push({c:'ok',m:'Contratos API preservados (/v1/jobs*).'});localRows.push({c:'ok',m:'Preview SVG soporta vanos multiples, apoyos y regiones por vano.'});return localRows})();checksListEl.innerHTML=rows.map(r=>`<li class="${r.c}">${r.m}</li>`).join('')}
 async function saveSelectionReport(){if(!currentJobId||!currentPreviewPayload){if(selectionSaveMsg)selectionSaveMsg.textContent='Primero ejecuta un job y espera el preview.';return}if(saveSelectionBtn)saveSelectionBtn.disabled=true;if(selectionSaveMsg)selectionSaveMsg.textContent='Guardando seleccion y generando reporte...';try{const response=await fetch(`/v1/jobs/${currentJobId}/selection`,{method:'POST',headers:{'Content-Type':'application/json',...headersWithApiKey()},body:JSON.stringify(buildSelectionPayload(currentPreviewPayload))});const payload=await response.json().catch(()=>({}));if(!response.ok){if(selectionSaveMsg)selectionSaveMsg.textContent=payload&&payload.message?`No se pudo guardar: ${payload.message}`:'No se pudo guardar la seleccion.';if(saveSelectionBtn)saveSelectionBtn.disabled=false;return}if(selectionSaveMsg)selectionSaveMsg.textContent=`Seleccion guardada. Reporte generado: ${payload.artifact_name}`;await refreshStatus(currentJobId)}catch(error){if(selectionSaveMsg)selectionSaveMsg.textContent=error&&error.message?`No se pudo guardar: ${error.message}`:'No se pudo guardar la seleccion.';if(saveSelectionBtn)saveSelectionBtn.disabled=false}}
@@ -391,4 +506,6 @@ form.addEventListener('submit',async(event)=>{event.preventDefault();if(isSubmit
 clearBtn.addEventListener('click',()=>{stopPolling();currentJobId=null;currentPreviewPayload=null;regionOptionSelections={};spanLongSelections={};if(saveSelectionBtn)saveSelectionBtn.disabled=true;if(selectionSaveMsg)selectionSaveMsg.textContent='';setSubmitting(false);setStatus('Esperando ejecucion');resultsLinksEl.innerHTML='';detailsEl.textContent='';detailsEl.classList.add('hidden');clearErrorBox();clearFieldErrors();renderArtifacts([]);refreshPreview()});
 if(saveSelectionBtn)saveSelectionBtn.addEventListener('click',saveSelectionReport);renderArtifacts([]);refreshPreview();
 })();
+
+
 

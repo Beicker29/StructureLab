@@ -91,6 +91,7 @@ class RegionDemand:
     t_req: float
     l_req: float
     station_count: int
+    is_deep_beam: bool = False
     fc_mpa: float | None = None
     fy_mpa: float | None = None
     region_length_mm: float = 0.0
@@ -157,6 +158,14 @@ class RegionDesignResult:
     transverse_weight_kg_per_m: float
     longitudinal_weight_kg_per_m: float
     stirrup_unit_weight_kg: float
+    long_provided_mm2_override: float | None = None
+    base_long_bar: str | None = None
+    base_long_count: int | None = None
+    extra_long_bar: str | None = None
+    extra_long_count: int | None = None
+    is_deep_beam: bool | None = None
+    longitudinal_mode: str | None = None
+    longitudinal_arrangement_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -286,6 +295,7 @@ def build_region_demands(
                 t_req=t_req,
                 l_req=l_req,
                 station_count=len(stations),
+                is_deep_beam=span.is_deep_beam,
                 fc_mpa=beam_fc_mpa,
                 fy_mpa=beam_fy_mpa,
                 region_length_mm=(region.to - region.from_) * span_length_mm,
@@ -812,10 +822,17 @@ def longitudinal_mass_kg_per_m(long_provided_mm2: float) -> float:
     return long_provided_mm2 * 1000.0 * STEEL_DENSITY_KG_PER_MM3
 
 
+def requires_longitudinal_design(region: RegionDemand) -> bool:
+    return bool(region.is_deep_beam or region.l_req > 0.0)
+
+
 def select_longitudinal_independent(
     region: RegionDemand,
     variables: VariablesConfig,
 ) -> tuple[str, int, float, bool]:
+    if not requires_longitudinal_design(region):
+        return "", 0, 0.0, True
+
     options: list[tuple[float, str, int]] = []
     for long_bar in variables.longitudinal_bars:
         for long_count in variables.longitudinal_bar_counts:
@@ -882,8 +899,14 @@ def attach_independent_longitudinal(
     region: RegionDemand,
     variables: VariablesConfig,
 ) -> Candidate:
+    needs_longitudinal = requires_longitudinal_design(region)
     long_bar, long_count, long_provided, long_ok = select_longitudinal_independent(region, variables)
-    if long_ok:
+    if not needs_longitudinal:
+        long_bar = ""
+        long_count = 0
+        long_provided = 0.0
+        message = candidate.message
+    elif long_ok:
         message = candidate.message
     else:
         message = (
@@ -912,7 +935,7 @@ def attach_independent_longitudinal(
         objective=candidate.objective,
         score=candidate.score,
         transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
-        longitudinal_weight_kg_per_m=candidate.longitudinal_weight_kg_per_m,
+        longitudinal_weight_kg_per_m=(0.0 if not needs_longitudinal else candidate.longitudinal_weight_kg_per_m),
         stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
         controlling_limit=candidate.controlling_limit,
     )
@@ -1151,14 +1174,21 @@ def top_region_alternatives(
         return []
 
     top_n = max(1, int(top_n))
+    needs_longitudinal = requires_longitudinal_design(region)
+    long_bar_domain = list(variables.longitudinal_bars)
+    long_count_domain = list(variables.longitudinal_bar_counts)
+    if not needs_longitudinal:
+        long_bar_domain = [variables.longitudinal_bars[0]]
+        long_count_domain = [0]
+
     evaluated: list[Candidate] = []
     for e_bar, g_bar, g_count, spacing, long_bar, long_count in itertools.product(
         variables.E_bars,
         variables.G_bars,
         allowed_g_counts,
         variables.stirrup_spacing_mm,
-        variables.longitudinal_bars,
-        variables.longitudinal_bar_counts,
+        long_bar_domain,
+        long_count_domain,
     ):
         candidate = evaluate_candidate(
             region,
@@ -1169,7 +1199,7 @@ def top_region_alternatives(
             long_bar=long_bar,
             long_count=long_count,
         )
-        if candidate.status == "ok" and candidate.long_provided < region.l_req:
+        if needs_longitudinal and candidate.status == "ok" and candidate.long_provided < region.l_req:
             candidate = failed_candidate(
                 e_bar=candidate.e_bar,
                 g_bar=candidate.g_bar,
@@ -1192,6 +1222,32 @@ def top_region_alternatives(
                 stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
                 controlling_limit=candidate.controlling_limit,
                 deficit=deficit_ratio(region.l_req, candidate.long_provided),
+            )
+        if not needs_longitudinal:
+            candidate = Candidate(
+                e_bar=candidate.e_bar,
+                g_bar=candidate.g_bar,
+                g_count=candidate.g_count,
+                spacing_mm=candidate.spacing_mm,
+                long_bar="",
+                long_count=0,
+                at=candidate.at,
+                at_over_s=candidate.at_over_s,
+                av1=candidate.av1,
+                av2=candidate.av2,
+                av_total=candidate.av_total,
+                av_over_s=candidate.av_over_s,
+                long_provided=0.0,
+                f_free=candidate.f_free,
+                failure_mode=candidate.failure_mode,
+                status=candidate.status,
+                message=candidate.message,
+                objective=candidate.objective,
+                score=candidate.score,
+                transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
+                longitudinal_weight_kg_per_m=0.0,
+                stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
+                controlling_limit=candidate.controlling_limit,
             )
         evaluated.append(_attach_candidate_longitudinal_mass(candidate, region))
 
@@ -1286,4 +1342,8 @@ def make_failed_region_result(
         evaluated_candidates=0,
         feasible_candidates=0,
     )
+
+
+
+
 

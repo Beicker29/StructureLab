@@ -33,6 +33,7 @@ function mapBackendField(field){
     ['d_mm','d_mm'],
     ['d_ratio','enable_span_layout'],
     ['clear_length_mm','enable_span_layout'],
+    ['is_deep_beam','enable_span_layout'],
     ['db_bar','db_bar'],
     ['cover_side_mm','cover_side_mm'],
     ['cover_top_mm','cover_top_mm'],
@@ -91,3 +92,4 @@ window.StructureLabPayload = {
   normalizeErrorPayload,
 };
 })();
+

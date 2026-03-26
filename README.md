@@ -113,4 +113,32 @@ curl -L "http://127.0.0.1:10000/v1/jobs/<job_id>/download" -o reports.zip
 ```
 
 
+## Modo longitudinal (GA acoplado por vano)
+
+El sistema soporta dos modos en `optimization.longitudinal_mode`:
+
+- `legacy_region_independent` (default): flujo historico por region.
+- `span_coupled`: optimizacion acoplada por vano con:
+  - refuerzo longitudinal base continuo por vano,
+  - refuerzo longitudinal adicional por region,
+  - chequeos deep-beam cuando `is_deep_beam=true`.
+
+Si no se envia el campo, se mantiene compatibilidad con `legacy_region_independent`.
+
+### Configuracion avanzada por vano
+
+En `span_layout_json` cada vano acepta:
+
+- `is_deep_beam` (opcional, default `false`).
+- alias aceptado: `viga_alta`.
+
+### Seleccion de resultados (API)
+
+Endpoint: `POST /v1/jobs/{job_id}/selection`
+
+- `selections`: contrato legacy por region.
+- `span_selections` (opcional): seleccion longitudinal por vano para `span_coupled`.
+
+Compatibilidad: ambos pueden coexistir; el backend mantiene el contrato previo.
+
 

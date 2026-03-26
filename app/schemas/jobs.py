@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
@@ -36,8 +36,15 @@ class RegionOptionSelection(BaseModel):
     longitudinal_label: str | None = None
 
 
+class SpanOptionSelection(BaseModel):
+    span_id: str = Field(min_length=1)
+    option: int | None = Field(default=None, ge=1)
+    longitudinal_label: str | None = None
+
+
 class JobSelectionSaveRequest(BaseModel):
     selections: list[RegionOptionSelection] = Field(default_factory=list)
+    span_selections: list[SpanOptionSelection] = Field(default_factory=list)
 
 
 class JobSelectionSaveResponse(BaseModel):
@@ -45,3 +52,5 @@ class JobSelectionSaveResponse(BaseModel):
     saved_regions: int
     artifact_name: str
     artifact_url: str
+
+

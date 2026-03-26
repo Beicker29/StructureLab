@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections import defaultdict
 from pathlib import Path
@@ -63,6 +63,11 @@ def _as_int(value: Any) -> int | None:
 def _norm_match(value: str) -> str:
     return " ".join(value.lower().split())
 
+def _long_arrangement_label(bar: str, count: int | None, *, empty_label: str = "") -> str:
+    if not bar or count is None or count <= 0:
+        return empty_label
+    return f"{count} x {bar}"
+
 
 def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str, Any]]:
     if path is None or not path.exists():
@@ -84,6 +89,13 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
     spacing_col = _find_col(columns, "spacing_mm")
     long_bar_col = _find_col(columns, "long_bar")
     long_count_col = _find_col(columns, "long_count")
+    longitudinal_arrangement_col = _find_col(columns, "longitudinal_arrangement")
+    base_long_bar_col = _find_col(columns, "base_long_bar")
+    base_long_count_col = _find_col(columns, "base_long_count")
+    extra_long_bar_col = _find_col(columns, "extra_long_bar")
+    extra_long_count_col = _find_col(columns, "extra_long_count")
+    longitudinal_mode_col = _find_col(columns, "longitudinal_mode")
+    is_deep_beam_col = _find_col(columns, "is_deep_beam")
     status_col = _find_col(columns, "status")
     if span_col is None or region_col is None:
         return {}
@@ -104,6 +116,13 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
         spacing = _as_int(row[spacing_col]) if spacing_col is not None else None
         long_bar = _as_text(row[long_bar_col]) if long_bar_col is not None else ""
         long_count = _as_int(row[long_count_col]) if long_count_col is not None else None
+        longitudinal_arrangement = _as_text(row[longitudinal_arrangement_col]) if longitudinal_arrangement_col is not None else ""
+        base_long_bar = _as_text(row[base_long_bar_col]) if base_long_bar_col is not None else ""
+        base_long_count = _as_int(row[base_long_count_col]) if base_long_count_col is not None else None
+        extra_long_bar = _as_text(row[extra_long_bar_col]) if extra_long_bar_col is not None else ""
+        extra_long_count = _as_int(row[extra_long_count_col]) if extra_long_count_col is not None else None
+        longitudinal_mode = _as_text(row[longitudinal_mode_col]) if longitudinal_mode_col is not None else ""
+        is_deep_beam = _as_text(row[is_deep_beam_col]) if is_deep_beam_col is not None else ""
 
         if e_bar and g_bar and g_count is not None and spacing is not None:
             transverse = f"1E {e_bar} + {g_count}G {g_bar} @ {spacing} mm"
@@ -112,18 +131,27 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
         else:
             transverse = ""
 
-        if long_count is not None and long_bar:
+        if longitudinal_arrangement:
+            longitudinal_schedule = longitudinal_arrangement
+            longitudinal = longitudinal_arrangement.replace(" x ", "")
+        elif long_count is not None and long_bar:
             longitudinal = f"{long_count}{long_bar}"
             longitudinal_schedule = f"{long_count} x {long_bar}"
         else:
-            longitudinal = ""
-            longitudinal_schedule = ""
+            longitudinal = "no se requiere"
+            longitudinal_schedule = "no se requiere"
 
         output[(span_id, region_id)] = {
             "spacing_mm": spacing,
             "transverse_label": transverse,
             "longitudinal_label": longitudinal,
             "longitudinal_schedule_label": longitudinal_schedule,
+            "base_long_bar": base_long_bar,
+            "base_long_count": base_long_count,
+            "extra_long_bar": extra_long_bar,
+            "extra_long_count": extra_long_count,
+            "longitudinal_mode": longitudinal_mode,
+            "is_deep_beam": is_deep_beam,
         }
     return output
 
@@ -146,6 +174,12 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
     length_col = _find_col(columns, "longitud_region_mm", "region_length_mm", "length_mm")
     trans_col = _find_col(columns, "arreglo_transversal", "transverse_arrangement")
     long_col = _find_col(columns, "arreglo_longitudinal", "longitudinal_arrangement")
+    base_arr_col = _find_col(columns, "arreglo_longitudinal_base", "base_longitudinal_arrangement")
+    add_arr_col = _find_col(columns, "arreglo_longitudinal_adicional", "additional_longitudinal_arrangement")
+    base_long_bar_col = _find_col(columns, "base_long_bar")
+    base_long_count_col = _find_col(columns, "base_long_count")
+    extra_long_bar_col = _find_col(columns, "extra_long_bar")
+    extra_long_count_col = _find_col(columns, "extra_long_count")
     weight_trans_col = _find_col(columns, "peso_transversal_region_kg", "transverse_weight_region_kg")
     weight_long_col = _find_col(columns, "peso_longitudinal_region_kg", "longitudinal_weight_region_kg")
     weight_total_col = _find_col(columns, "peso_total_region_kg", "total_weight_region_kg")
@@ -168,6 +202,18 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
         option = _as_int(row[option_col]) if option_col is not None else None
         transverse = _as_text(row[trans_col]) if trans_col is not None else ""
         longitudinal = _as_text(row[long_col]) if long_col is not None else ""
+        base_long_bar = _as_text(row[base_long_bar_col]) if base_long_bar_col is not None else ""
+        base_long_count = _as_int(row[base_long_count_col]) if base_long_count_col is not None else None
+        extra_long_bar = _as_text(row[extra_long_bar_col]) if extra_long_bar_col is not None else ""
+        extra_long_count = _as_int(row[extra_long_count_col]) if extra_long_count_col is not None else None
+        base_longitudinal_label = (
+            _as_text(row[base_arr_col])
+            if base_arr_col is not None
+            else _long_arrangement_label(base_long_bar, base_long_count, empty_label="no se requiere")
+        )
+        additional_longitudinal_label = _as_text(row[add_arr_col]) if add_arr_col is not None else ""
+        if not additional_longitudinal_label:
+            additional_longitudinal_label = _long_arrangement_label(extra_long_bar, extra_long_count, empty_label="no se requiere")
         weight_trans_kg = _as_non_negative_float(row[weight_trans_col]) if weight_trans_col is not None else None
         weight_long_kg = _as_non_negative_float(row[weight_long_col]) if weight_long_col is not None else None
         weight_total_kg = _as_non_negative_float(row[weight_total_col]) if weight_total_col is not None else None
@@ -177,6 +223,12 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
                 "option": option,
                 "transverse_label": transverse,
                 "longitudinal_label": longitudinal,
+                "base_longitudinal_label": base_longitudinal_label,
+                "additional_longitudinal_label": additional_longitudinal_label,
+                "base_long_bar": base_long_bar,
+                "base_long_count": base_long_count,
+                "extra_long_bar": extra_long_bar,
+                "extra_long_count": extra_long_count,
                 "weight_transverse_kg": weight_trans_kg,
                 "weight_longitudinal_kg": weight_long_kg,
                 "weight_total_kg": weight_total_kg,
@@ -200,7 +252,13 @@ def _pick_schedule_row(
                 row_long = _norm_match(str(row.get("longitudinal_label") or ""))
                 if row_trans == opt_trans and (not opt_long or row_long == opt_long):
                     return row
-    rows_sorted = sorted(rows, key=lambda item: item.get("option") if item.get("option") is not None else 999_999)
+    rows_sorted = sorted(
+        rows,
+        key=lambda item: (
+            item.get("weight_total_kg") if item.get("weight_total_kg") is not None else float("inf"),
+            item.get("option") if item.get("option") is not None else 999_999,
+        ),
+    )
     return rows_sorted[0] if rows_sorted else None
 
 
@@ -234,6 +292,60 @@ def _build_component_options(
         for item in ordered[:max_items]
     ]
 
+
+def _build_span_option_choices(region_rows: list[dict[str, Any]], max_items: int = 10) -> list[dict[str, Any]]:
+    if not region_rows:
+        return []
+
+    coupled_rows = [
+        row
+        for row in region_rows
+        if _as_text(row.get("longitudinal_mode")).lower() == "span_coupled"
+        and isinstance(row.get("options"), list)
+        and row.get("options")
+    ]
+    if len(coupled_rows) != len(region_rows):
+        return []
+
+    common_options: set[int] | None = None
+    options_by_region: list[dict[int, dict[str, Any]]] = []
+    for row in coupled_rows:
+        by_option: dict[int, dict[str, Any]] = {}
+        for option_row in row.get("options") or []:
+            option_value = _as_int(option_row.get("option"))
+            if option_value is None:
+                continue
+            by_option[option_value] = option_row
+        if not by_option:
+            return []
+        options_by_region.append(by_option)
+        region_options = set(by_option.keys())
+        common_options = region_options if common_options is None else (common_options & region_options)
+
+    if not common_options:
+        return []
+
+    output: list[dict[str, Any]] = []
+    for option in sorted(common_options):
+        total_weight = 0.0
+        longitudinal_weight = 0.0
+        for by_option in options_by_region:
+            row = by_option[option]
+            total_weight += float(row.get("weight_total_kg") or 0.0)
+            longitudinal_weight += float(row.get("weight_longitudinal_kg") or 0.0)
+        output.append(
+            {
+                "option": option,
+                "total_weight_kg": total_weight,
+                "long_weight_kg": longitudinal_weight,
+                "regions": len(region_rows),
+            }
+        )
+
+    output.sort(key=lambda item: (item["total_weight_kg"], item["option"]))
+    return output[:max_items]
+
+
 def _build_span_preview(
     span: dict[str, Any],
     *,
@@ -246,6 +358,7 @@ def _build_span_preview(
     support_right_mm = _as_non_negative_float(span.get("support_right_mm"))
     clear_length_mm = _as_float(span.get("clear_length_mm"))
     span_default_length_mm = clear_length_mm if clear_length_mm is not None else default_span_length_mm
+    is_deep_beam = bool(span.get("is_deep_beam"))
     regions = span.get("regions") if isinstance(span.get("regions"), list) else []
     region_rows: list[dict[str, Any]] = []
     region_lengths: list[float] = []
@@ -267,8 +380,8 @@ def _build_span_preview(
         sorted_schedule_rows = sorted(
             schedule_rows,
             key=lambda item: (
-                item.get("option") if item.get("option") is not None else 999_999,
                 item.get("weight_total_kg") if item.get("weight_total_kg") is not None else float("inf"),
+                item.get("option") if item.get("option") is not None else 999_999,
             ),
         )
         schedule_row = _pick_schedule_row(schedule_rows, optimized)
@@ -294,6 +407,7 @@ def _build_span_preview(
                 any_estimated = True
 
         spacing_mm = optimized.get("spacing_mm") if optimized else None
+        longitudinal_mode = _as_text((optimized or {}).get("longitudinal_mode")) or None
         if spacing_mm is None:
             spacing_mm = 100 if region_type.upper() == "C" else 200
             spacing_estimated = True
@@ -330,6 +444,35 @@ def _build_span_preview(
                 "spacing_estimated": spacing_estimated,
                 "transverse_label": transverse_label,
                 "longitudinal_label": longitudinal_label,
+                "base_longitudinal_label": (
+                    _as_text((schedule_row or {}).get("base_longitudinal_label"))
+                    or _long_arrangement_label(
+                        _as_text((optimized or {}).get("base_long_bar")),
+                        _as_int((optimized or {}).get("base_long_count")),
+                        empty_label="no se requiere",
+                    )
+                    or None
+                ),
+                "additional_longitudinal_label": (
+                    _as_text((schedule_row or {}).get("additional_longitudinal_label"))
+                    or _long_arrangement_label(
+                        _as_text((optimized or {}).get("extra_long_bar")),
+                        _as_int((optimized or {}).get("extra_long_count")),
+                        empty_label="no se requiere",
+                    )
+                ),
+                "base_long_bar": _as_text((schedule_row or {}).get("base_long_bar"))
+                or _as_text((optimized or {}).get("base_long_bar"))
+                or None,
+                "base_long_count": _as_int((schedule_row or {}).get("base_long_count"))
+                or _as_int((optimized or {}).get("base_long_count")),
+                "extra_long_bar": _as_text((schedule_row or {}).get("extra_long_bar"))
+                or _as_text((optimized or {}).get("extra_long_bar"))
+                or None,
+                "extra_long_count": _as_int((schedule_row or {}).get("extra_long_count"))
+                or _as_int((optimized or {}).get("extra_long_count")),
+                "longitudinal_mode": longitudinal_mode,
+                "is_deep_beam": is_deep_beam,
                 "selected_option": _as_int(schedule_row.get("option")) if schedule_row is not None else None,
                 "best_option": _as_int(schedule_options[0].get("option")) if schedule_options else None,
                 "best_weight_kg": (
@@ -347,6 +490,22 @@ def _build_span_preview(
                         "option": _as_int(opt.get("option")) or (opt_index + 1),
                         "transverse_label": _as_text(opt.get("transverse_label")),
                         "longitudinal_label": _as_text(opt.get("longitudinal_label")),
+                        "base_longitudinal_label": _as_text(opt.get("base_longitudinal_label"))
+                        or _long_arrangement_label(
+                            _as_text(opt.get("base_long_bar")),
+                            _as_int(opt.get("base_long_count")),
+                            empty_label="no se requiere",
+                        ),
+                        "additional_longitudinal_label": _as_text(opt.get("additional_longitudinal_label"))
+                        or _long_arrangement_label(
+                            _as_text(opt.get("extra_long_bar")),
+                            _as_int(opt.get("extra_long_count")),
+                            empty_label="no se requiere",
+                        ),
+                        "base_long_bar": _as_text(opt.get("base_long_bar")) or None,
+                        "base_long_count": _as_int(opt.get("base_long_count")),
+                        "extra_long_bar": _as_text(opt.get("extra_long_bar")) or None,
+                        "extra_long_count": _as_int(opt.get("extra_long_count")),
                         "weight_transverse_kg": (
                             float(opt["weight_transverse_kg"])
                             if opt.get("weight_transverse_kg") is not None
@@ -386,6 +545,8 @@ def _build_span_preview(
         "width_mm": int(round(span_width_mm)) if span_width_mm is not None else None,
         "height_mm": int(round(span_height_mm)) if span_height_mm is not None else None,
         "d_mm": int(round(span_d_mm)) if span_d_mm is not None else None,
+        "is_deep_beam": is_deep_beam,
+        "span_option_choices": _build_span_option_choices(region_rows),
         "regions": region_rows,
     }
 
@@ -449,3 +610,13 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
             "reinforcement_schedule": bool(schedule_map),
         },
     }
+
+
+
+
+
+
+
+
+
+

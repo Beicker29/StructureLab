@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from rc_shear_torsion.models import ALLOWED_BAR_LABELS, CaseConfig
 
@@ -38,6 +38,16 @@ def validate_case_rules(config: CaseConfig) -> list[DomainIssue]:
                 "All values must be > 0",
             )
         )
+    if config.optimization.longitudinal_mode == "span_coupled":
+        odd_counts = sorted({value for value in variables.longitudinal_bar_counts if value % 2 != 0})
+        if odd_counts:
+            issues.append(
+                _issue(
+                    "invalid_range",
+                    "optimization.variables.longitudinal_bar_counts",
+                    f"span_coupled requires even values; received {odd_counts}",
+                )
+            )
 
     invalid_e = sorted({bar for bar in variables.E_bars if bar not in ALLOWED_BAR_LABELS})
     if invalid_e:
@@ -216,3 +226,4 @@ def validate_case_rules(config: CaseConfig) -> list[DomainIssue]:
                     )
 
     return issues
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
@@ -12,6 +12,7 @@ from .design import (
     to_region_result,
 )
 from .io import load_etabs_sources
+from .span_coupled import optimize_span_coupled
 from .models import load_case_config
 from .report import (
     beam_summary_from_spans,
@@ -92,6 +93,7 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                 t_req=0.0,
                 l_req=0.0,
                 station_count=0,
+                is_deep_beam=span.is_deep_beam,
                 fc_mpa=beam.fc_mpa,
                 fy_mpa=beam.fy_mpa,
             )
@@ -157,20 +159,39 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                     log_lines.append(f"error: {message}")
                     add_failed_span_regions(beam, span, message, span_results)
                 else:
-                    for demand in region_demands:
-                        outcome = optimize_region(demand, config.optimization)
-                        result = to_region_result(demand, outcome)
-                        span_results.append(result)
-                        region_alternatives[(beam.beam_id, span.id, demand.region_id)] = top_region_alternatives(
-                            demand,
-                            config.optimization.variables,
+                    if config.optimization.longitudinal_mode == "span_coupled":
+                        span_outcome = optimize_span_coupled(
+                            region_demands,
+                            config.optimization,
+                            span_length_mm=span_length_mm,
                             top_n=10,
                         )
-                        log_lines.append(
-                            f"region={beam.beam_id}/{span.id}/{demand.region_id} method={outcome.method} "
-                            f"status={result.status} failure_mode={result.failure_mode} "
-                            f"evaluated={outcome.evaluated_candidates} feasible={outcome.feasible_candidates}"
-                        )
+                        for result in span_outcome.results:
+                            span_results.append(result)
+                            region_alternatives[(beam.beam_id, span.id, result.region_id)] = span_outcome.alternatives_by_region.get(
+                                result.region_id,
+                                [result],
+                            )
+                            log_lines.append(
+                                f"region={beam.beam_id}/{span.id}/{result.region_id} method={span_outcome.method} "
+                                f"status={result.status} failure_mode={result.failure_mode} "
+                                f"evaluated={span_outcome.evaluated_candidates} feasible={span_outcome.feasible_candidates}"
+                            )
+                    else:
+                        for demand in region_demands:
+                            outcome = optimize_region(demand, config.optimization)
+                            result = to_region_result(demand, outcome)
+                            span_results.append(result)
+                            region_alternatives[(beam.beam_id, span.id, demand.region_id)] = top_region_alternatives(
+                                demand,
+                                config.optimization.variables,
+                                top_n=10,
+                            )
+                            log_lines.append(
+                                f"region={beam.beam_id}/{span.id}/{demand.region_id} method={outcome.method} "
+                                f"status={result.status} failure_mode={result.failure_mode} "
+                                f"evaluated={outcome.evaluated_candidates} feasible={outcome.feasible_candidates}"
+                            )
 
             span_summary = span_summary_from_results(
                 beam_id=beam.beam_id,
@@ -202,4 +223,6 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
     write_run_log(output_dir / "run_log.txt", log_lines)
 
     return output_dir
+
+
 

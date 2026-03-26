@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -43,6 +43,7 @@ class SpanConfig(BaseModel):
     id: str
     seismic: str
     gravity: str
+    is_deep_beam: bool = False
     support_left_mm: float | None = None
     support_right_mm: float | None = None
     clear_length_mm: float | None = Field(
@@ -164,6 +165,7 @@ class GAConfig(BaseModel):
 class OptimizationConfig(BaseModel):
     enabled: bool
     objective: Literal["min_weight"]
+    longitudinal_mode: Literal["legacy_region_independent", "span_coupled"] = "legacy_region_independent"
     variables: VariablesConfig
     genetic_algorithm: GAConfig
 
@@ -224,3 +226,5 @@ def resolve_path(path_value: str, base_dir: Path) -> Path:
 
     # Keep deterministic error paths anchored to the case directory.
     return base_candidate
+
+

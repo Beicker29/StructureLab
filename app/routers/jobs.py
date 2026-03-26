@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime
 
@@ -14,6 +14,8 @@ from app.schemas.jobs import (
     JobSelectionSaveRequest,
     JobSelectionSaveResponse,
     JobStatusResponse,
+    RegionOptionSelection,
+    SpanOptionSelection,
 )
 from app.services.case_builder_service import build_case_payload_from_form
 from app.services.job_preview_service import build_job_preview_payload
@@ -386,6 +388,77 @@ def save_job_selection_endpoint(
             code="selection_unavailable",
         )
 
+    span_region_data: dict[str, list[tuple[str, dict]]] = {}
+    for (span_id, region_id), data in region_data.items():
+        span_region_data.setdefault(span_id, []).append((region_id, data))
+
+    span_longitudinal_options: dict[str, list[dict]] = {}
+    span_option_rows: dict[str, dict[int, dict[str, dict]]] = {}
+    for span_id, items in span_region_data.items():
+        common_labels: set[str] | None = None
+        for _, data in items:
+            labels = {
+                str(option.get("label") or "").strip()
+                for option in data["longitudinal_options"]
+                if str(option.get("label") or "").strip()
+            }
+            common_labels = labels if common_labels is None else (common_labels & labels)
+
+        options: list[dict] = []
+        if common_labels:
+            for label in common_labels:
+                weight_sum = 0.0
+                for _, data in items:
+                    option = next(
+                        (
+                            entry
+                            for entry in data["longitudinal_options"]
+                            if str(entry.get("label") or "").strip() == label
+                        ),
+                        None,
+                    )
+                    weight_sum += float((option or {}).get("weight_kg") or 0.0)
+                options.append({"label": label, "weight_kg": weight_sum, "coverage": len(items)})
+            options.sort(key=lambda item: (float(item["weight_kg"]), str(item["label"])))
+        else:
+            union: dict[str, dict] = {}
+            for _, data in items:
+                for option in data["longitudinal_options"]:
+                    label = str(option.get("label") or "").strip()
+                    if not label:
+                        continue
+                    entry = union.setdefault(label, {"label": label, "weight_kg": 0.0, "coverage": 0})
+                    entry["weight_kg"] = float(entry["weight_kg"]) + float(option.get("weight_kg") or 0.0)
+                    entry["coverage"] = int(entry["coverage"]) + 1
+            options = sorted(
+                union.values(),
+                key=lambda item: (-int(item["coverage"]), float(item["weight_kg"]), str(item["label"])),
+            )
+
+        span_longitudinal_options[span_id] = options[:10]
+
+        common_option_numbers: set[int] | None = None
+        for _, data in items:
+            numbers = {
+                int(row["option"])
+                for row in data["rows"]
+                if row.get("option") is not None
+            }
+            common_option_numbers = numbers if common_option_numbers is None else (common_option_numbers & numbers)
+
+        option_map: dict[int, dict[str, dict]] = {}
+        for option_number in sorted(common_option_numbers or []):
+            per_region: dict[str, dict] = {}
+            for region_id, data in items:
+                row = next((row for row in data["rows"] if int(row["option"]) == option_number), None)
+                if row is None:
+                    per_region = {}
+                    break
+                per_region[region_id] = row
+            if per_region:
+                option_map[option_number] = per_region
+        span_option_rows[span_id] = option_map
+
     requested_map: dict[tuple[str, str], RegionOptionSelection] = {}
     for item in payload.selections:
         key = (item.span_id.strip(), item.region_id.strip())
@@ -402,6 +475,29 @@ def save_job_selection_endpoint(
                 code="invalid_selection",
             )
         requested_map[key] = item
+
+    requested_span_map: dict[str, SpanOptionSelection] = {}
+    for item in payload.span_selections:
+        span_id = item.span_id.strip()
+        if not span_id:
+            raise AppError(
+                message="Cada seleccion por vano debe incluir span_id valido.",
+                status_code=422,
+                code="invalid_selection",
+            )
+        if span_id in requested_span_map:
+            raise AppError(
+                message=f"El vano {span_id} esta repetido en span_selections.",
+                status_code=422,
+                code="invalid_selection",
+            )
+        if span_id not in span_region_data:
+            raise AppError(
+                message=f"El vano {span_id} no existe en el preview del job.",
+                status_code=422,
+                code="invalid_selection",
+            )
+        requested_span_map[span_id] = item
 
     invalid_regions = sorted(
         [f"{span_id}/{region_id}" for (span_id, region_id) in requested_map if (span_id, region_id) not in region_data]
@@ -423,6 +519,7 @@ def save_job_selection_endpoint(
         long_lookup = {item["label"]: item for item in data["longitudinal_options"] if item.get("label")}
 
         req = requested_map.get(key)
+        span_req = requested_span_map.get(span_id)
         selected_transverse_label: str | None = None
         selected_longitudinal_label: str | None = None
 
@@ -441,6 +538,26 @@ def save_job_selection_endpoint(
                     )
                 selected_transverse_label = selected_transverse_label or option_row["transverse_label"]
                 selected_longitudinal_label = selected_longitudinal_label or option_row["longitudinal_label"]
+
+        if not selected_longitudinal_label and span_req is not None:
+            span_options = span_longitudinal_options.get(span_id, [])
+            option_rows = span_option_rows.get(span_id, {})
+            if span_req.longitudinal_label:
+                selected_longitudinal_label = span_req.longitudinal_label.strip()
+            elif span_req.option is not None:
+                span_option_number = int(span_req.option)
+                option_row = (option_rows.get(span_option_number) or {}).get(region_id)
+                if option_row is not None:
+                    selected_longitudinal_label = str(option_row.get("longitudinal_label") or "").strip()
+                else:
+                    option_index = span_option_number - 1
+                    if option_index < 0 or option_index >= len(span_options):
+                        raise AppError(
+                            message=f"La opcion {span_req.option} no existe para el vano {span_id}.",
+                            status_code=422,
+                            code="invalid_selection",
+                        )
+                    selected_longitudinal_label = str(span_options[option_index]["label"])
 
         selected_transverse_label = selected_transverse_label or str(best.get("transverse_label") or "").strip()
         selected_longitudinal_label = selected_longitudinal_label or str(best.get("longitudinal_label") or "").strip()
@@ -536,4 +653,10 @@ def download_job_artifact(job_id: str, artifact_name: str) -> FileResponse:
         path=artifact_path,
         filename=artifact_name,
     )
+
+
+
+
+
+
 

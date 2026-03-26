@@ -19,11 +19,13 @@ from rc_shear_torsion.design import (
     build_region_demands,
     evaluate_candidate,
     optimize_region_exhaustive,
+    select_longitudinal_independent,
     top_region_alternatives,
 )
 from rc_shear_torsion.io import EtabsFrameData, EtabsStationRow
-from rc_shear_torsion.models import CaseConfig, SpanConfig, VariablesConfig, resolve_path
+from rc_shear_torsion.models import CaseConfig, OptimizationConfig, SpanConfig, VariablesConfig, resolve_path
 from rc_shear_torsion.results_model import to_canonical_region_result
+from rc_shear_torsion.span_coupled import optimize_span_coupled
 from rc_shear_torsion.run import run_case
 
 TMP_TEST_ROOT = Path(__file__).resolve().parents[1] / ".tmp_test_runtime"
@@ -1090,6 +1092,508 @@ class CoreTests(unittest.TestCase):
         self.assertIn("optimization.variables.stirrup_spacing_mm", fields)
         self.assertIn("optimization.genetic_algorithm.population_size", fields)
 
+    def test_select_longitudinal_independent_skips_when_not_required(self) -> None:
+        region = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="NC",
+            beam_detailing="DES",
+            d_mm=540.0,
+            db_bar="#6",
+            min_branches=2,
+            width_mm=300.0,
+            height_mm=600.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            source_control="mixed",
+            governing_station=0.0,
+            v_req=5.0,
+            t_req=1.0,
+            l_req=0.0,
+            station_count=2,
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+            region_length_mm=1000.0,
+            is_deep_beam=False,
+        )
+        variables = VariablesConfig.model_validate(
+            {
+                "E_bars": ["#3"],
+                "G_bars": ["#3"],
+                "G_counts": [0, 1],
+                "stirrup_spacing_mm": [100],
+                "longitudinal_bars": ["#4", "#5"],
+                "longitudinal_bar_counts": [2, 4],
+            }
+        )
+
+        long_bar, long_count, long_provided, long_ok = select_longitudinal_independent(region, variables)
+
+        self.assertEqual(long_bar, "")
+        self.assertEqual(long_count, 0)
+        self.assertEqual(long_provided, 0.0)
+        self.assertTrue(long_ok)
+
+    def test_span_coupled_reports_no_longitudinal_when_not_required(self) -> None:
+        demand = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="NC",
+            beam_detailing="DES",
+            d_mm=540.0,
+            db_bar="#6",
+            min_branches=2,
+            width_mm=300.0,
+            height_mm=600.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            source_control="mixed",
+            governing_station=0.0,
+            v_req=8.0,
+            t_req=2.0,
+            l_req=0.0,
+            station_count=3,
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+            region_length_mm=2000.0,
+            is_deep_beam=False,
+        )
+        optimization = OptimizationConfig.model_validate(
+            {
+                "enabled": False,
+                "objective": "min_weight",
+                "longitudinal_mode": "span_coupled",
+                "variables": {
+                    "E_bars": ["#3"],
+                    "G_bars": ["#3"],
+                    "G_counts": [0, 1],
+                    "stirrup_spacing_mm": [100],
+                    "longitudinal_bars": ["#4", "#5"],
+                    "longitudinal_bar_counts": [2, 4],
+                },
+                "genetic_algorithm": {
+                    "population_size": 8,
+                    "generations": 2,
+                    "crossover_rate": 0.8,
+                    "mutation_rate": 0.1,
+                    "elite_count": 2,
+                },
+            }
+        )
+
+        outcome = optimize_span_coupled([demand], optimization, span_length_mm=2000.0, top_n=3)
+
+        self.assertEqual(len(outcome.results), 1)
+        result = outcome.results[0]
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.long_count, 0)
+        self.assertEqual(result.long_bar, "")
+        self.assertEqual(result.long_provided_mm2_override, 0.0)
+        self.assertIsNone(result.base_long_count)
+        self.assertIsNone(result.base_long_bar)
+        self.assertEqual(result.longitudinal_arrangement_label, "no se requiere")
+
+    def test_domain_validation_rejects_odd_longitudinal_counts_in_span_coupled(self) -> None:
+        payload = {
+            "case_name": "span_coupled_invalid_counts",
+            "inputs": {
+                "seismic_excel": "a.xlsx",
+                "gravity_excel": "b.xlsx",
+                "sheet_name": "Conc Bm Sum - ACI 318-08",
+            },
+            "units": {"rebar_per_length": "mm2/m"},
+            "beams": [
+                {
+                    "beam_id": "B1",
+                    "detailing": "DES",
+                    "spans": [
+                        {
+                            "id": "S1",
+                            "seismic": "1",
+                            "gravity": "1",
+                            "regions": [
+                                {
+                                    "id": "R1",
+                                    "from": 0.0,
+                                    "to": 1.0,
+                                    "type": "C",
+                                    "d_mm": 600.0,
+                                    "db_bar": "#6",
+                                    "width_mm": 300.0,
+                                    "height_mm": 600.0,
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "optimization": {
+                "enabled": False,
+                "objective": "min_weight",
+                "longitudinal_mode": "span_coupled",
+                "variables": {
+                    "E_bars": ["#3"],
+                    "G_bars": ["#3"],
+                    "G_counts": [0, 1, 2],
+                    "stirrup_spacing_mm": [100],
+                    "longitudinal_bars": ["#4"],
+                    "longitudinal_bar_counts": [3],
+                },
+                "genetic_algorithm": {
+                    "population_size": 10,
+                    "generations": 2,
+                    "crossover_rate": 0.8,
+                    "mutation_rate": 0.1,
+                    "elite_count": 2,
+                },
+            },
+        }
+        with self.assertRaises(DomainValidationError) as ctx:
+            validate_case_payload(payload)
+        fields = {issue.field for issue in ctx.exception.issues}
+        self.assertIn("optimization.variables.longitudinal_bar_counts", fields)
+
+    def test_span_coupled_optimizer_provides_longitudinal_area_per_region(self) -> None:
+        demands = [
+            RegionDemand(
+                beam_id="B1",
+                span_id="S1",
+                region_id="R1",
+                region_type="C",
+                beam_detailing="DES",
+                d_mm=540.0,
+                db_bar="#6",
+                min_branches=2,
+                width_mm=300.0,
+                height_mm=600.0,
+                cover_side_mm=40.0,
+                cover_top_mm=40.0,
+                cover_bottom_mm=40.0,
+                source_control="mixed",
+                governing_station=0.0,
+                v_req=10.0,
+                t_req=5.0,
+                l_req=300.0,
+                station_count=3,
+                fc_mpa=28.0,
+                fy_mpa=420.0,
+                region_length_mm=1500.0,
+                is_deep_beam=False,
+            ),
+            RegionDemand(
+                beam_id="B1",
+                span_id="S1",
+                region_id="R2",
+                region_type="NC",
+                beam_detailing="DES",
+                d_mm=540.0,
+                db_bar="#6",
+                min_branches=2,
+                width_mm=300.0,
+                height_mm=600.0,
+                cover_side_mm=40.0,
+                cover_top_mm=40.0,
+                cover_bottom_mm=40.0,
+                source_control="mixed",
+                governing_station=0.0,
+                v_req=8.0,
+                t_req=2.0,
+                l_req=700.0,
+                station_count=3,
+                fc_mpa=28.0,
+                fy_mpa=420.0,
+                region_length_mm=3000.0,
+                is_deep_beam=False,
+            ),
+            RegionDemand(
+                beam_id="B1",
+                span_id="S1",
+                region_id="R3",
+                region_type="C",
+                beam_detailing="DES",
+                d_mm=540.0,
+                db_bar="#6",
+                min_branches=2,
+                width_mm=300.0,
+                height_mm=600.0,
+                cover_side_mm=40.0,
+                cover_top_mm=40.0,
+                cover_bottom_mm=40.0,
+                source_control="mixed",
+                governing_station=0.0,
+                v_req=10.0,
+                t_req=5.0,
+                l_req=300.0,
+                station_count=3,
+                fc_mpa=28.0,
+                fy_mpa=420.0,
+                region_length_mm=1500.0,
+                is_deep_beam=False,
+            ),
+        ]
+        optimization = OptimizationConfig.model_validate(
+            {
+                "enabled": False,
+                "objective": "min_weight",
+                "longitudinal_mode": "span_coupled",
+                "variables": {
+                    "E_bars": ["#3"],
+                    "G_bars": ["#3"],
+                    "G_counts": [0, 1, 2, 3],
+                    "stirrup_spacing_mm": [90, 100, 120],
+                    "longitudinal_bars": ["#4", "#5", "#6"],
+                    "longitudinal_bar_counts": [2, 4, 6],
+                },
+                "genetic_algorithm": {
+                    "population_size": 12,
+                    "generations": 3,
+                    "crossover_rate": 0.8,
+                    "mutation_rate": 0.1,
+                    "elite_count": 2,
+                },
+            }
+        )
+
+        outcome = optimize_span_coupled(demands, optimization, span_length_mm=6000.0, top_n=5)
+
+        self.assertEqual(len(outcome.results), 3)
+        self.assertTrue(all(result.status == "ok" for result in outcome.results))
+        by_region = {result.region_id: result for result in outcome.results}
+        for demand in demands:
+            result = by_region[demand.region_id]
+            provided = float(result.long_provided_mm2_override or 0.0)
+            self.assertGreaterEqual(provided, demand.l_req)
+            self.assertEqual(result.longitudinal_mode, "span_coupled")
+            self.assertIsNotNone(result.base_long_bar)
+            self.assertIsNotNone(result.base_long_count)
+
+    def test_span_coupled_deep_beam_rejects_s1_over_limit(self) -> None:
+        demand = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="C",
+            beam_detailing="DES",
+            d_mm=500.0,
+            db_bar="#6",
+            min_branches=2,
+            width_mm=300.0,
+            height_mm=700.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            source_control="mixed",
+            governing_station=0.0,
+            v_req=5.0,
+            t_req=2.0,
+            l_req=258.0,
+            station_count=3,
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+            region_length_mm=2000.0,
+            is_deep_beam=True,
+        )
+        optimization = OptimizationConfig.model_validate(
+            {
+                "enabled": False,
+                "objective": "min_weight",
+                "longitudinal_mode": "span_coupled",
+                "variables": {
+                    "E_bars": ["#3"],
+                    "G_bars": ["#3"],
+                    "G_counts": [0, 1],
+                    "stirrup_spacing_mm": [110],
+                    "longitudinal_bars": ["#4"],
+                    "longitudinal_bar_counts": [2, 4],
+                },
+                "genetic_algorithm": {
+                    "population_size": 8,
+                    "generations": 2,
+                    "crossover_rate": 0.8,
+                    "mutation_rate": 0.1,
+                    "elite_count": 2,
+                },
+            }
+        )
+
+        outcome = optimize_span_coupled([demand], optimization, span_length_mm=2000.0, top_n=3)
+
+        self.assertEqual(len(outcome.results), 1)
+        self.assertEqual(outcome.results[0].status, "fail")
+        self.assertIn("Deep beam requires s1 <=", outcome.results[0].message)
+        self.assertEqual(outcome.results[0].failure_mode, "longitudinal_fail")
+    def test_span_coupled_deep_beam_rejects_av_total_minimum(self) -> None:
+        demand = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="C",
+            beam_detailing="DES",
+            d_mm=500.0,
+            db_bar="#6",
+            min_branches=2,
+            width_mm=700.0,
+            height_mm=700.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            source_control="mixed",
+            governing_station=0.0,
+            v_req=5.0,
+            t_req=2.0,
+            l_req=258.0,
+            station_count=3,
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+            region_length_mm=2000.0,
+            is_deep_beam=True,
+        )
+        optimization = OptimizationConfig.model_validate(
+            {
+                "enabled": False,
+                "objective": "min_weight",
+                "longitudinal_mode": "span_coupled",
+                "variables": {
+                    "E_bars": ["#3"],
+                    "G_bars": ["#3"],
+                    "G_counts": [0],
+                    "stirrup_spacing_mm": [100],
+                    "longitudinal_bars": ["#4"],
+                    "longitudinal_bar_counts": [2],
+                },
+                "genetic_algorithm": {
+                    "population_size": 8,
+                    "generations": 2,
+                    "crossover_rate": 0.8,
+                    "mutation_rate": 0.1,
+                    "elite_count": 2,
+                },
+            }
+        )
+
+        outcome = optimize_span_coupled([demand], optimization, span_length_mm=2000.0, top_n=3)
+
+        self.assertEqual(len(outcome.results), 1)
+        self.assertEqual(outcome.results[0].status, "fail")
+        self.assertIn("Deep beam requires Av_total >=", outcome.results[0].message)
+        self.assertEqual(outcome.results[0].failure_mode, "longitudinal_fail")
+
+    def test_span_coupled_deep_beam_rejects_s2_limit(self) -> None:
+        demand = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="C",
+            beam_detailing="DES",
+            d_mm=400.0,
+            db_bar="#6",
+            min_branches=2,
+            width_mm=300.0,
+            height_mm=540.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            source_control="mixed",
+            governing_station=0.0,
+            v_req=5.0,
+            t_req=2.0,
+            l_req=300.0,
+            station_count=3,
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+            region_length_mm=2000.0,
+            is_deep_beam=True,
+        )
+        optimization = OptimizationConfig.model_validate(
+            {
+                "enabled": False,
+                "objective": "min_weight",
+                "longitudinal_mode": "span_coupled",
+                "variables": {
+                    "E_bars": ["#3"],
+                    "G_bars": ["#3"],
+                    "G_counts": [1],
+                    "stirrup_spacing_mm": [80],
+                    "longitudinal_bars": ["#4"],
+                    "longitudinal_bar_counts": [4],
+                },
+                "genetic_algorithm": {
+                    "population_size": 8,
+                    "generations": 2,
+                    "crossover_rate": 0.8,
+                    "mutation_rate": 0.1,
+                    "elite_count": 2,
+                },
+            }
+        )
+
+        outcome = optimize_span_coupled([demand], optimization, span_length_mm=2000.0, top_n=3)
+
+        self.assertEqual(len(outcome.results), 1)
+        self.assertEqual(outcome.results[0].status, "fail")
+        self.assertIn("Deep beam requires s2 <=", outcome.results[0].message)
+        self.assertEqual(outcome.results[0].failure_mode, "longitudinal_fail")
+
+    def test_span_coupled_deep_beam_rejects_a_layer_minimum(self) -> None:
+        demand = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="C",
+            beam_detailing="DES",
+            d_mm=400.0,
+            db_bar="#6",
+            min_branches=2,
+            width_mm=4000.0,
+            height_mm=720.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            source_control="mixed",
+            governing_station=0.0,
+            v_req=5.0,
+            t_req=2.0,
+            l_req=300.0,
+            station_count=3,
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+            region_length_mm=2000.0,
+            is_deep_beam=True,
+        )
+        optimization = OptimizationConfig.model_validate(
+            {
+                "enabled": False,
+                "objective": "min_weight",
+                "longitudinal_mode": "span_coupled",
+                "variables": {
+                    "E_bars": ["#8"],
+                    "G_bars": ["#8"],
+                    "G_counts": [4],
+                    "stirrup_spacing_mm": [80],
+                    "longitudinal_bars": ["#4"],
+                    "longitudinal_bar_counts": [4],
+                },
+                "genetic_algorithm": {
+                    "population_size": 8,
+                    "generations": 2,
+                    "crossover_rate": 0.8,
+                    "mutation_rate": 0.1,
+                    "elite_count": 2,
+                },
+            }
+        )
+
+        outcome = optimize_span_coupled([demand], optimization, span_length_mm=2000.0, top_n=3)
+
+        self.assertEqual(len(outcome.results), 1)
+        self.assertEqual(outcome.results[0].status, "fail")
+        self.assertIn("Deep beam requires A_layer >=", outcome.results[0].message)
+        self.assertEqual(outcome.results[0].failure_mode, "longitudinal_fail")
+
     def test_cli_reports_domain_validation_errors(self) -> None:
         repo = Path(__file__).resolve().parents[1]
         run_root = _new_runtime_dir("cli_invalid")
@@ -1266,6 +1770,12 @@ class CoreTests(unittest.TestCase):
                     "limite_controlante",
                     "cantidad_estribos_region",
                     "arreglo_longitudinal",
+                    "arreglo_longitudinal_base",
+                    "arreglo_longitudinal_adicional",
+                    "base_long_bar",
+                    "base_long_count",
+                    "extra_long_bar",
+                    "extra_long_count",
                     "peso_unitario_estribo_kg",
                     "peso_transversal_region_kg",
                     "peso_longitudinal_region_kg",
@@ -1327,6 +1837,13 @@ class CoreTests(unittest.TestCase):
                     "total_weight_kg_per_m",
                     "evaluated_candidates",
                     "feasible_candidates",
+                    "base_long_bar",
+                    "base_long_count",
+                    "extra_long_bar",
+                    "extra_long_count",
+                    "is_deep_beam",
+                    "longitudinal_mode",
+                    "longitudinal_arrangement",
                 ],
             )
 
@@ -1369,6 +1886,13 @@ class CoreTests(unittest.TestCase):
                     "failure_mode",
                     "status",
                     "message",
+                    "base_long_bar",
+                    "base_long_count",
+                    "extra_long_bar",
+                    "extra_long_count",
+                    "is_deep_beam",
+                    "longitudinal_mode",
+                    "longitudinal_arrangement",
                 ],
             )
 
@@ -1389,6 +1913,13 @@ class CoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+
+
+
+
 
 
 

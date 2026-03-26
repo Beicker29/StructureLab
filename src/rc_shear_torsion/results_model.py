@@ -39,6 +39,13 @@ class CanonicalRegionResult:
     long_bar: str
     long_count: int
     long_provided_mm2: float
+    base_long_bar: str | None
+    base_long_count: int | None
+    extra_long_bar: str | None
+    extra_long_count: int | None
+    is_deep_beam: bool | None
+    longitudinal_mode: str | None
+    longitudinal_arrangement_label: str | None
     checks: RegionChecks
     failure_mode: str
     status: str
@@ -54,6 +61,8 @@ class CanonicalRegionResult:
 
 
 def _longitudinal_provided_mm2(result: RegionDesignResult) -> float:
+    if result.long_provided_mm2_override is not None:
+        return float(result.long_provided_mm2_override)
     return BAR_AREAS_MM2.get(result.long_bar, 0.0) * result.long_count
 
 
@@ -94,6 +103,13 @@ def to_canonical_region_result(result: RegionDesignResult) -> CanonicalRegionRes
         long_bar=result.long_bar,
         long_count=result.long_count,
         long_provided_mm2=long_provided_mm2,
+        base_long_bar=result.base_long_bar,
+        base_long_count=result.base_long_count,
+        extra_long_bar=result.extra_long_bar,
+        extra_long_count=result.extra_long_count,
+        is_deep_beam=result.is_deep_beam,
+        longitudinal_mode=result.longitudinal_mode,
+        longitudinal_arrangement_label=result.longitudinal_arrangement_label,
         checks=checks,
         failure_mode=result.failure_mode,
         status=result.status,
@@ -111,3 +127,5 @@ def to_canonical_region_result(result: RegionDesignResult) -> CanonicalRegionRes
 
 def to_canonical_region_results(results: Iterable[RegionDesignResult]) -> list[CanonicalRegionResult]:
     return [to_canonical_region_result(result) for result in results]
+
+

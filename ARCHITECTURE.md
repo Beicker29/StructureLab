@@ -61,3 +61,29 @@ This repository follows a layered engineering-service architecture focused on tr
 4. UI:
 - Presentation and payload assembly only.
 - Never duplicate engineering formulas.
+
+
+## Span-Coupled Longitudinal Mode
+
+1. Activation:
+- `optimization.longitudinal_mode` supports:
+  - `legacy_region_independent` (default),
+  - `span_coupled`.
+
+2. Domain inputs:
+- `span_layout_json[].is_deep_beam` optional (default `false`).
+- `optimization.variables.longitudinal_bar_counts` must be even in `span_coupled`.
+
+3. Engine behavior:
+- `engine` routes to `optimize_span_coupled` only when mode is `span_coupled`.
+- Legacy mode remains unchanged.
+
+4. Selection contract:
+- Region-level `selections` remains valid.
+- Span-level `span_selections` is optional for coupled mode.
+
+5. Preview contract:
+- Region options remain available.
+- Optional span block `span_option_choices` is exposed for coupled spans.
+
+

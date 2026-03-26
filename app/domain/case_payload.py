@@ -223,6 +223,7 @@ def build_validated_case_payload(
             "id": span_id,
             "seismic": pair["seismic"],
             "gravity": pair["gravity"],
+            "is_deep_beam": bool(span_meta.get("is_deep_beam")) if span_meta else False,
             "regions": _build_regions_for_span(
                 span_meta=span_meta,
                 span_width_mm=span_width_mm,
@@ -277,3 +278,4 @@ def build_validated_case_payload(
         ) from exc
 
     return validated.model_dump(mode="python", by_alias=True)
+

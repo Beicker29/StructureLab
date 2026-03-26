@@ -46,7 +46,7 @@
 <input type="hidden" id="frame_pairs_json" name="frame_pairs_json" /><input type="hidden" id="optimization_overrides_json" name="optimization_overrides_json" /><input type="hidden" id="span_layout_json" name="span_layout_json" />
 <div class="adv-block"><div class="toggle"><input type="checkbox" id="enable_span_layout" /><label for="enable_span_layout">Configurar vanos, apoyos y regiones por vano</label></div><p class="help">Permite definir apoyos/separacion entre vanos y multiples regiones con indicador de confinado.</p><div id="span-layout-fields" class="adv-disabled"><div id="span-layout-list" class="span-list"></div><button type="button" class="mini-btn" id="btn-add-span">Agregar vano</button></div></div>
 <div class="adv-block"><div class="toggle"><input type="checkbox" id="enable_optimization_overrides" /><label for="enable_optimization_overrides">Personalizar optimizacion</label></div><p class="help">La UI construye internamente JSON compatible con backend.</p><div id="optimization-fields" class="grid g2 adv-disabled">
-<div class="field"><label for="opt_generations">Cantidad de generaciones</label><input id="opt_generations" type="number" min="1" step="1" placeholder="Ej: 80" /><p class="help">Entero >= 1.</p></div>
+<div class="field"><label for="opt_generations">Cantidad de generaciones</label><input id="opt_generations" type="number" min="1" step="1" placeholder="Ej: 80" /><p class="help">Entero >= 1.</p></div><div class="field"><label for="opt_longitudinal_mode">Modo longitudinal</label><select id="opt_longitudinal_mode"><option value="legacy_region_independent">legacy_region_independent</option><option value="span_coupled" selected>span_coupled</option></select><p class="help">`span_coupled` activa base continuo + adicional por region.</p></div>
 <div class="field"><label for="opt_e_bars">Diametros para estribos cerrados</label><input id="opt_e_bars" type="text" placeholder="Ej: #3, #4, #6" /><p class="help">Separados por coma.</p></div>
 <div class="field"><label for="opt_g_bars">Diametros para ramas simples</label><input id="opt_g_bars" type="text" placeholder="Ej: #3, #4, #6" /><p class="help">Separados por coma.</p></div>
 <div class="field"><label for="opt_long_bars">Diametros para refuerzo longitudinal</label><input id="opt_long_bars" type="text" placeholder="Ej: #4, #5, #6" /><p class="help">Separados por coma.</p></div>
@@ -64,4 +64,5 @@
 <script src="/ui/static/ui.js"></script>
 </body>
 </html>
+
 

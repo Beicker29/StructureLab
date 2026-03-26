@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import math
 from pathlib import Path
@@ -44,6 +44,13 @@ DESIGN_COLUMNS = [
     "failure_mode",
     "status",
     "message",
+    "base_long_bar",
+    "base_long_count",
+    "extra_long_bar",
+    "extra_long_count",
+    "is_deep_beam",
+    "longitudinal_mode",
+    "longitudinal_arrangement",
 ]
 
 
@@ -94,6 +101,13 @@ def write_design_results(path: Path, region_results: Iterable[RegionDesignResult
                 canonical.failure_mode,
                 canonical.status,
                 canonical.message,
+                canonical.base_long_bar,
+                canonical.base_long_count,
+                canonical.extra_long_bar,
+                canonical.extra_long_count,
+                canonical.is_deep_beam,
+                canonical.longitudinal_mode,
+                canonical.longitudinal_arrangement_label,
             ]
         )
     workbook.save(path)
@@ -167,6 +181,13 @@ def write_optimized_results(path: Path, region_results: Iterable[RegionDesignRes
             "total_weight_kg_per_m",
             "evaluated_candidates",
             "feasible_candidates",
+            "base_long_bar",
+            "base_long_count",
+            "extra_long_bar",
+            "extra_long_count",
+            "is_deep_beam",
+            "longitudinal_mode",
+            "longitudinal_arrangement",
         ]
     )
     for result in region_results:
@@ -205,6 +226,13 @@ def write_optimized_results(path: Path, region_results: Iterable[RegionDesignRes
                 canonical.total_weight_kg_per_m,
                 canonical.evaluated_candidates,
                 canonical.feasible_candidates,
+                canonical.base_long_bar,
+                canonical.base_long_count,
+                canonical.extra_long_bar,
+                canonical.extra_long_count,
+                canonical.is_deep_beam,
+                canonical.longitudinal_mode,
+                canonical.longitudinal_arrangement_label,
             ]
         )
     workbook.save(path)
@@ -233,6 +261,12 @@ def write_reinforcement_schedule(
             "limite_controlante",
             "cantidad_estribos_region",
             "arreglo_longitudinal",
+            "arreglo_longitudinal_base",
+            "arreglo_longitudinal_adicional",
+            "base_long_bar",
+            "base_long_count",
+            "extra_long_bar",
+            "extra_long_count",
             "peso_unitario_estribo_kg",
             "peso_transversal_region_kg",
             "peso_longitudinal_region_kg",
@@ -256,9 +290,18 @@ def write_reinforcement_schedule(
                 else:
                     transverse_arrangement = f"1E {result.e_bar} @ {result.spacing_mm} mm"
 
-            longitudinal_arrangement = ""
-            if result.long_bar and result.long_count > 0:
+            longitudinal_arrangement = "no se requiere"
+            if result.longitudinal_arrangement_label:
+                longitudinal_arrangement = result.longitudinal_arrangement_label
+            elif result.long_bar and result.long_count > 0:
                 longitudinal_arrangement = f"{result.long_count} x {result.long_bar}"
+
+            base_long_arrangement = "no se requiere"
+            if result.base_long_bar and result.base_long_count and result.base_long_count > 0:
+                base_long_arrangement = f"{result.base_long_count} x {result.base_long_bar}"
+            extra_long_arrangement = "no se requiere"
+            if result.extra_long_bar and result.extra_long_count and result.extra_long_count > 0:
+                extra_long_arrangement = f"{result.extra_long_count} x {result.extra_long_bar}"
 
             estado = "cumple" if result.status == "ok" else "falla"
             longitud_region_mm = lengths_mm.get((result.beam_id, result.span_id, result.region_id), 0.0)
@@ -282,6 +325,12 @@ def write_reinforcement_schedule(
                     result.controlling_limit,
                     cantidad_estribos_region,
                     longitudinal_arrangement,
+                    base_long_arrangement,
+                    extra_long_arrangement,
+                    result.base_long_bar,
+                    result.base_long_count,
+                    result.extra_long_bar,
+                    result.extra_long_count,
                     peso_unitario_estribo_kg,
                     peso_transversal_region_kg,
                     peso_longitudinal_region_kg,
@@ -376,3 +425,6 @@ def beam_summary_from_spans(beam_id: str, span_summaries: list[SpanSummary]) -> 
         fail_spans=fail_spans,
         status="ok" if fail_spans == 0 else "fail",
     )
+
+
+

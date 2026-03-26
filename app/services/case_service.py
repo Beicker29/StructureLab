@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -70,6 +70,7 @@ def merge_optimization_defaults(overrides: dict[str, Any] | None) -> dict[str, A
     defaults: dict[str, Any] = {
         "enabled": True,
         "objective": "min_weight",
+        "longitudinal_mode": "legacy_region_independent",
         "variables": {
             "E_bars": ["#3", "#4", "#6"],
             "G_bars": ["#3", "#4", "#6"],
@@ -101,3 +102,5 @@ def merge_optimization_defaults(overrides: dict[str, Any] | None) -> dict[str, A
         else:
             merged[key] = value
     return merged
+
+
