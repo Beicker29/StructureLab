@@ -1,18 +1,14 @@
 ﻿from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from typing import Literal
 
 from .design import (
     BAR_AREAS_MM2,
-    Candidate,
     DEAP_FITNESS_CLASS,
     DEAP_INDIVIDUAL_CLASS,
     RegionDemand,
     RegionDesignResult,
-    evaluate_candidate,
-    g_count_domain_for_region,
     longitudinal_mass_kg_per_m,
     requires_longitudinal_design,
     stirrup_count_in_region,
@@ -26,14 +22,8 @@ LARGE_EXHAUSTIVE_SPACE = 250_000
 
 
 @dataclass(frozen=True)
-class SpanRegionGeneDomain:
-    allowed_g_counts: list[int]
-
-
-@dataclass(frozen=True)
 class SpanRegionState:
     demand: RegionDemand
-    transverse: Candidate
     extra_long_bar: str
     extra_long_count: int
     long_provided_mm2: float
@@ -57,7 +47,7 @@ class SpanCandidate:
 @dataclass(frozen=True)
 class SpanOptimizationOutcome:
     results: list[RegionDesignResult]
-    alternatives_by_region: dict[str, list[RegionDesignResult]]
+    alternatives_by_region: dict[tuple[str, str], list[RegionDesignResult]]
     method: str
     evaluated_candidates: int
     feasible_candidates: int
@@ -104,8 +94,6 @@ def _evaluate_longitudinal_region(
     base_long_count: int,
     extra_long_bar: str,
     extra_long_count: int,
-    spacing_mm: int,
-    av_total: float,
 ) -> tuple[bool, str, float, int, float | None]:
     if base_long_count < 0 or extra_long_count < 0:
         return False, "Longitudinal bar counts must be >= 0", 0.0, 0, None
@@ -147,53 +135,6 @@ def _evaluate_longitudinal_region(
             if s2_mm > 300.0:
                 return False, f"Longitudinal layer spacing s2={s2_mm:.1f} mm exceeds 300 mm", provided, layers, s2_mm
 
-    if demand.is_deep_beam:
-        if demand.d_mm is None or demand.width_mm is None:
-            return False, "Deep-beam checks require d_mm and width_mm", provided, layers, s2_mm
-
-        s1_limit = min(demand.d_mm / 5.0, 300.0)
-        if float(spacing_mm) > s1_limit:
-            return (
-                False,
-                f"Deep beam requires s1 <= min(d/5,300)={s1_limit:.1f} mm (got {spacing_mm})",
-                provided,
-                layers,
-                s2_mm,
-            )
-
-        min_av_total = 0.0025 * demand.width_mm * float(spacing_mm)
-        if av_total < min_av_total:
-            return (
-                False,
-                f"Deep beam requires Av_total >= 0.0025*b*s1 ({min_av_total:.2f} mm2)",
-                provided,
-                layers,
-                s2_mm,
-            )
-
-        if layers > 1:
-            assert s2_mm is not None
-            s2_limit = min(demand.d_mm / 5.0, 300.0)
-            if s2_mm > s2_limit:
-                return (
-                    False,
-                    f"Deep beam requires s2 <= min(d/5,300)={s2_limit:.1f} mm (got {s2_mm:.1f})",
-                    provided,
-                    layers,
-                    s2_mm,
-                )
-
-            a_layer = provided / float(layers)
-            min_a_layer = 0.0025 * demand.width_mm * s2_mm
-            if a_layer < min_a_layer:
-                return (
-                    False,
-                    f"Deep beam requires A_layer >= 0.0025*b*s2 ({min_a_layer:.2f} mm2)",
-                    provided,
-                    layers,
-                    s2_mm,
-                )
-
     return True, "ok", provided, layers, s2_mm
 
 
@@ -210,17 +151,50 @@ def _region_result_from_state(
     *,
     state: SpanRegionState,
     span_candidate: SpanCandidate,
+    transverse_template: RegionDesignResult | None,
     method: str,
     evaluated_candidates: int,
     feasible_candidates: int,
 ) -> RegionDesignResult:
     demand = state.demand
-    transverse = state.transverse
+
+    if transverse_template is None:
+        e_bar = ""
+        g_bar = ""
+        g_count = 0
+        spacing_mm = 0
+        av1 = 0.0
+        av2 = 0.0
+        av_total = 0.0
+        at = 0.0
+        at_over_s = 0.0
+        av_over_s = 0.0
+        controlling_limit = ""
+        transverse_weight_kg_per_m = 0.0
+        stirrup_unit_weight_kg = 0.0
+    else:
+        e_bar = transverse_template.e_bar
+        g_bar = transverse_template.g_bar
+        g_count = transverse_template.g_count
+        spacing_mm = transverse_template.spacing_mm
+        av1 = transverse_template.av1
+        av2 = transverse_template.av2
+        av_total = transverse_template.av_total
+        at = transverse_template.at
+        at_over_s = transverse_template.at_over_s
+        av_over_s = transverse_template.av_over_s
+        controlling_limit = transverse_template.controlling_limit
+        transverse_weight_kg_per_m = transverse_template.transverse_weight_kg_per_m
+        stirrup_unit_weight_kg = transverse_template.stirrup_unit_weight_kg
+
     region_length_m = max(0.0, demand.region_length_mm / 1000.0)
-    transverse_region_weight_kg = transverse.stirrup_unit_weight_kg * stirrup_count_in_region(
-        demand.region_length_mm,
-        transverse.spacing_mm,
-    )
+    transverse_region_weight_kg = 0.0
+    if stirrup_unit_weight_kg > 0.0 and spacing_mm > 0:
+        transverse_region_weight_kg = stirrup_unit_weight_kg * stirrup_count_in_region(
+            demand.region_length_mm,
+            spacing_mm,
+        )
+
     long_weight_kg_per_m = longitudinal_mass_kg_per_m(state.long_provided_mm2)
     long_region_weight_kg = long_weight_kg_per_m * region_length_m
 
@@ -228,6 +202,7 @@ def _region_result_from_state(
     base_count = span_candidate.base_long_count if span_candidate.base_long_count > 0 else None
     extra_bar = state.extra_long_bar if state.extra_long_count > 0 else None
     extra_count = state.extra_long_count if state.extra_long_count > 0 else None
+
     effective_long_count = max(0, span_candidate.base_long_count) + max(0, state.extra_long_count)
     effective_long_bar = ""
     if effective_long_count > 0:
@@ -243,29 +218,29 @@ def _region_result_from_state(
         v_req=demand.v_req,
         t_req=demand.t_req,
         l_req=demand.l_req,
-        e_bar=transverse.e_bar,
-        g_bar=transverse.g_bar,
-        g_count=transverse.g_count,
-        spacing_mm=transverse.spacing_mm,
-        av1=transverse.av1,
-        av2=transverse.av2,
-        av_total=transverse.av_total,
-        at=transverse.at,
-        at_over_s=transverse.at_over_s,
-        av_over_s=transverse.av_over_s,
+        e_bar=e_bar,
+        g_bar=g_bar,
+        g_count=g_count,
+        spacing_mm=spacing_mm,
+        av1=av1,
+        av2=av2,
+        av_total=av_total,
+        at=at,
+        at_over_s=at_over_s,
+        av_over_s=av_over_s,
         long_bar=effective_long_bar,
         long_count=effective_long_count,
-        controlling_limit=transverse.controlling_limit,
-        failure_mode=transverse.failure_mode,
-        status=transverse.status,
-        message=transverse.message,
+        controlling_limit=controlling_limit,
+        failure_mode="ok",
+        status="ok",
+        message="Longitudinal candidate satisfies checks",
         objective=transverse_region_weight_kg + long_region_weight_kg,
         method=method,
         evaluated_candidates=evaluated_candidates,
         feasible_candidates=feasible_candidates,
-        transverse_weight_kg_per_m=transverse.transverse_weight_kg_per_m,
+        transverse_weight_kg_per_m=transverse_weight_kg_per_m,
         longitudinal_weight_kg_per_m=long_weight_kg_per_m,
-        stirrup_unit_weight_kg=transverse.stirrup_unit_weight_kg,
+        stirrup_unit_weight_kg=stirrup_unit_weight_kg,
         long_provided_mm2_override=state.long_provided_mm2,
         base_long_bar=base_bar,
         base_long_count=base_count,
@@ -280,10 +255,40 @@ def _region_result_from_state(
 def _failed_region_result(
     demand: RegionDemand,
     *,
+    template: RegionDesignResult | None,
     method: str,
     message: str,
     failure_mode: str = "longitudinal_fail",
 ) -> RegionDesignResult:
+    if template is None:
+        e_bar = ""
+        g_bar = ""
+        g_count = 0
+        spacing_mm = 0
+        av1 = 0.0
+        av2 = 0.0
+        av_total = 0.0
+        at = 0.0
+        at_over_s = 0.0
+        av_over_s = 0.0
+        controlling_limit = ""
+        transverse_weight_kg_per_m = 0.0
+        stirrup_unit_weight_kg = 0.0
+    else:
+        e_bar = template.e_bar
+        g_bar = template.g_bar
+        g_count = template.g_count
+        spacing_mm = template.spacing_mm
+        av1 = template.av1
+        av2 = template.av2
+        av_total = template.av_total
+        at = template.at
+        at_over_s = template.at_over_s
+        av_over_s = template.av_over_s
+        controlling_limit = template.controlling_limit
+        transverse_weight_kg_per_m = template.transverse_weight_kg_per_m
+        stirrup_unit_weight_kg = template.stirrup_unit_weight_kg
+
     return RegionDesignResult(
         beam_id=demand.beam_id,
         span_id=demand.span_id,
@@ -294,19 +299,19 @@ def _failed_region_result(
         v_req=demand.v_req,
         t_req=demand.t_req,
         l_req=demand.l_req,
-        e_bar="",
-        g_bar="",
-        g_count=0,
-        spacing_mm=0,
-        av1=0.0,
-        av2=0.0,
-        av_total=0.0,
-        at=0.0,
-        at_over_s=0.0,
-        av_over_s=0.0,
+        e_bar=e_bar,
+        g_bar=g_bar,
+        g_count=g_count,
+        spacing_mm=spacing_mm,
+        av1=av1,
+        av2=av2,
+        av_total=av_total,
+        at=at,
+        at_over_s=at_over_s,
+        av_over_s=av_over_s,
         long_bar="",
         long_count=0,
-        controlling_limit="",
+        controlling_limit=controlling_limit,
         failure_mode=failure_mode,
         status="fail",
         message=message,
@@ -314,11 +319,17 @@ def _failed_region_result(
         method=method,
         evaluated_candidates=0,
         feasible_candidates=0,
-        transverse_weight_kg_per_m=0.0,
+        transverse_weight_kg_per_m=transverse_weight_kg_per_m,
         longitudinal_weight_kg_per_m=0.0,
-        stirrup_unit_weight_kg=0.0,
+        stirrup_unit_weight_kg=stirrup_unit_weight_kg,
+        long_provided_mm2_override=0.0,
+        base_long_bar=None,
+        base_long_count=None,
+        extra_long_bar=None,
+        extra_long_count=None,
         is_deep_beam=demand.is_deep_beam,
         longitudinal_mode="span_coupled",
+        longitudinal_arrangement_label="no se requiere",
     )
 
 
@@ -328,8 +339,11 @@ def optimize_span_coupled(
     *,
     span_length_mm: float,
     top_n: int = 10,
+    transverse_templates: dict[tuple[str, str], RegionDesignResult] | None = None,
 ) -> SpanOptimizationOutcome:
     method_prefix = "span_coupled"
+    templates = transverse_templates or {}
+
     if not demands:
         return SpanOptimizationOutcome(
             results=[],
@@ -341,86 +355,60 @@ def optimize_span_coupled(
         )
 
     variables = optimization.variables
-    span_needs_longitudinal = any(requires_longitudinal_design(demand) for demand in demands)
-    if span_needs_longitudinal:
-        base_long_bars = list(variables.longitudinal_bars)
-        base_long_counts = list(variables.longitudinal_bar_counts)
-        extra_long_bars = list(variables.longitudinal_bars)
-        extra_long_counts = sorted({0, *variables.longitudinal_bar_counts})
-    else:
-        base_long_bars = [variables.longitudinal_bars[0]]
-        base_long_counts = [0]
-        extra_long_bars = [variables.longitudinal_bars[0]]
-        extra_long_counts = [0]
+    base_long_bars = list(variables.longitudinal_bars)
+    base_long_counts = sorted({0, *variables.longitudinal_bar_counts})
+    extra_long_bars = list(variables.longitudinal_bars)
+    default_extra_counts = sorted({0, *variables.longitudinal_bar_counts})
 
     if not base_long_bars or not base_long_counts:
-        message = "longitudinal_bars and longitudinal_bar_counts cannot be empty"
-        failed_results = [_failed_region_result(demand, method=f"{method_prefix}_none", message=message) for demand in demands]
+        failed_results = [
+            _failed_region_result(
+                demand,
+                template=templates.get((demand.span_id, demand.region_id)),
+                method=f"{method_prefix}_none",
+                message="longitudinal_bars and longitudinal_bar_counts cannot be empty",
+                failure_mode="input_fail",
+            )
+            for demand in demands
+        ]
         return SpanOptimizationOutcome(
             results=failed_results,
-            alternatives_by_region={demand.region_id: [row] for demand, row in zip(demands, failed_results)},
+            alternatives_by_region={(demand.span_id, demand.region_id): [row] for demand, row in zip(demands, failed_results)},
             method=f"{method_prefix}_none",
             evaluated_candidates=0,
             feasible_candidates=0,
             failure_counts={"input_fail": 1},
         )
 
-    region_domains: list[SpanRegionGeneDomain] = []
+    region_extra_count_domains: list[list[int]] = []
     for demand in demands:
-        allowed_g_counts, min_required_g = g_count_domain_for_region(demand, variables.G_counts)
-        if not allowed_g_counts:
-            message = (
-                f"No G_counts satisfy min_branches={demand.min_branches}; "
-                f"required G_count >= {min_required_g}"
-            )
-            failed_results = [_failed_region_result(item, method=f"{method_prefix}_none", message=message) for item in demands]
-            return SpanOptimizationOutcome(
-                results=failed_results,
-                alternatives_by_region={item.region_id: [row] for item, row in zip(demands, failed_results)},
-                method=f"{method_prefix}_none",
-                evaluated_candidates=0,
-                feasible_candidates=0,
-                failure_counts={"input_fail": 1},
-            )
-        region_domains.append(SpanRegionGeneDomain(allowed_g_counts=list(allowed_g_counts)))
+        if requires_longitudinal_design(demand):
+            region_extra_count_domains.append(default_extra_counts)
+        else:
+            region_extra_count_domains.append([0])
 
     domain_sizes: list[int] = [len(base_long_bars), len(base_long_counts)]
-    for region_domain in region_domains:
-        domain_sizes.extend(
-            [
-                len(variables.E_bars),
-                len(variables.G_bars),
-                len(region_domain.allowed_g_counts),
-                len(variables.stirrup_spacing_mm),
-                len(extra_long_bars),
-                len(extra_long_counts),
-            ]
-        )
+    for extra_counts in region_extra_count_domains:
+        domain_sizes.extend([len(extra_long_bars), len(extra_counts)])
 
     evaluation_cache: dict[tuple[int, ...], SpanCandidate] = {}
+    span_length_m = max(0.0, span_length_mm / 1000.0)
 
-    def decode(individual: list[int]) -> tuple[str, int, list[tuple[str, str, int, int, str, int]]]:
+    def decode(individual: list[int]) -> tuple[str, int, list[tuple[str, int]]]:
         offset = 0
         base_long_bar = str(base_long_bars[individual[offset]])
         offset += 1
         base_long_count = int(base_long_counts[individual[offset]])
         offset += 1
 
-        decoded_regions: list[tuple[str, str, int, int, str, int]] = []
-        for region_domain in region_domains:
-            e_bar = str(variables.E_bars[individual[offset]])
-            offset += 1
-            g_bar = str(variables.G_bars[individual[offset]])
-            offset += 1
-            g_count = int(region_domain.allowed_g_counts[individual[offset]])
-            offset += 1
-            spacing_mm = int(variables.stirrup_spacing_mm[individual[offset]])
-            offset += 1
+        decoded_regions: list[tuple[str, int]] = []
+        for extra_counts in region_extra_count_domains:
             extra_long_bar = str(extra_long_bars[individual[offset]])
             offset += 1
-            extra_long_count = int(extra_long_counts[individual[offset]])
+            extra_long_count = int(extra_counts[individual[offset]])
             offset += 1
-            decoded_regions.append((e_bar, g_bar, g_count, spacing_mm, extra_long_bar, extra_long_count))
+            decoded_regions.append((extra_long_bar, extra_long_count))
+
         return base_long_bar, base_long_count, decoded_regions
 
     def evaluate_individual(individual: list[int]) -> SpanCandidate:
@@ -431,42 +419,17 @@ def optimize_span_coupled(
 
         base_long_bar, base_long_count, decoded_regions = decode(individual)
         base_long_area = BAR_AREAS_MM2.get(base_long_bar, 0.0) * base_long_count
-        span_length_m = max(0.0, span_length_mm / 1000.0)
         objective = longitudinal_mass_kg_per_m(base_long_area) * span_length_m
 
         states: list[SpanRegionState] = []
         for demand, decoded in zip(demands, decoded_regions):
-            e_bar, g_bar, g_count, spacing_mm, extra_long_bar, extra_long_count = decoded
-            transverse = evaluate_candidate(
-                demand,
-                e_bar=e_bar,
-                g_bar=g_bar,
-                g_count=g_count,
-                spacing_mm=spacing_mm,
-                long_bar=base_long_bar,
-                long_count=base_long_count,
-            )
-            if transverse.status != "ok":
-                failed = _failed_candidate(
-                    base_long_bar=base_long_bar,
-                    base_long_count=base_long_count,
-                    failure_mode=transverse.failure_mode,
-                    message=(
-                        f"{demand.span_id}/{demand.region_id}: {transverse.message}"
-                    ),
-                    objective=objective + 1.0e4,
-                )
-                evaluation_cache[key] = failed
-                return failed
-
+            extra_long_bar, extra_long_count = decoded
             long_ok, long_message, long_provided, layers, s2_mm = _evaluate_longitudinal_region(
                 demand,
                 base_long_bar=base_long_bar,
                 base_long_count=base_long_count,
                 extra_long_bar=extra_long_bar,
                 extra_long_count=extra_long_count,
-                spacing_mm=spacing_mm,
-                av_total=transverse.av_total,
             )
             if not long_ok:
                 failed = _failed_candidate(
@@ -479,19 +442,14 @@ def optimize_span_coupled(
                 evaluation_cache[key] = failed
                 return failed
 
-            transverse_region_kg = transverse.stirrup_unit_weight_kg * stirrup_count_in_region(
-                demand.region_length_mm,
-                spacing_mm,
-            )
             extra_long_area = BAR_AREAS_MM2[extra_long_bar] * extra_long_count
             region_length_m = max(0.0, demand.region_length_mm / 1000.0)
             extra_long_region_kg = longitudinal_mass_kg_per_m(extra_long_area) * region_length_m
-            objective += transverse_region_kg + extra_long_region_kg
+            objective += extra_long_region_kg
 
             states.append(
                 SpanRegionState(
                     demand=demand,
-                    transverse=transverse,
                     extra_long_bar=extra_long_bar,
                     extra_long_count=extra_long_count,
                     long_provided_mm2=long_provided,
@@ -512,7 +470,7 @@ def optimize_span_coupled(
             states=tuple(states),
             status="ok",
             failure_mode="ok",
-            message="Span candidate satisfies transverse and longitudinal checks",
+            message="Longitudinal candidate satisfies checks",
             objective=objective,
             score=objective,
         )
@@ -528,7 +486,7 @@ def optimize_span_coupled(
     )
 
     search_space = _estimate_search_space(domain_sizes)
-    use_genetic = optimization.enabled or search_space > LARGE_EXHAUSTIVE_SPACE
+    use_genetic = True
 
     if use_genetic:
         ga = optimization.genetic_algorithm
@@ -560,11 +518,8 @@ def optimize_span_coupled(
             candidate.base_long_count,
             tuple(
                 (
+                    state.demand.span_id,
                     state.demand.region_id,
-                    state.transverse.e_bar,
-                    state.transverse.g_bar,
-                    state.transverse.g_count,
-                    state.transverse.spacing_mm,
                     state.extra_long_bar,
                     state.extra_long_count,
                 )
@@ -576,15 +531,18 @@ def optimize_span_coupled(
             feasible_unique[fingerprint] = candidate
 
     feasible_sorted = sorted(feasible_unique.values(), key=lambda item: item.objective)
-    if selected.status == "ok" and all(selected is not candidate for candidate in feasible_sorted):
-        feasible_sorted.insert(0, selected)
-    top_candidates = feasible_sorted[: max(1, int(top_n))]
+    if selected.status != "ok" and feasible_sorted:
+        selected = feasible_sorted[0]
+
+    max_candidates = max(1, int(top_n))
+    top_candidates = feasible_sorted[:max_candidates]
 
     if selected.status == "ok":
         selected_results = [
             _region_result_from_state(
                 state=state,
                 span_candidate=selected,
+                transverse_template=templates.get((state.demand.span_id, state.demand.region_id)),
                 method=method,
                 evaluated_candidates=raw_outcome.evaluated_candidates,
                 feasible_candidates=raw_outcome.feasible_candidates,
@@ -595,6 +553,7 @@ def optimize_span_coupled(
         selected_results = [
             _failed_region_result(
                 demand,
+                template=templates.get((demand.span_id, demand.region_id)),
                 method=method,
                 message=selected.message,
                 failure_mode=selected.failure_mode,
@@ -602,13 +561,14 @@ def optimize_span_coupled(
             for demand in demands
         ]
 
-    alternatives_by_region: dict[str, list[RegionDesignResult]] = {}
+    alternatives_by_region: dict[tuple[str, str], list[RegionDesignResult]] = {}
     if top_candidates:
         for demand_index, demand in enumerate(demands):
-            alternatives_by_region[demand.region_id] = [
+            alternatives_by_region[(demand.span_id, demand.region_id)] = [
                 _region_result_from_state(
                     state=candidate.states[demand_index],
                     span_candidate=candidate,
+                    transverse_template=templates.get((demand.span_id, demand.region_id)),
                     method=f"{method_prefix}_top",
                     evaluated_candidates=raw_outcome.evaluated_candidates,
                     feasible_candidates=raw_outcome.feasible_candidates,
@@ -617,7 +577,7 @@ def optimize_span_coupled(
             ]
     else:
         for result in selected_results:
-            alternatives_by_region[result.region_id] = [result]
+            alternatives_by_region[(result.span_id, result.region_id)] = [result]
 
     return SpanOptimizationOutcome(
         results=selected_results,

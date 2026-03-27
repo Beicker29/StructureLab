@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
 const form=document.getElementById('job-form'),submitBtn=document.getElementById('btn-submit'),submitLabel=document.getElementById('btn-submit-label'),clearBtn=document.getElementById('btn-clear'),globalStatusEl=document.getElementById('global-status'),statusEl=document.getElementById('status'),resultsLinksEl=document.getElementById('results-links'),detailsEl=document.getElementById('details'),errorBoxEl=document.getElementById('error-box'),summaryListEl=document.getElementById('summary-list'),checksListEl=document.getElementById('checks-list'),artifactsListEl=document.getElementById('artifacts-list'),beamElevationContainer=document.getElementById('beam-elevation-container'),beamElevationLegend=document.getElementById('beam-elevation-legend'),regionOptionsEl=document.getElementById('region-options'),saveSelectionBtn=document.getElementById('btn-save-selection'),selectionSaveMsg=document.getElementById('selection-save-msg'),hiddenFramePairsInput=document.getElementById('frame_pairs_json'),hiddenOptimizationInput=document.getElementById('optimization_overrides_json'),hiddenSpanLayoutInput=document.getElementById('span_layout_json'),enableSpanLayout=document.getElementById('enable_span_layout'),spanLayoutFields=document.getElementById('span-layout-fields'),spanLayoutList=document.getElementById('span-layout-list'),addSpanBtn=document.getElementById('btn-add-span'),enableOptimizationOverrides=document.getElementById('enable_optimization_overrides'),optimizationFields=document.getElementById('optimization-fields'),optGenerations=document.getElementById('opt_generations'),optEBars=document.getElementById('opt_e_bars'),optGBars=document.getElementById('opt_g_bars'),optLongBars=document.getElementById('opt_long_bars'),optSpacing=document.getElementById('opt_spacing'),optLongCounts=document.getElementById('opt_long_counts'),optLongitudinalMode=document.getElementById('opt_longitudinal_mode');
 const navButtons=Array.from(document.querySelectorAll('[data-view]')),views=Array.from(document.querySelectorAll('.view'));
 let currentJobId=null,currentPreviewPayload=null,pollTimer=null,isSubmitting=false,regionOptionSelections={},spanLongSelections={};
@@ -230,8 +230,54 @@ function fmtPct(value){if(statusModule.fmtPct)return statusModule.fmtPct(value);
 function uniqueLabelOptions(options,labelKey,weightKey){const map={};(options||[]).forEach(opt=>{const label=String(opt&&opt[labelKey]||'').trim();if(!label)return;const raw=Number(opt&&opt[weightKey]);const weight=Number.isFinite(raw)?raw:0;const current=map[label];if(!current||weight<current.weight_kg)map[label]={label,weight_kg:weight}});return Object.values(map).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10)}
 function buildLongArrangementLabel(bar,count,emptyLabel=''){const b=String(bar||'').trim();const c=Number(count);if(!b||!Number.isFinite(c)||c<=0)return emptyLabel;return `${Math.round(c)} x ${b}`}
 function normalizeAdditionalLabel(value){const label=String(value||'').trim();return label||'no se requiere'}
-function buildAdditionalOptionsByBase(region,baseLabel){const selectedBase=String(baseLabel||'').trim();const rows=(region.options||[]).filter(row=>String(row.base_longitudinal_label||'').trim()===selectedBase).sort((a,b)=>{const aw=Number.isFinite(Number(a.weight_longitudinal_kg))?Number(a.weight_longitudinal_kg):Number.POSITIVE_INFINITY;const bw=Number.isFinite(Number(b.weight_longitudinal_kg))?Number(b.weight_longitudinal_kg):Number.POSITIVE_INFINITY;if(aw!==bw)return aw-bw;const ao=Number.isFinite(Number(a.option))?Number(a.option):Number.MAX_SAFE_INTEGER;const bo=Number.isFinite(Number(b.option))?Number(b.option):Number.MAX_SAFE_INTEGER;return ao-bo});const topRows=rows.slice(0,10);return topRows.map((row,index)=>{const label=normalizeAdditionalLabel(row.additional_longitudinal_label);const longLabel=String(row.longitudinal_label||'').trim()||label;const parsedWeight=Number(row.weight_longitudinal_kg);const weight=label==='no se requiere'?0:(Number.isFinite(parsedWeight)?parsedWeight:0);const option=Number.isFinite(Number(row.option))?Number(row.option):null;const value=`add_${option!==null?option:index}_${label}`;return{value,label,longitudinal_label:longLabel,weight_kg:weight,option}})}
-function buildSpanBaseOptionsForCoupled(regions){if(!regions.length)return[];const optionMaps=regions.map(region=>{const byOption={};(region.options||[]).forEach(row=>{const option=Number.isFinite(Number(row.option))?Number(row.option):null;if(option===null)return;byOption[option]={base_label:String(row.base_longitudinal_label||'').trim()||'no se requiere',weight_kg:Number.isFinite(Number(row.weight_longitudinal_kg))?Number(row.weight_longitudinal_kg):0}});return byOption});let commonOptions=null;optionMaps.forEach(map=>{const keys=new Set(Object.keys(map));commonOptions=commonOptions===null?keys:new Set([...commonOptions].filter(key=>keys.has(key)))});if(!commonOptions||!commonOptions.size)return[];return[...commonOptions].map(key=>{const option=Number(key);let weight=0;let baseLabel='no se requiere';optionMaps.forEach(map=>{const item=map[key];if(item){weight+=Number(item.weight_kg)||0;baseLabel=item.base_label||baseLabel}});return{value:`base_${option}`,base_label:baseLabel,weight_kg:weight,option}}).sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return a.option-b.option}).slice(0,10)}
+function getAdditionalOptionsByBaseValue(region,baseValue){
+const key=String(baseValue||'').trim();
+if(!key)return[];
+const map=region&&region.additionalOptionsByBase&&typeof region.additionalOptionsByBase==='object'?region.additionalOptionsByBase:{};
+const rows=Array.isArray(map[key])?map[key]:[];
+if(!rows.length)return[];
+const byLabel={};
+rows.forEach((row,index)=>{
+const label=normalizeAdditionalLabel(row&&row.label);
+const longLabel=String(row&&row.longitudinal_label||'').trim()||label;
+const parsedWeight=Number(row&&row.weight_kg);
+const weight=label==='no se requiere'?0:(Number.isFinite(parsedWeight)?parsedWeight:0);
+const option=Number.isFinite(Number(row&&row.option))?Number(row.option):null;
+const value=String(row&&row.value||`add_${option!==null?option:index}_${label.replace(/\s+/g,'_')}`).trim();
+const current=byLabel[label];
+const currentOption=current&&Number.isFinite(Number(current.option))?Number(current.option):Number.MAX_SAFE_INTEGER;
+const nextOption=option===null?Number.MAX_SAFE_INTEGER:option;
+if(!current||weight<Number(current.weight_kg)||((weight===Number(current.weight_kg))&&(nextOption<currentOption))){
+byLabel[label]={value,label,longitudinal_label:longLabel,weight_kg:weight,option};
+}
+});
+return Object.values(byLabel)
+.sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return (a.option||0)-(b.option||0);})
+.slice(0,10);
+}
+function normalizeSpanBaseOptions(spanPayload){
+const raw=spanPayload&&Array.isArray(spanPayload.longitudinal_base_options)?spanPayload.longitudinal_base_options:[];
+const parsed=raw.map((opt,index)=>{
+const option=Number.isFinite(Number(opt&&opt.option))?Number(opt.option):null;
+const value=String(opt&&opt.value||`base_${option!==null?option:index+1}`).trim();
+const baseLabel=String(opt&&opt.base_label||'no se requiere').trim()||'no se requiere';
+const longWeightRaw=Number(opt&&opt.long_weight_kg);
+const fallbackWeightRaw=Number(opt&&opt.weight_kg);
+const totalWeightRaw=Number(opt&&opt.total_weight_kg);
+const weightKg=Number.isFinite(longWeightRaw)?longWeightRaw:(Number.isFinite(fallbackWeightRaw)?fallbackWeightRaw:0);
+const totalWeightKg=Number.isFinite(totalWeightRaw)?totalWeightRaw:weightKg;
+return{value,option,base_label:baseLabel,weight_kg:weightKg,total_weight_kg:totalWeightKg};
+}).filter(opt=>opt.value&&opt.base_label);
+const byLabel={};
+parsed.forEach(opt=>{
+const key=String(opt.base_label||'no se requiere').trim()||'no se requiere';
+const current=byLabel[key];
+if(!current||opt.weight_kg<current.weight_kg||((opt.weight_kg===current.weight_kg)&&((opt.option||0)<(current.option||0)))){
+byLabel[key]=opt;
+}
+});
+return Object.values(byLabel).sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return (a.option||0)-(b.option||0);}).slice(0,10);
+}
 function renderRegionOptions(previewPayload){
 if(!regionOptionsEl)return;
 if(selectionSaveMsg)selectionSaveMsg.textContent='';
@@ -265,8 +311,8 @@ weight_longitudinal_kg:Number.isFinite(Number(opt.weight_longitudinal_kg))?Numbe
 }).sort((a,b)=>{const aw=Number.isFinite(Number(a.weight_total_kg))?Number(a.weight_total_kg):Number.POSITIVE_INFINITY;const bw=Number.isFinite(Number(b.weight_total_kg))?Number(b.weight_total_kg):Number.POSITIVE_INFINITY;if(aw!==bw)return aw-bw;return (Number(a.option)||0)-(Number(b.option)||0)}).slice(0,10);
 if(!options.length)return;
 const best=options[0];
-const transOptionsSource=(Array.isArray(rg.transverse_options)?rg.transverse_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})).filter(opt=>opt.label).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10);
-const longOptionsSource=(Array.isArray(rg.longitudinal_options)?rg.longitudinal_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})).filter(opt=>opt.label).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10);
+const transOptionsSource=uniqueLabelOptions((Array.isArray(rg.transverse_options)?rg.transverse_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})),'label','weight_kg');
+const longOptionsSource=uniqueLabelOptions((Array.isArray(rg.longitudinal_options)?rg.longitudinal_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})),'label','weight_kg');
 const transOptions=transOptionsSource.length?transOptionsSource:uniqueLabelOptions(options,'transverse_label','weight_transverse_kg');
 const longOptions=longOptionsSource.length?longOptionsSource:uniqueLabelOptions(options,'longitudinal_label','weight_longitudinal_kg');
 if(!transOptions.length||!longOptions.length)return;
@@ -277,6 +323,7 @@ const optionsByNumber={};
 const optionNumbers=[];
 options.forEach(row=>{optionsByNumber[row.option]=row;optionNumbers.push(row.option)});
 const longMode=String(rg.longitudinal_mode||'').trim().toLowerCase();
+const additionalOptionsByBase=(rg&&typeof rg.additional_options_by_base==='object'&&rg.additional_options_by_base)?rg.additional_options_by_base:{};
 regionRows.push({
 key:`${spanId}__${regionId}`,
 spanId,
@@ -294,15 +341,17 @@ longMode,
 defaultLong:String(best.longitudinal_label||longOptions[0].label||'').trim(),
 defaultBaseLong:String(best.base_longitudinal_label||'no se requiere').trim()||'no se requiere',
 defaultAdditionalLong:normalizeAdditionalLabel(best.additional_longitudinal_label),
+additionalOptionsByBase,
 });
 });
 if(!regionRows.length)return;
 const isSpanCoupled=regionRows.some(region=>region.longMode==='span_coupled');
 if(isSpanCoupled){
-const spanBaseOptions=buildSpanBaseOptionsForCoupled(regionRows);
+const spanBaseOptions=normalizeSpanBaseOptions(sp);
 if(!spanBaseOptions.length)return;
-const defaultBase=(regionRows[0]&&regionRows[0].defaultBaseLong)||spanBaseOptions[0].label;
-spanBuckets.push({spanId,regions:regionRows,isSpanCoupled:true,spanBaseOptions,defaultSpanBase:spanBaseOptions.some(opt=>opt.label===defaultBase)?defaultBase:spanBaseOptions[0].label});
+const backendDefaultBaseValue=String(sp.default_longitudinal_base_value||'').trim();
+const defaultSpanBaseValue=spanBaseOptions.some(opt=>opt.value===backendDefaultBaseValue)?backendDefaultBaseValue:spanBaseOptions[0].value;
+spanBuckets.push({spanId,regions:regionRows,isSpanCoupled:true,spanBaseOptions,defaultSpanBaseValue});
 return;
 }
 let commonLongLabels=regionRows[0].longOptions.map(opt=>opt.label);
@@ -341,7 +390,7 @@ spanLongSelect=spanCard.querySelector('.span-opt-longitudinal');
 bucket.spanBaseOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`${opt.base_label} | ${fmtKg(opt.weight_kg)} (long. vano)`;spanLongSelect.appendChild(el)});
 const savedSpan=spanLongSelections[bucket.spanId];
 const savedBaseValue=(savedSpan&&savedSpan.mode==='base')?savedSpan.value:null;
-const initialBaseOption=bucket.spanBaseOptions.find(opt=>opt.value===savedBaseValue)||bucket.spanBaseOptions.find(opt=>opt.base_label===bucket.defaultSpanBase)||bucket.spanBaseOptions[0];
+const initialBaseOption=bucket.spanBaseOptions.find(opt=>opt.value===savedBaseValue)||bucket.spanBaseOptions.find(opt=>opt.value===bucket.defaultSpanBaseValue)||bucket.spanBaseOptions[0];
 spanLongSelect.value=initialBaseOption.value;
 spanLongSelections[bucket.spanId]={mode:'base',value:initialBaseOption.value,label:initialBaseOption.base_label,option:initialBaseOption.option};
 }else{
@@ -388,17 +437,17 @@ let cachedAdditionalOptions=[];
 const refreshAdditionalChoices=()=>{
 if(!bucket.isSpanCoupled||!addSelect)return[];
 const selectedBase=bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.value)||bucket.spanBaseOptions[0];
-const baseLabel=String((selectedBase&&selectedBase.base_label)||'').trim();
-if(card.dataset.baseLabel!==baseLabel||!cachedAdditionalOptions.length){
-cachedAdditionalOptions=buildAdditionalOptionsByBase(region,baseLabel);
+const baseValue=String((selectedBase&&selectedBase.value)||'').trim();
+if(card.dataset.baseValue!==baseValue||!cachedAdditionalOptions.length){
+cachedAdditionalOptions=getAdditionalOptionsByBaseValue(region,baseValue);
 const keep=(regionOptionSelections[region.key]||{}).additional_value||addSelect.value;
 addSelect.innerHTML='';
-if(!cachedAdditionalOptions.length){addSelect.innerHTML='';const el=document.createElement('option');el.value='';el.textContent='Sin opcion adicional viable para esta base (backend)';addSelect.appendChild(el);addSelect.value='';addSelect.disabled=true;card.dataset.baseLabel=baseLabel;return cachedAdditionalOptions;}
+if(!cachedAdditionalOptions.length){addSelect.innerHTML='';const el=document.createElement('option');el.value='';el.textContent='Sin opcion adicional viable para esta base (backend)';addSelect.appendChild(el);addSelect.value='';addSelect.disabled=true;card.dataset.baseValue=baseValue;return cachedAdditionalOptions;}
 addSelect.disabled=false;
 cachedAdditionalOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}`;addSelect.appendChild(el)});
 const selectedLabel=cachedAdditionalOptions.some(opt=>opt.value===keep)?keep:cachedAdditionalOptions[0].value;
 addSelect.value=selectedLabel;
-card.dataset.baseLabel=baseLabel;
+card.dataset.baseValue=baseValue;
 }
 return cachedAdditionalOptions;
 };
@@ -506,6 +555,9 @@ form.addEventListener('submit',async(event)=>{event.preventDefault();if(isSubmit
 clearBtn.addEventListener('click',()=>{stopPolling();currentJobId=null;currentPreviewPayload=null;regionOptionSelections={};spanLongSelections={};if(saveSelectionBtn)saveSelectionBtn.disabled=true;if(selectionSaveMsg)selectionSaveMsg.textContent='';setSubmitting(false);setStatus('Esperando ejecucion');resultsLinksEl.innerHTML='';detailsEl.textContent='';detailsEl.classList.add('hidden');clearErrorBox();clearFieldErrors();renderArtifacts([]);refreshPreview()});
 if(saveSelectionBtn)saveSelectionBtn.addEventListener('click',saveSelectionReport);renderArtifacts([]);refreshPreview();
 })();
+
+
+
 
 
 

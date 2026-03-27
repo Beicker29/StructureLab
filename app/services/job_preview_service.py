@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections import defaultdict
 from pathlib import Path
@@ -346,6 +346,124 @@ def _build_span_option_choices(region_rows: list[dict[str, Any]], max_items: int
     return output[:max_items]
 
 
+def _build_span_longitudinal_base_options(
+    region_rows: list[dict[str, Any]],
+    max_items: int = 10,
+) -> list[dict[str, Any]]:
+    if not region_rows:
+        return []
+
+    coupled_rows = [
+        row
+        for row in region_rows
+        if _as_text(row.get("longitudinal_mode")).lower() == "span_coupled"
+        and isinstance(row.get("options"), list)
+        and row.get("options")
+    ]
+    if len(coupled_rows) != len(region_rows):
+        return []
+
+    common_options: set[int] | None = None
+    options_by_region: list[dict[int, dict[str, Any]]] = []
+    for row in coupled_rows:
+        by_option: dict[int, dict[str, Any]] = {}
+        for option_row in row.get("options") or []:
+            option_value = _as_int(option_row.get("option"))
+            if option_value is None:
+                continue
+            by_option[option_value] = option_row
+        if not by_option:
+            return []
+        options_by_region.append(by_option)
+        region_options = set(by_option.keys())
+        common_options = region_options if common_options is None else (common_options & region_options)
+
+    if not common_options:
+        return []
+
+    by_base_label: dict[str, dict[str, Any]] = {}
+    for option in sorted(common_options):
+        total_weight = 0.0
+        long_weight = 0.0
+        base_label = "no se requiere"
+        for by_option in options_by_region:
+            row = by_option[option]
+            total_weight += float(row.get("weight_total_kg") or 0.0)
+            long_weight += float(row.get("weight_longitudinal_kg") or 0.0)
+            current_label = _as_text(row.get("base_longitudinal_label")) or "no se requiere"
+            if current_label:
+                base_label = current_label
+        item = {
+            "value": f"base_{option}",
+            "option": option,
+            "base_label": base_label,
+            "long_weight_kg": long_weight,
+            "total_weight_kg": total_weight,
+        }
+        current = by_base_label.get(base_label)
+        if current is None or (item["long_weight_kg"], item["option"]) < (current["long_weight_kg"], current["option"]):
+            by_base_label[base_label] = item
+
+    ordered = sorted(
+        by_base_label.values(),
+        key=lambda item: (item["long_weight_kg"], item["total_weight_kg"], item["option"], item["base_label"]),
+    )
+    return ordered[:max_items]
+
+
+def _build_region_additional_options_by_base(
+    region_row: dict[str, Any],
+    base_options: list[dict[str, Any]],
+    max_items: int = 10,
+) -> dict[str, list[dict[str, Any]]]:
+    options = region_row.get("options") if isinstance(region_row.get("options"), list) else []
+    if not options or not base_options:
+        return {}
+
+    output: dict[str, list[dict[str, Any]]] = {}
+    for base in base_options:
+        base_value = _as_text(base.get("value"))
+        base_label = _as_text(base.get("base_label")) or "no se requiere"
+        rows = [
+            row
+            for row in options
+            if (_as_text(row.get("base_longitudinal_label")) or "no se requiere") == base_label
+        ]
+        rows_sorted = sorted(
+            rows,
+            key=lambda item: (
+                item.get("weight_longitudinal_kg") if item.get("weight_longitudinal_kg") is not None else float("inf"),
+                item.get("option") if item.get("option") is not None else 999_999,
+            ),
+        )
+        by_label: dict[str, dict[str, Any]] = {}
+        for row in rows_sorted:
+            add_label = _as_text(row.get("additional_longitudinal_label")) or "no se requiere"
+            long_label = _as_text(row.get("longitudinal_label")) or add_label
+            option_value = _as_int(row.get("option"))
+            weight_kg = float(row.get("weight_longitudinal_kg") or 0.0)
+            item = {
+                "value": f"add_{option_value if option_value is not None else len(by_label) + 1}_{add_label.replace(' ', '_')}",
+                "label": add_label,
+                "longitudinal_label": long_label,
+                "weight_kg": weight_kg,
+                "option": option_value,
+            }
+            current = by_label.get(add_label)
+            if current is None or (item["weight_kg"], item.get("option") or 999_999) < (
+                current["weight_kg"],
+                current.get("option") or 999_999,
+            ):
+                by_label[add_label] = item
+
+        ordered = sorted(
+            by_label.values(),
+            key=lambda item: (item["weight_kg"], item.get("option") or 999_999, item["label"]),
+        )
+        output[base_value] = ordered[:max_items]
+    return output
+
+
 def _build_span_preview(
     span: dict[str, Any],
     *,
@@ -385,7 +503,9 @@ def _build_span_preview(
             ),
         )
         schedule_row = _pick_schedule_row(schedule_rows, optimized)
-        schedule_options = sorted_schedule_rows[:10]
+        longitudinal_mode = _as_text((optimized or {}).get("longitudinal_mode")) or None
+        schedule_option_limit = 60 if (longitudinal_mode or "").lower() == "span_coupled" else 10
+        schedule_options = sorted_schedule_rows[:schedule_option_limit]
         transverse_options = _build_component_options(
             sorted_schedule_rows,
             label_key="transverse_label",
@@ -407,7 +527,6 @@ def _build_span_preview(
                 any_estimated = True
 
         spacing_mm = optimized.get("spacing_mm") if optimized else None
-        longitudinal_mode = _as_text((optimized or {}).get("longitudinal_mode")) or None
         if spacing_mm is None:
             spacing_mm = 100 if region_type.upper() == "C" else 200
             spacing_estimated = True
@@ -530,6 +649,13 @@ def _build_span_preview(
         )
         region_lengths.append(length_mm)
 
+    longitudinal_base_options = _build_span_longitudinal_base_options(region_rows)
+    for row in region_rows:
+        row["additional_options_by_base"] = _build_region_additional_options_by_base(
+            row,
+            longitudinal_base_options,
+        )
+
     span_length_mm = int(round(sum(region_lengths))) if region_lengths else int(span_default_length_mm)
     if not region_rows and clear_length_mm is None:
         any_estimated = True
@@ -546,6 +672,8 @@ def _build_span_preview(
         "height_mm": int(round(span_height_mm)) if span_height_mm is not None else None,
         "d_mm": int(round(span_d_mm)) if span_d_mm is not None else None,
         "is_deep_beam": is_deep_beam,
+        "longitudinal_base_options": longitudinal_base_options,
+        "default_longitudinal_base_value": (longitudinal_base_options[0]["value"] if longitudinal_base_options else None),
         "span_option_choices": _build_span_option_choices(region_rows),
         "regions": region_rows,
     }
@@ -610,6 +738,8 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
             "reinforcement_schedule": bool(schedule_map),
         },
     }
+
+
 
 
 

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import itertools
 import math
@@ -492,6 +492,84 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             controlling_limit=controlling_limit,
             deficit=1.0,
         )
+
+    if region.is_deep_beam:
+        if region.d_mm is None or region.width_mm is None:
+            return failed_candidate(
+                e_bar=e_bar,
+                g_bar=g_bar,
+                g_count=g_count,
+                spacing_mm=spacing_mm,
+                long_bar=long_bar,
+                long_count=long_count,
+                failure_mode="region_detail_fail",
+                message="Deep beam checks require d_mm and width_mm",
+                at=at,
+                at_over_s=at_over_s,
+                av1=av1,
+                av2=av2,
+                av_total=av_total,
+                av_over_s=av_over_s,
+                long_provided=along,
+                f_free=f_free,
+                objective=objective,
+                transverse_weight_kg_per_m=transverse_weight_kg_per_m,
+                stirrup_unit_weight_kg=stirrup_unit_weight_kg,
+                controlling_limit="s1",
+                deficit=1.0,
+            )
+
+        s1_limit = min(region.d_mm / 5.0, 300.0)
+        if float(spacing_mm) > s1_limit:
+            return failed_candidate(
+                e_bar=e_bar,
+                g_bar=g_bar,
+                g_count=g_count,
+                spacing_mm=spacing_mm,
+                long_bar=long_bar,
+                long_count=long_count,
+                failure_mode="region_detail_fail",
+                message=f"Deep beam requires s1 <= min(d/5,300)={s1_limit:.1f} mm (got {spacing_mm})",
+                at=at,
+                at_over_s=at_over_s,
+                av1=av1,
+                av2=av2,
+                av_total=av_total,
+                av_over_s=av_over_s,
+                long_provided=along,
+                f_free=f_free,
+                objective=objective,
+                transverse_weight_kg_per_m=transverse_weight_kg_per_m,
+                stirrup_unit_weight_kg=stirrup_unit_weight_kg,
+                controlling_limit="s1",
+                deficit=1.0,
+            )
+
+        min_av_total = 0.0025 * region.width_mm * float(spacing_mm)
+        if av_total < min_av_total:
+            return failed_candidate(
+                e_bar=e_bar,
+                g_bar=g_bar,
+                g_count=g_count,
+                spacing_mm=spacing_mm,
+                long_bar=long_bar,
+                long_count=long_count,
+                failure_mode="region_detail_fail",
+                message=f"Deep beam requires Av_total >= 0.0025*b*s1 ({min_av_total:.2f} mm2)",
+                at=at,
+                at_over_s=at_over_s,
+                av1=av1,
+                av2=av2,
+                av_total=av_total,
+                av_over_s=av_over_s,
+                long_provided=along,
+                f_free=f_free,
+                objective=objective,
+                transverse_weight_kg_per_m=transverse_weight_kg_per_m,
+                stirrup_unit_weight_kg=stirrup_unit_weight_kg,
+                controlling_limit="Av_total",
+                deficit=deficit_ratio(min_av_total, av_total),
+            )
     return Candidate(
         e_bar=e_bar,
         g_bar=g_bar,
@@ -630,7 +708,8 @@ def check_region_rule(
                 f"s={spacing_mm} > min({formatted_limits}) = {max_spacing:.1f} mm",
                 controlling_name,
             )
-        return True, "DES region C detailing checks satisfied", controlling_name
+        controlling_label = controlling_name if float(spacing_mm) >= (max_spacing - 1.0e-9) else "Resistencia"
+        return True, "DES region C detailing checks satisfied", controlling_label
 
     if region.db_bar not in BAR_DIAMETERS_MM:
         return False, f"Unsupported db_bar for detailing checks: {region.db_bar}", ""
@@ -677,6 +756,7 @@ def check_region_rule(
                 f"16db={db16_limit:.1f}, 48dest={dest48_limit:.1f}, 24dest={dest24_limit:.1f}) = {max_spacing:.1f} mm",
                 controlling_name,
             )
+        controlling_label = controlling_name if float(spacing_mm) >= (max_spacing - 1.0e-9) else "Resistencia"
 
         _ = long_count
         provided_branches = 2 + g_count
@@ -688,7 +768,7 @@ def check_region_rule(
                 controlling_name,
             )
 
-        return True, "DMO region C detailing checks satisfied", controlling_name
+        return True, "DMO region C detailing checks satisfied", controlling_label
 
     if region.region_type != "NC":
         return True, "Detailing rule check: unsupported region type skipped", "N/A"
@@ -753,8 +833,8 @@ def check_region_rule(
             controlling_name,
         )
 
-    return True, "DMO region NC detailing checks satisfied", controlling_name
-
+    controlling_label = controlling_name if float(spacing_mm) >= (max_spacing - 1.0e-9) else "Resistencia"
+    return True, "DMO region NC detailing checks satisfied", controlling_label
 
 def deficit_ratio(required: float, provided: float) -> float:
     if required <= 0.0:
@@ -848,99 +928,6 @@ def select_longitudinal_independent(
     return long_bar, long_count, provided, False
 
 
-def _attach_candidate_longitudinal_mass(
-    candidate: Candidate,
-    region: RegionDemand,
-) -> Candidate:
-    longitudinal_mass_per_m = longitudinal_mass_kg_per_m(candidate.long_provided)
-    region_length_m = max(0.0, region.region_length_mm / 1000.0)
-    longitudinal_mass_region_kg = longitudinal_mass_per_m * region_length_m
-    transverse_mass_region_kg = candidate.stirrup_unit_weight_kg * stirrup_count_in_region(
-        region.region_length_mm,
-        candidate.spacing_mm,
-    )
-    if transverse_mass_region_kg <= 0.0:
-        transverse_mass_region_kg = candidate.objective
-
-    objective = transverse_mass_region_kg + longitudinal_mass_region_kg
-    score = candidate.score + longitudinal_mass_region_kg
-    if candidate.status == "ok":
-        score = objective
-
-    return Candidate(
-        e_bar=candidate.e_bar,
-        g_bar=candidate.g_bar,
-        g_count=candidate.g_count,
-        spacing_mm=candidate.spacing_mm,
-        long_bar=candidate.long_bar,
-        long_count=candidate.long_count,
-        at=candidate.at,
-        at_over_s=candidate.at_over_s,
-        av1=candidate.av1,
-        av2=candidate.av2,
-        av_total=candidate.av_total,
-        av_over_s=candidate.av_over_s,
-        long_provided=candidate.long_provided,
-        f_free=candidate.f_free,
-        failure_mode=candidate.failure_mode,
-        status=candidate.status,
-        message=candidate.message,
-        objective=objective,
-        score=score,
-        transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
-        longitudinal_weight_kg_per_m=longitudinal_mass_per_m,
-        stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
-        controlling_limit=candidate.controlling_limit,
-    )
-
-
-def attach_independent_longitudinal(
-    candidate: Candidate,
-    region: RegionDemand,
-    variables: VariablesConfig,
-) -> Candidate:
-    needs_longitudinal = requires_longitudinal_design(region)
-    long_bar, long_count, long_provided, long_ok = select_longitudinal_independent(region, variables)
-    if not needs_longitudinal:
-        long_bar = ""
-        long_count = 0
-        long_provided = 0.0
-        message = candidate.message
-    elif long_ok:
-        message = candidate.message
-    else:
-        message = (
-            f"{candidate.message} | longitudinal independent warning: "
-            f"max domain provided={long_provided:.2f} < required={region.l_req:.2f}"
-        )
-
-    candidate_with_long = Candidate(
-        e_bar=candidate.e_bar,
-        g_bar=candidate.g_bar,
-        g_count=candidate.g_count,
-        spacing_mm=candidate.spacing_mm,
-        long_bar=long_bar,
-        long_count=long_count,
-        at=candidate.at,
-        at_over_s=candidate.at_over_s,
-        av1=candidate.av1,
-        av2=candidate.av2,
-        av_total=candidate.av_total,
-        av_over_s=candidate.av_over_s,
-        long_provided=long_provided,
-        f_free=candidate.f_free,
-        failure_mode=candidate.failure_mode,
-        status=candidate.status,
-        message=message,
-        objective=candidate.objective,
-        score=candidate.score,
-        transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
-        longitudinal_weight_kg_per_m=(0.0 if not needs_longitudinal else candidate.longitudinal_weight_kg_per_m),
-        stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
-        controlling_limit=candidate.controlling_limit,
-    )
-    return _attach_candidate_longitudinal_mass(candidate_with_long, region)
-
 def optimize_region(region: RegionDemand, optimization: OptimizationConfig) -> OptimizationOutcome:
     if optimization.enabled:
         return optimize_region_ga(region, optimization)
@@ -956,7 +943,7 @@ def optimize_region_exhaustive(region: RegionDemand, variables: VariablesConfig)
             g_count=0,
             spacing_mm=variables.stirrup_spacing_mm[0],
             long_bar=variables.longitudinal_bars[0],
-            long_count=variables.longitudinal_bar_counts[0],
+            long_count=0,
             failure_mode="input_fail",
             message=(
                 f"No G_counts satisfy min_branches={region.min_branches}; "
@@ -980,7 +967,7 @@ def optimize_region_exhaustive(region: RegionDemand, variables: VariablesConfig)
         variables.stirrup_spacing_mm,
     ]
     default_long_bar = variables.longitudinal_bars[0]
-    default_long_count = variables.longitudinal_bar_counts[0]
+    default_long_count = 0
 
     def decode(individual: list[int]) -> tuple[str, str, int, int]:
         return (
@@ -1001,7 +988,7 @@ def optimize_region_exhaustive(region: RegionDemand, variables: VariablesConfig)
             long_bar=default_long_bar,
             long_count=default_long_count,
         )
-        return attach_independent_longitudinal(candidate, region, variables)
+        return candidate
 
     hooks = SearchHooks[Candidate](
         evaluate=evaluate_individual,
@@ -1034,7 +1021,7 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
             g_count=0,
             spacing_mm=variables.stirrup_spacing_mm[0],
             long_bar=variables.longitudinal_bars[0],
-            long_count=variables.longitudinal_bar_counts[0],
+            long_count=0,
             failure_mode="input_fail",
             message=(
                 f"No G_counts satisfy min_branches={region.min_branches}; "
@@ -1059,7 +1046,7 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
     ]
     domain_sizes = [len(values) for values in domain]
     default_long_bar = variables.longitudinal_bars[0]
-    default_long_count = variables.longitudinal_bar_counts[0]
+    default_long_count = 0
 
     def decode(individual: list[int]) -> tuple[str, str, int, int]:
         return (
@@ -1087,9 +1074,8 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
             long_bar=default_long_bar,
             long_count=default_long_count,
         )
-        resolved = attach_independent_longitudinal(candidate, region, variables)
-        evaluation_cache[key] = resolved
-        return resolved
+        evaluation_cache[key] = candidate
+        return candidate
 
     hooks = SearchHooks[Candidate](
         evaluate=evaluate_individual,
@@ -1147,8 +1133,8 @@ def candidate_to_region_result(
         at=candidate.at,
         at_over_s=candidate.at_over_s,
         av_over_s=candidate.av_over_s,
-        long_bar=candidate.long_bar,
-        long_count=candidate.long_count,
+        long_bar=(candidate.long_bar if candidate.long_count > 0 else ""),
+        long_count=(candidate.long_count if candidate.long_count > 0 else 0),
         controlling_limit=candidate.controlling_limit,
         failure_mode=candidate.failure_mode,
         status=candidate.status,
@@ -1174,21 +1160,15 @@ def top_region_alternatives(
         return []
 
     top_n = max(1, int(top_n))
-    needs_longitudinal = requires_longitudinal_design(region)
-    long_bar_domain = list(variables.longitudinal_bars)
-    long_count_domain = list(variables.longitudinal_bar_counts)
-    if not needs_longitudinal:
-        long_bar_domain = [variables.longitudinal_bars[0]]
-        long_count_domain = [0]
+    default_long_bar = variables.longitudinal_bars[0]
+    default_long_count = 0
 
     evaluated: list[Candidate] = []
-    for e_bar, g_bar, g_count, spacing, long_bar, long_count in itertools.product(
+    for e_bar, g_bar, g_count, spacing in itertools.product(
         variables.E_bars,
         variables.G_bars,
         allowed_g_counts,
         variables.stirrup_spacing_mm,
-        long_bar_domain,
-        long_count_domain,
     ):
         candidate = evaluate_candidate(
             region,
@@ -1196,76 +1176,45 @@ def top_region_alternatives(
             g_bar=g_bar,
             g_count=g_count,
             spacing_mm=spacing,
-            long_bar=long_bar,
-            long_count=long_count,
+            long_bar=default_long_bar,
+            long_count=default_long_count,
         )
-        if needs_longitudinal and candidate.status == "ok" and candidate.long_provided < region.l_req:
-            candidate = failed_candidate(
-                e_bar=candidate.e_bar,
-                g_bar=candidate.g_bar,
-                g_count=candidate.g_count,
-                spacing_mm=candidate.spacing_mm,
-                long_bar=candidate.long_bar,
-                long_count=candidate.long_count,
-                failure_mode="longitudinal_fail",
-                message="Along_real < Along_req",
-                at=candidate.at,
-                at_over_s=candidate.at_over_s,
-                av1=candidate.av1,
-                av2=candidate.av2,
-                av_total=candidate.av_total,
-                av_over_s=candidate.av_over_s,
-                long_provided=candidate.long_provided,
-                f_free=candidate.f_free,
-                objective=candidate.objective,
-                transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
-                stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
-                controlling_limit=candidate.controlling_limit,
-                deficit=deficit_ratio(region.l_req, candidate.long_provided),
-            )
-        if not needs_longitudinal:
-            candidate = Candidate(
-                e_bar=candidate.e_bar,
-                g_bar=candidate.g_bar,
-                g_count=candidate.g_count,
-                spacing_mm=candidate.spacing_mm,
-                long_bar="",
-                long_count=0,
-                at=candidate.at,
-                at_over_s=candidate.at_over_s,
-                av1=candidate.av1,
-                av2=candidate.av2,
-                av_total=candidate.av_total,
-                av_over_s=candidate.av_over_s,
-                long_provided=0.0,
-                f_free=candidate.f_free,
-                failure_mode=candidate.failure_mode,
-                status=candidate.status,
-                message=candidate.message,
-                objective=candidate.objective,
-                score=candidate.score,
-                transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
-                longitudinal_weight_kg_per_m=0.0,
-                stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
-                controlling_limit=candidate.controlling_limit,
-            )
-        evaluated.append(_attach_candidate_longitudinal_mass(candidate, region))
+        evaluated.append(candidate)
 
     feasible = sorted(
         (candidate for candidate in evaluated if candidate.status == "ok"),
-        key=lambda candidate: (candidate.objective, candidate.score),
+        key=lambda candidate: (
+            candidate.objective,
+            candidate.transverse_weight_kg_per_m,
+            candidate.e_bar,
+            candidate.g_bar,
+            candidate.g_count,
+            candidate.spacing_mm,
+        ),
     )
     feasible_count = len(feasible)
 
-    # Keep alternatives deterministic and aligned with user expectation:
-    # "top N" means top feasible candidates sorted by objective/score.
-    selected: list[Candidate] = list(feasible[:top_n])
-    if len(selected) < top_n:
+    selected: list[Candidate] = []
+    seen_transverse: set[tuple[str, str, int, int]] = set()
+    for candidate in feasible:
+        key = (candidate.e_bar, candidate.g_bar, candidate.g_count, candidate.spacing_mm)
+        if key in seen_transverse:
+            continue
+        seen_transverse.add(key)
+        selected.append(candidate)
+        if len(selected) >= top_n:
+            break
+
+    if not selected:
         failed = sorted(
             (candidate for candidate in evaluated if candidate.status != "ok"),
             key=lambda candidate: candidate.score,
         )
         for candidate in failed:
+            key = (candidate.e_bar, candidate.g_bar, candidate.g_count, candidate.spacing_mm)
+            if key in seen_transverse:
+                continue
+            seen_transverse.add(key)
             selected.append(candidate)
             if len(selected) >= top_n:
                 break
@@ -1274,13 +1223,12 @@ def top_region_alternatives(
         candidate_to_region_result(
             region,
             candidate,
-            method="top_alternativa",
+            method="top_transversal",
             evaluated_candidates=len(evaluated),
             feasible_candidates=feasible_count,
         )
         for candidate in selected
     ]
-
 def to_region_result(
     demand: RegionDemand,
     outcome: OptimizationOutcome,
@@ -1342,6 +1290,7 @@ def make_failed_region_result(
         evaluated_candidates=0,
         feasible_candidates=0,
     )
+
 
 
 
