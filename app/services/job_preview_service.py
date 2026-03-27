@@ -237,6 +237,58 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
     return output
 
 
+def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    if path is None or not path.exists():
+        return {}
+
+    workbook = load_workbook(path, data_only=True, read_only=True)
+    if "transversales" not in workbook.sheetnames:
+        return {}
+
+    sheet = workbook["transversales"]
+    iterator = sheet.iter_rows(values_only=True)
+    header_row = next(iterator, None)
+    if header_row is None:
+        return {}
+
+    columns = _header_map(header_row)
+    span_col = _find_col(columns, "vano_id", "span_id")
+    region_col = _find_col(columns, "region_id")
+    status_col = _find_col(columns, "estado", "status")
+    label_col = _find_col(columns, "arreglo_transversal", "transverse_arrangement")
+    weight_col = _find_col(columns, "peso_transversal_region_kg", "transverse_weight_region_kg")
+
+    if span_col is None or region_col is None or label_col is None:
+        return {}
+
+    output: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in iterator:
+        span_id = _as_text(row[span_col])
+        region_id = _as_text(row[region_col])
+        if not span_id or not region_id:
+            continue
+
+        status = _as_text(row[status_col]).lower() if status_col is not None else ""
+        if status and status not in {"cumple", "ok"}:
+            continue
+
+        label = _as_text(row[label_col])
+        if not label:
+            continue
+
+        weight = _as_non_negative_float(row[weight_col]) if weight_col is not None else None
+        output[(span_id, region_id)].append({"label": label, "weight_kg": float(weight) if weight is not None else None})
+
+    for key, rows in output.items():
+        ordered = sorted(
+            rows,
+            key=lambda item: (item["weight_kg"] if item["weight_kg"] is not None else float("inf"), item["label"]),
+        )
+        output[key] = ordered[:10]
+
+    return output
+
+
 def _pick_schedule_row(
     rows: list[dict[str, Any]],
     optimized: dict[str, Any] | None,
@@ -267,7 +319,7 @@ def _build_component_options(
     *,
     label_key: str,
     weight_key: str,
-    max_items: int = 10,
+    max_items: int | None = 10,
 ) -> list[dict[str, Any]]:
     best_by_label: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -284,12 +336,14 @@ def _build_component_options(
                 "_sort_weight": sort_weight,
             }
     ordered = sorted(best_by_label.values(), key=lambda item: (item["_sort_weight"], item["label"]))
+    if max_items is not None:
+        ordered = ordered[: max(1, int(max_items))]
     return [
         {
             "label": item["label"],
             "weight_kg": item["weight_kg"],
         }
-        for item in ordered[:max_items]
+        for item in ordered
     ]
 
 
@@ -401,7 +455,11 @@ def _build_span_longitudinal_base_options(
             "total_weight_kg": total_weight,
         }
         current = by_base_label.get(base_label)
-        if current is None or (item["long_weight_kg"], item["option"]) < (current["long_weight_kg"], current["option"]):
+        if current is None or (item["long_weight_kg"], item["total_weight_kg"], item["option"]) < (
+            current["long_weight_kg"],
+            current["total_weight_kg"],
+            current["option"],
+        ):
             by_base_label[base_label] = item
 
     ordered = sorted(
@@ -469,6 +527,7 @@ def _build_span_preview(
     *,
     optimized_map: dict[tuple[str, str], dict[str, Any]],
     schedule_map: dict[tuple[str, str], list[dict[str, Any]]],
+    transverse_options_map: dict[tuple[str, str], list[dict[str, Any]]],
     default_span_length_mm: float = 6000.0,
 ) -> dict[str, Any]:
     span_id = _as_text(span.get("id")) or "S1"
@@ -504,13 +563,16 @@ def _build_span_preview(
         )
         schedule_row = _pick_schedule_row(schedule_rows, optimized)
         longitudinal_mode = _as_text((optimized or {}).get("longitudinal_mode")) or None
-        schedule_option_limit = 60 if (longitudinal_mode or "").lower() == "span_coupled" else 10
+        schedule_option_limit = 200 if (longitudinal_mode or "").lower() == "span_coupled" else 10
         schedule_options = sorted_schedule_rows[:schedule_option_limit]
-        transverse_options = _build_component_options(
-            sorted_schedule_rows,
-            label_key="transverse_label",
-            weight_key="weight_transverse_kg",
-        )
+        transverse_options = list(transverse_options_map.get((span_id, region_id), []))
+        if not transverse_options:
+            transverse_options = _build_component_options(
+                sorted_schedule_rows,
+                label_key="transverse_label",
+                weight_key="weight_transverse_kg",
+                max_items=10,
+            )
         longitudinal_options = _build_component_options(
             sorted_schedule_rows,
             label_key="longitudinal_label",
@@ -687,6 +749,7 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
 
     optimized_map = _read_optimized_regions(optimized_path)
     schedule_map = _read_schedule_rows(schedule_path)
+    transverse_options_map = _read_transverse_options(schedule_path)
 
     beams = case_payload.get("beams") if isinstance(case_payload.get("beams"), list) else []
     beam = beams[0] if beams else {}
@@ -696,6 +759,7 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
             span,
             optimized_map=optimized_map,
             schedule_map=schedule_map,
+            transverse_options_map=transverse_options_map,
         )
         for span in spans
     ]
@@ -738,6 +802,7 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
             "reinforcement_schedule": bool(schedule_map),
         },
     }
+
 
 
 

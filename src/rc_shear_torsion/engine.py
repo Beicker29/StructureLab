@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
@@ -68,6 +68,7 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
 
     all_region_results: list = []
     region_alternatives: dict[tuple[str, str, str], list] = {}
+    transverse_alternatives: dict[tuple[str, str, str], list] = {}
     all_span_summaries: list = []
     all_beam_summaries: list = []
 
@@ -104,6 +105,7 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
             )
             span_results.append(failed_result)
             region_alternatives[(beam.beam_id, span.id, region.id)] = [failed_result]
+            transverse_alternatives[(beam.beam_id, span.id, region.id)] = [failed_result]
 
     for beam in config.beams:
         beam_span_summaries: list = []
@@ -172,12 +174,14 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                         beam_demands.append(demand)
                         transverse_templates[(demand.span_id, demand.region_id)] = result
 
-                        options = top_region_alternatives(
+                        transverse_options = top_region_alternatives(
                             demand,
                             config.optimization.variables,
                             top_n=10,
                         )
-                        region_alternatives[(beam.beam_id, span.id, demand.region_id)] = options or [result]
+                        key_region = (beam.beam_id, span.id, demand.region_id)
+                        transverse_alternatives[key_region] = transverse_options or [result]
+                        region_alternatives[key_region] = transverse_options or [result]
                         log_lines.append(
                             f"region={beam.beam_id}/{span.id}/{demand.region_id} method={outcome.method} "
                             f"status={result.status} failure_mode={result.failure_mode} "
@@ -194,7 +198,7 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                 beam_demands,
                 config.optimization,
                 span_length_mm=beam_length_mm,
-                top_n=60,
+                top_n=200,
                 transverse_templates=transverse_templates,
             )
 
@@ -241,6 +245,7 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
         all_region_results,
         region_lengths_mm,
         region_alternatives,
+        transverse_alternatives=transverse_alternatives,
     )
     write_run_log(output_dir / "run_log.txt", log_lines)
 

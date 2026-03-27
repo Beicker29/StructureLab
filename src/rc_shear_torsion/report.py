@@ -243,9 +243,11 @@ def write_reinforcement_schedule(
     region_results: Iterable[RegionDesignResult],
     region_lengths_mm: dict[tuple[str, str, str], float] | None = None,
     region_alternatives: dict[tuple[str, str, str], list[RegionDesignResult]] | None = None,
+    transverse_alternatives: dict[tuple[str, str, str], list[RegionDesignResult]] | None = None,
 ) -> None:
     lengths_mm = region_lengths_mm or {}
     alternatives = region_alternatives or {}
+    transverse_by_region = transverse_alternatives or {}
     workbook = Workbook()
     region_sheet = workbook.active
     region_sheet.title = "por_region"
@@ -392,6 +394,68 @@ def write_reinforcement_schedule(
                 float(span_row["total_weight_sum_kg"]),
             ]
         )
+
+    if transverse_by_region:
+        transverse_sheet = workbook.create_sheet("transversales")
+        transverse_sheet.append(
+            [
+                "viga_id",
+                "vano_id",
+                "region_id",
+                "opcion",
+                "estado",
+                "arreglo_transversal",
+                "limite_controlante",
+                "espaciamiento_mm",
+                "cantidad_estribos_region",
+                "peso_unitario_estribo_kg",
+                "peso_transversal_region_kg",
+            ]
+        )
+
+        for beam_id, span_id, region_id in sorted(transverse_by_region.keys()):
+            region_length_mm = lengths_mm.get((beam_id, span_id, region_id), 0.0)
+            feasible_rows = [row for row in (transverse_by_region.get((beam_id, span_id, region_id)) or []) if row.status == "ok"]
+            rows_sorted = sorted(
+                feasible_rows,
+                key=lambda row: (
+                    float(row.stirrup_unit_weight_kg or 0.0)
+                    * (max(1, math.floor(region_length_mm / float(row.spacing_mm)) + 1) if row.spacing_mm > 0 and region_length_mm > 0.0 else 0),
+                    row.e_bar,
+                    row.g_bar,
+                    row.g_count,
+                    row.spacing_mm,
+                ),
+            )
+            for option_idx, result in enumerate(rows_sorted, start=1):
+                transverse_arrangement = ""
+                if result.e_bar and result.spacing_mm > 0:
+                    if result.g_bar and result.g_count > 0:
+                        transverse_arrangement = f"1E {result.e_bar} + {result.g_count}G {result.g_bar} @ {result.spacing_mm} mm"
+                    else:
+                        transverse_arrangement = f"1E {result.e_bar} @ {result.spacing_mm} mm"
+
+                cantidad_estribos_region = 0
+                if result.spacing_mm > 0 and region_length_mm > 0.0:
+                    cantidad_estribos_region = max(1, math.floor(region_length_mm / float(result.spacing_mm)) + 1)
+
+                peso_unitario_estribo_kg = float(result.stirrup_unit_weight_kg or 0.0)
+                peso_transversal_region_kg = peso_unitario_estribo_kg * cantidad_estribos_region
+                transverse_sheet.append(
+                    [
+                        beam_id,
+                        span_id,
+                        region_id,
+                        option_idx,
+                        "cumple",
+                        transverse_arrangement,
+                        result.controlling_limit,
+                        result.spacing_mm,
+                        cantidad_estribos_region,
+                        peso_unitario_estribo_kg,
+                        peso_transversal_region_kg,
+                    ]
+                )
 
     workbook.save(path)
 

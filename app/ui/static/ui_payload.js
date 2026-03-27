@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
 function parseCsvTokens(raw){
   return String(raw || '').split(',').map(v => v.trim()).filter(v => v.length > 0);
 }
@@ -41,6 +41,8 @@ function mapBackendField(field){
     ['frame_pairs','enable_span_layout'],
     ['span_layout','enable_span_layout'],
     ['optimization','enable_optimization_overrides'],
+    ['population_size','opt_population_size'],
+    ['generations','opt_generations'],
     ['seismic_excel','seismic_excel'],
     ['gravity_excel','gravity_excel'],
     ['geometry_excel','geometry_excel'],

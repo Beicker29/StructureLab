@@ -380,8 +380,15 @@ class ApiTests(unittest.TestCase):
         self.assertIn("longitudinal_options", first_region)
         self.assertIsInstance(first_region["transverse_options"], list)
         self.assertIsInstance(first_region["longitudinal_options"], list)
+        self.assertGreaterEqual(len(first_region["transverse_options"]), 1)
         self.assertLessEqual(len(first_region["transverse_options"]), 10)
         self.assertLessEqual(len(first_region["longitudinal_options"]), 10)
+        transverse_weights = [
+            float(item["weight_kg"])
+            for item in first_region["transverse_options"]
+            if item.get("weight_kg") is not None
+        ]
+        self.assertEqual(transverse_weights, sorted(transverse_weights))
         if first_region["options"]:
             first_option = first_region["options"][0]
             self.assertIn("option", first_option)
@@ -790,6 +797,34 @@ class ApiTests(unittest.TestCase):
         self.assertTrue(spans)
         self.assertIn("span_option_choices", spans[0])
         self.assertIsInstance(spans[0]["span_option_choices"], list)
+
+        first_span = spans[0]
+        base_options = first_span.get("longitudinal_base_options", [])
+        self.assertLessEqual(len(base_options), 10)
+        if base_options:
+            base_weights = [float(opt.get("long_weight_kg") or 0.0) for opt in base_options]
+            self.assertEqual(base_weights, sorted(base_weights))
+            base_labels = [str(opt.get("base_label") or "") for opt in base_options]
+            self.assertEqual(len(base_labels), len(set(base_labels)))
+
+        regions = first_span.get("regions", [])
+        self.assertTrue(regions)
+        first_region = regions[0]
+        transverse_options = first_region.get("transverse_options", [])
+        self.assertLessEqual(len(transverse_options), 10)
+        if transverse_options:
+            trans_weights = [float(opt.get("weight_kg") or 0.0) for opt in transverse_options]
+            self.assertEqual(trans_weights, sorted(trans_weights))
+
+        additional_map = first_region.get("additional_options_by_base", {})
+        for base in base_options:
+            values = additional_map.get(base.get("value"), [])
+            self.assertLessEqual(len(values), 10)
+            if values:
+                add_weights = [float(opt.get("weight_kg") or 0.0) for opt in values]
+                self.assertEqual(add_weights, sorted(add_weights))
+                add_labels = [str(opt.get("label") or "") for opt in values]
+                self.assertEqual(len(add_labels), len(set(add_labels)))
 
     def test_download_single_artifact_success(self) -> None:
         job_id = self._create_job()

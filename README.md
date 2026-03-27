@@ -117,8 +117,8 @@ curl -L "http://127.0.0.1:10000/v1/jobs/<job_id>/download" -o reports.zip
 
 El sistema soporta dos modos en `optimization.longitudinal_mode`:
 
-- `legacy_region_independent` (default): flujo historico por region.
-- `span_coupled`: optimizacion acoplada por vano con:
+- `legacy_region_independent` (Dise?o independiente por regi?n (legacy), default): flujo historico por region.
+- `span_coupled` (Dise?o acoplado por tramo): optimizacion acoplada por vano con:
   - refuerzo longitudinal base continuo por vano,
   - refuerzo longitudinal adicional por region,
   - chequeos deep-beam cuando `is_deep_beam=true`.

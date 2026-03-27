@@ -1,5 +1,5 @@
-(() => {
-const form=document.getElementById('job-form'),submitBtn=document.getElementById('btn-submit'),submitLabel=document.getElementById('btn-submit-label'),clearBtn=document.getElementById('btn-clear'),globalStatusEl=document.getElementById('global-status'),statusEl=document.getElementById('status'),resultsLinksEl=document.getElementById('results-links'),detailsEl=document.getElementById('details'),errorBoxEl=document.getElementById('error-box'),summaryListEl=document.getElementById('summary-list'),checksListEl=document.getElementById('checks-list'),artifactsListEl=document.getElementById('artifacts-list'),beamElevationContainer=document.getElementById('beam-elevation-container'),beamElevationLegend=document.getElementById('beam-elevation-legend'),regionOptionsEl=document.getElementById('region-options'),saveSelectionBtn=document.getElementById('btn-save-selection'),selectionSaveMsg=document.getElementById('selection-save-msg'),hiddenFramePairsInput=document.getElementById('frame_pairs_json'),hiddenOptimizationInput=document.getElementById('optimization_overrides_json'),hiddenSpanLayoutInput=document.getElementById('span_layout_json'),enableSpanLayout=document.getElementById('enable_span_layout'),spanLayoutFields=document.getElementById('span-layout-fields'),spanLayoutList=document.getElementById('span-layout-list'),addSpanBtn=document.getElementById('btn-add-span'),enableOptimizationOverrides=document.getElementById('enable_optimization_overrides'),optimizationFields=document.getElementById('optimization-fields'),optGenerations=document.getElementById('opt_generations'),optEBars=document.getElementById('opt_e_bars'),optGBars=document.getElementById('opt_g_bars'),optLongBars=document.getElementById('opt_long_bars'),optSpacing=document.getElementById('opt_spacing'),optLongCounts=document.getElementById('opt_long_counts'),optLongitudinalMode=document.getElementById('opt_longitudinal_mode');
+﻿(() => {
+const form=document.getElementById('job-form'),submitBtn=document.getElementById('btn-submit'),submitLabel=document.getElementById('btn-submit-label'),clearBtn=document.getElementById('btn-clear'),globalStatusEl=document.getElementById('global-status'),statusEl=document.getElementById('status'),resultsLinksEl=document.getElementById('results-links'),detailsEl=document.getElementById('details'),errorBoxEl=document.getElementById('error-box'),summaryListEl=document.getElementById('summary-list'),checksListEl=document.getElementById('checks-list'),artifactsListEl=document.getElementById('artifacts-list'),beamElevationContainer=document.getElementById('beam-elevation-container'),beamElevationLegend=document.getElementById('beam-elevation-legend'),regionOptionsEl=document.getElementById('region-options'),saveSelectionBtn=document.getElementById('btn-save-selection'),selectionSaveMsg=document.getElementById('selection-save-msg'),hiddenFramePairsInput=document.getElementById('frame_pairs_json'),hiddenOptimizationInput=document.getElementById('optimization_overrides_json'),hiddenSpanLayoutInput=document.getElementById('span_layout_json'),enableSpanLayout=document.getElementById('enable_span_layout'),spanLayoutFields=document.getElementById('span-layout-fields'),spanLayoutList=document.getElementById('span-layout-list'),addSpanBtn=document.getElementById('btn-add-span'),enableOptimizationOverrides=document.getElementById('enable_optimization_overrides'),optimizationFields=document.getElementById('optimization-fields'),optGenerations=document.getElementById('opt_generations'),optPopulationSize=document.getElementById('opt_population_size'),optEBars=document.getElementById('opt_e_bars'),optGBars=document.getElementById('opt_g_bars'),optLongBars=document.getElementById('opt_long_bars'),optSpacing=document.getElementById('opt_spacing'),optLongCounts=document.getElementById('opt_long_counts'),optLongitudinalMode=document.getElementById('opt_longitudinal_mode');
 const navButtons=Array.from(document.querySelectorAll('[data-view]')),views=Array.from(document.querySelectorAll('.view'));
 let currentJobId=null,currentPreviewPayload=null,pollTimer=null,isSubmitting=false,regionOptionSelections={},spanLongSelections={};
 const parseNum=v=>{const p=Number(v);return Number.isFinite(p)?p:null},clamp=(v,mx,mn)=>Math.max(mx,Math.min(mn,v));const DEFAULT_C_RATIO=0.2,DEFAULT_MIN_BRANCHES_C=4,DEFAULT_MIN_BRANCHES_NC=2;
@@ -17,7 +17,7 @@ function clearErrorBox(){errorBoxEl.classList.add('hidden');errorBoxEl.innerHTML
 function clearFieldErrors(){form.querySelectorAll('[aria-invalid="true"]').forEach(el=>el.removeAttribute('aria-invalid'));form.querySelectorAll('.field-error').forEach(el=>el.remove())}
 function ensureFieldVisible(el){if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'})}
 function markElementError(el,msg){if(!el)return;el.setAttribute('aria-invalid','true');const field=el.closest('.field');if(field){const p=document.createElement('p');p.className='field-error';p.textContent=msg;field.appendChild(p)}ensureFieldVisible(el)}
-function mapBackendField(field){if(payloadModule.mapBackendField)return payloadModule.mapBackendField(field);if(!field)return null;const raw=String(field).toLowerCase();const map=[['sheet_name','sheet_name'],['region_c_ratio','region_c_ratio'],['min_branches','min_branches_c'],['fc_mpa','fc_mpa'],['fy_mpa','fy_mpa'],['width_mm','width_mm'],['height_mm','height_mm'],['d_mm','d_mm'],['d_ratio','enable_span_layout'],['clear_length_mm','enable_span_layout'],['is_deep_beam','enable_span_layout'],['db_bar','db_bar'],['cover_side_mm','cover_side_mm'],['cover_top_mm','cover_top_mm'],['cover_bottom_mm','cover_bottom_mm'],['frame_pairs','enable_span_layout'],['span_layout','enable_span_layout'],['optimization','enable_optimization_overrides'],['seismic_excel','seismic_excel'],['gravity_excel','gravity_excel'],['geometry_excel','geometry_excel']];for(const [t,id] of map){if(raw.includes(t))return id}return null}
+function mapBackendField(field){if(payloadModule.mapBackendField)return payloadModule.mapBackendField(field);if(!field)return null;const raw=String(field).toLowerCase();const map=[['sheet_name','sheet_name'],['region_c_ratio','region_c_ratio'],['min_branches','min_branches_c'],['fc_mpa','fc_mpa'],['fy_mpa','fy_mpa'],['width_mm','width_mm'],['height_mm','height_mm'],['d_mm','d_mm'],['d_ratio','enable_span_layout'],['clear_length_mm','enable_span_layout'],['is_deep_beam','enable_span_layout'],['db_bar','db_bar'],['cover_side_mm','cover_side_mm'],['cover_top_mm','cover_top_mm'],['cover_bottom_mm','cover_bottom_mm'],['frame_pairs','enable_span_layout'],['span_layout','enable_span_layout'],['optimization','enable_optimization_overrides'],['population_size','opt_population_size'],['generations','opt_generations'],['seismic_excel','seismic_excel'],['gravity_excel','gravity_excel'],['geometry_excel','geometry_excel']];for(const [t,id] of map){if(raw.includes(t))return id}return null}
 function normalizeErrorPayload(payload,status){if(payloadModule.normalizeErrorPayload)return payloadModule.normalizeErrorPayload(payload,status);if(!payload||typeof payload!=='object')return{error:'request_error',message:`No fue posible completar la solicitud (HTTP ${status}).`,details:[]};if(Array.isArray(payload.details))return{error:payload.error||'request_error',message:payload.message||'Error de solicitud',details:payload.details};if(Array.isArray(payload.detail))return{error:'validation_error',message:`No fue posible completar la solicitud (HTTP ${status}).`,details:payload.detail.map(it=>({code:it.type||'validation_error',field:Array.isArray(it.loc)?it.loc[it.loc.length-1]:'',message:it.msg||'Entrada invalida',severity:'error'}))};return{error:payload.error||'request_error',message:payload.message||payload.detail||'Error de solicitud',details:[]}}
 function renderError(payload){clearErrorBox();clearFieldErrors();const details=Array.isArray(payload?.details)?payload.details:[];const items=[];for(const d of details){const mapped=mapBackendField(d.field||'');if(mapped)markElementError(document.getElementById(mapped),d.message||'Valor no valido');const pref=d.field?`${d.field}: `:'';const suf=d.code?` [${d.code}]`:'';items.push(`<li>${pref}${d.message||'Detalle de validacion'}${suf}</li>`)}const list=items.length?`<ul>${items.join('')}</ul>`:'';errorBoxEl.innerHTML=`<h4>${payload?.message||'Error de solicitud'}</h4><p>Codigo: <strong>${payload?.error||'request_error'}</strong></p>${list}`;errorBoxEl.classList.remove('hidden');setStatus('Se encontraron errores de validacion','err');switchView('view-results')}
 function renderUiValidationErrors(errors){clearErrorBox();clearFieldErrors();const items=[];for(const e of errors){if(e.element)markElementError(e.element,e.message);items.push(`<li>${e.label}: ${e.message}</li>`)}errorBoxEl.innerHTML=`<h4>Revisa la configuracion avanzada</h4><p>Codigo: <strong>ui_validation_error</strong></p><ul>${items.join('')}</ul>`;errorBoxEl.classList.remove('hidden');setStatus('Corrige errores de configuracion avanzada','err');switchView('view-results')}
@@ -72,7 +72,7 @@ function collectSpanLayoutPreview(){if(!enableSpanLayout.checked)return[];const 
 function buildAdvancedPayload(){
 hiddenFramePairsInput.value='';hiddenOptimizationInput.value='';hiddenSpanLayoutInput.value='';const errors=[];
 if(enableSpanLayout.checked){const spans=collectSpanLayoutStrict(errors);if(!errors.length){hiddenSpanLayoutInput.value=JSON.stringify(spans.map(s=>({id:s.id,seismic:s.seismic,gravity:s.gravity,d_ratio:s.d_ratio,support_left_mm:s.support_left_mm,support_right_mm:s.support_right_mm,clear_length_mm:s.clear_length_mm,is_deep_beam:s.is_deep_beam,regions:s.regions})));hiddenFramePairsInput.value=JSON.stringify(spans.map(s=>({id:s.id,seismic:s.seismic,gravity:s.gravity})))}}
-if(enableOptimizationOverrides.checked){const genRaw=(optGenerations.value||'').trim(),gen=Number(genRaw),longModeRaw=String((optLongitudinalMode&&optLongitudinalMode.value)||'span_coupled').trim(),longMode=longModeRaw||'span_coupled';if(!genRaw)errors.push({label:'Generaciones',element:optGenerations,message:'Indica la cantidad de generaciones.'});else if(!Number.isInteger(gen)||gen<1)errors.push({label:'Generaciones',element:optGenerations,message:'Debe ser un entero >= 1.'});if(!['legacy_region_independent','span_coupled'].includes(longMode))errors.push({label:'Modo longitudinal',element:optLongitudinalMode,message:'Selecciona un modo longitudinal valido.'});const eb=parseCsvTokens(optEBars.value),gb=parseCsvTokens(optGBars.value),lb=parseCsvTokens(optLongBars.value);if(!eb.length)errors.push({label:'Estribos cerrados',element:optEBars,message:'Define al menos un diametro.'});if(!gb.length)errors.push({label:'Ramas simples',element:optGBars,message:'Define al menos un diametro.'});if(!lb.length)errors.push({label:'Refuerzo longitudinal',element:optLongBars,message:'Define al menos un diametro.'});const sp=parsePositiveIntList(optSpacing.value),lc=parsePositiveIntList(optLongCounts.value);if(!sp.ok)errors.push({label:'Espaciamientos',element:optSpacing,message:sp.message});if(!lc.ok)errors.push({label:'Cantidades longitudinales',element:optLongCounts,message:lc.message});if(!errors.length)hiddenOptimizationInput.value=JSON.stringify({longitudinal_mode:longMode,variables:{E_bars:eb,G_bars:gb,stirrup_spacing_mm:sp.values,longitudinal_bars:lb,longitudinal_bar_counts:lc.values},genetic_algorithm:{generations:gen}})}else if(enableSpanLayout.checked){hiddenOptimizationInput.value=JSON.stringify({longitudinal_mode:'span_coupled'})}
+if(enableOptimizationOverrides.checked){const genRaw=(optGenerations.value||'').trim(),gen=Number(genRaw),popRaw=(optPopulationSize&&optPopulationSize.value||'').trim(),pop=Number(popRaw),longModeRaw=String((optLongitudinalMode&&optLongitudinalMode.value)||'span_coupled').trim(),longMode=longModeRaw||'span_coupled';if(!genRaw)errors.push({label:'Generaciones',element:optGenerations,message:'Indica la cantidad de generaciones.'});else if(!Number.isInteger(gen)||gen<1)errors.push({label:'Generaciones',element:optGenerations,message:'Debe ser un entero >= 1.'});if(!popRaw)errors.push({label:'Tamano de poblacion',element:optPopulationSize,message:'Indica el tamano de poblacion.'});else if(!Number.isInteger(pop)||pop<4)errors.push({label:'Tamano de poblacion',element:optPopulationSize,message:'Debe ser un entero >= 4.'});if(!['legacy_region_independent','span_coupled'].includes(longMode))errors.push({label:'Modo longitudinal',element:optLongitudinalMode,message:'Selecciona un modo longitudinal valido.'});const eb=parseCsvTokens(optEBars.value),gb=parseCsvTokens(optGBars.value),lb=parseCsvTokens(optLongBars.value);if(!eb.length)errors.push({label:'Estribos cerrados',element:optEBars,message:'Define al menos un diametro.'});if(!gb.length)errors.push({label:'Ramas simples',element:optGBars,message:'Define al menos un diametro.'});if(!lb.length)errors.push({label:'Refuerzo longitudinal',element:optLongBars,message:'Define al menos un diametro.'});const sp=parsePositiveIntList(optSpacing.value),lc=parsePositiveIntList(optLongCounts.value);if(!sp.ok)errors.push({label:'Espaciamientos',element:optSpacing,message:sp.message});if(!lc.ok)errors.push({label:'Cantidades longitudinales',element:optLongCounts,message:lc.message});if(!errors.length)hiddenOptimizationInput.value=JSON.stringify({longitudinal_mode:longMode,variables:{E_bars:eb,G_bars:gb,stirrup_spacing_mm:sp.values,longitudinal_bars:lb,longitudinal_bar_counts:lc.values},genetic_algorithm:{population_size:pop,generations:gen}})}else if(enableSpanLayout.checked){hiddenOptimizationInput.value=JSON.stringify({longitudinal_mode:'span_coupled'})}
 if(errors.length){renderUiValidationErrors(errors);return false}
 return true
 }
@@ -227,7 +227,7 @@ renderBeam(beamElevationContainer,data);
 }
 function fmtKg(value){if(statusModule.fmtKg)return statusModule.fmtKg(value);const num=Number(value);return Number.isFinite(num)?`${num.toFixed(2)} kg`:'n/d'}
 function fmtPct(value){if(statusModule.fmtPct)return statusModule.fmtPct(value);const num=Number(value);return Number.isFinite(num)?`${num.toFixed(2)} %`:'n/d'}
-function uniqueLabelOptions(options,labelKey,weightKey){const map={};(options||[]).forEach(opt=>{const label=String(opt&&opt[labelKey]||'').trim();if(!label)return;const raw=Number(opt&&opt[weightKey]);const weight=Number.isFinite(raw)?raw:0;const current=map[label];if(!current||weight<current.weight_kg)map[label]={label,weight_kg:weight}});return Object.values(map).sort((a,b)=>a.weight_kg-b.weight_kg).slice(0,10)}
+function uniqueLabelOptions(options,labelKey,weightKey,maxItems=10){const map={};(options||[]).forEach(opt=>{const label=String(opt&&opt[labelKey]||'').trim();if(!label)return;const raw=Number(opt&&opt[weightKey]);const weight=Number.isFinite(raw)?raw:0;const current=map[label];if(!current||weight<current.weight_kg)map[label]={label,weight_kg:weight}});const ordered=Object.values(map).sort((a,b)=>a.weight_kg-b.weight_kg);if(Number.isInteger(maxItems)&&maxItems>0)return ordered.slice(0,maxItems);return ordered}
 function buildLongArrangementLabel(bar,count,emptyLabel=''){const b=String(bar||'').trim();const c=Number(count);if(!b||!Number.isFinite(c)||c<=0)return emptyLabel;return `${Math.round(c)} x ${b}`}
 function normalizeAdditionalLabel(value){const label=String(value||'').trim();return label||'no se requiere'}
 function getAdditionalOptionsByBaseValue(region,baseValue){
@@ -236,24 +236,16 @@ if(!key)return[];
 const map=region&&region.additionalOptionsByBase&&typeof region.additionalOptionsByBase==='object'?region.additionalOptionsByBase:{};
 const rows=Array.isArray(map[key])?map[key]:[];
 if(!rows.length)return[];
-const byLabel={};
-rows.forEach((row,index)=>{
+const parsed=rows.map((row,index)=>{
 const label=normalizeAdditionalLabel(row&&row.label);
 const longLabel=String(row&&row.longitudinal_label||'').trim()||label;
 const parsedWeight=Number(row&&row.weight_kg);
 const weight=label==='no se requiere'?0:(Number.isFinite(parsedWeight)?parsedWeight:0);
 const option=Number.isFinite(Number(row&&row.option))?Number(row.option):null;
-const value=String(row&&row.value||`add_${option!==null?option:index}_${label.replace(/\s+/g,'_')}`).trim();
-const current=byLabel[label];
-const currentOption=current&&Number.isFinite(Number(current.option))?Number(current.option):Number.MAX_SAFE_INTEGER;
-const nextOption=option===null?Number.MAX_SAFE_INTEGER:option;
-if(!current||weight<Number(current.weight_kg)||((weight===Number(current.weight_kg))&&(nextOption<currentOption))){
-byLabel[label]={value,label,longitudinal_label:longLabel,weight_kg:weight,option};
-}
-});
-return Object.values(byLabel)
-.sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return (a.option||0)-(b.option||0);})
-.slice(0,10);
+const value=String(row&&row.value||`add_${option!==null?option:index+1}_${label.replace(/\s+/g,'_')}`).trim();
+return{value,label,longitudinal_label:longLabel,weight_kg:weight,option};
+}).filter(opt=>opt.value&&opt.label);
+return parsed.sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return (a.option||0)-(b.option||0);}).slice(0,10);
 }
 function normalizeSpanBaseOptions(spanPayload){
 const raw=spanPayload&&Array.isArray(spanPayload.longitudinal_base_options)?spanPayload.longitudinal_base_options:[];
@@ -268,15 +260,7 @@ const weightKg=Number.isFinite(longWeightRaw)?longWeightRaw:(Number.isFinite(fal
 const totalWeightKg=Number.isFinite(totalWeightRaw)?totalWeightRaw:weightKg;
 return{value,option,base_label:baseLabel,weight_kg:weightKg,total_weight_kg:totalWeightKg};
 }).filter(opt=>opt.value&&opt.base_label);
-const byLabel={};
-parsed.forEach(opt=>{
-const key=String(opt.base_label||'no se requiere').trim()||'no se requiere';
-const current=byLabel[key];
-if(!current||opt.weight_kg<current.weight_kg||((opt.weight_kg===current.weight_kg)&&((opt.option||0)<(current.option||0)))){
-byLabel[key]=opt;
-}
-});
-return Object.values(byLabel).sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return (a.option||0)-(b.option||0);}).slice(0,10);
+return parsed.sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return (a.option||0)-(b.option||0);}).slice(0,10);
 }
 function renderRegionOptions(previewPayload){
 if(!regionOptionsEl)return;
@@ -311,14 +295,14 @@ weight_longitudinal_kg:Number.isFinite(Number(opt.weight_longitudinal_kg))?Numbe
 }).sort((a,b)=>{const aw=Number.isFinite(Number(a.weight_total_kg))?Number(a.weight_total_kg):Number.POSITIVE_INFINITY;const bw=Number.isFinite(Number(b.weight_total_kg))?Number(b.weight_total_kg):Number.POSITIVE_INFINITY;if(aw!==bw)return aw-bw;return (Number(a.option)||0)-(Number(b.option)||0)}).slice(0,10);
 if(!options.length)return;
 const best=options[0];
-const transOptionsSource=uniqueLabelOptions((Array.isArray(rg.transverse_options)?rg.transverse_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})),'label','weight_kg');
-const longOptionsSource=uniqueLabelOptions((Array.isArray(rg.longitudinal_options)?rg.longitudinal_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})),'label','weight_kg');
-const transOptions=transOptionsSource.length?transOptionsSource:uniqueLabelOptions(options,'transverse_label','weight_transverse_kg');
-const longOptions=longOptionsSource.length?longOptionsSource:uniqueLabelOptions(options,'longitudinal_label','weight_longitudinal_kg');
+const transOptionsSource=(Array.isArray(rg.transverse_options)?rg.transverse_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})).filter(opt=>opt.label);
+const longOptionsSource=(Array.isArray(rg.longitudinal_options)?rg.longitudinal_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,})).filter(opt=>opt.label);
+const transOptions=transOptionsSource.length?transOptionsSource:uniqueLabelOptions(options,'transverse_label','weight_transverse_kg',10);
+const longOptions=longOptionsSource.length?longOptionsSource:uniqueLabelOptions(options,'longitudinal_label','weight_longitudinal_kg',10);
 if(!transOptions.length||!longOptions.length)return;
 const longLookup={};
 longOptions.forEach(opt=>{longLookup[opt.label]=opt});
-const defaultTrans=best.transverse_label||transOptions[0].label;
+const defaultTrans=transOptions[0].label;
 const optionsByNumber={};
 const optionNumbers=[];
 options.forEach(row=>{optionsByNumber[row.option]=row;optionNumbers.push(row.option)});
@@ -368,7 +352,7 @@ spanLongOptions=Object.values(unionMap).sort((a,b)=>{if(b.coverage!==a.coverage)
 if(!spanLongOptions.length)return;
 spanBuckets.push({spanId,regions:regionRows,spanLongOptions,defaultSpanLong:spanLongOptions[0].label,hasCommonLong,isSpanCoupled:false});
 });
-if(!spanBuckets.length){regionOptionsEl.innerHTML='<p class="help">No hay alternativas de seleccion disponibles por vano/regi?n para este job.</p>';return}
+if(!spanBuckets.length){regionOptionsEl.innerHTML='<p class="help">No hay alternativas de seleccion disponibles por vano/región para este job.</p>';return}
 regionOptionsEl.innerHTML='';
 const summary=document.createElement('div');
 summary.className='region-opt-summary';
@@ -431,7 +415,7 @@ if(longSelect){
 const initialLong=region.longOptions.some(opt=>opt.label===saved.longitudinal_label)?saved.longitudinal_label:region.longOptions[0].label;
 longSelect.value=initialLong;
 }
-const state={best:0,selected:0};
+const state={best:bucket.isSpanCoupled?null:(Number(region.bestWeight)||0),selected:0,locked:false};
 states.push(state);
 let cachedAdditionalOptions=[];
 const refreshAdditionalChoices=()=>{
@@ -481,9 +465,9 @@ selectedLongWeight=Number(long.weight_kg)||0;
 regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel};
 }
 const selectedWeight=(Number(trans.weight_kg)||0)+selectedLongWeight;
-const bestWeight=Number(region.bestWeight)||0;
+if(bucket.isSpanCoupled&&!state.locked){state.best=selectedWeight;state.locked=true;}
+const bestWeight=Number.isFinite(Number(state.best))?Number(state.best):(Number(region.bestWeight)||0);
 const deltaPct=bestWeight>0?((selectedWeight-bestWeight)/bestWeight)*100:null;
-state.best=bestWeight;
 state.selected=selectedWeight;
 weightLine.textContent=`Peso total region seleccionado: ${fmtKg(selectedWeight)} | Peso total region optimo (${reference}): ${fmtKg(bestWeight)} | Delta: ${fmtPct(deltaPct)}`;
 };

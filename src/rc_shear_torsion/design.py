@@ -1153,13 +1153,18 @@ def top_region_alternatives(
     region: RegionDemand,
     variables: VariablesConfig,
     *,
-    top_n: int = 10,
+    top_n: int | None = 10,
 ) -> list[RegionDesignResult]:
     allowed_g_counts, _ = g_count_domain_for_region(region, variables.G_counts)
     if not allowed_g_counts:
         return []
 
-    top_n = max(1, int(top_n))
+    limit: int | None
+    if top_n is None:
+        limit = None
+    else:
+        top_n_int = int(top_n)
+        limit = None if top_n_int <= 0 else max(1, top_n_int)
     default_long_bar = variables.longitudinal_bars[0]
     default_long_count = 0
 
@@ -1202,7 +1207,7 @@ def top_region_alternatives(
             continue
         seen_transverse.add(key)
         selected.append(candidate)
-        if len(selected) >= top_n:
+        if limit is not None and len(selected) >= limit:
             break
 
     if not selected:
@@ -1216,7 +1221,7 @@ def top_region_alternatives(
                 continue
             seen_transverse.add(key)
             selected.append(candidate)
-            if len(selected) >= top_n:
+            if limit is not None and len(selected) >= limit:
                 break
 
     return [
@@ -1290,6 +1295,8 @@ def make_failed_region_result(
         evaluated_candidates=0,
         feasible_candidates=0,
     )
+
+
 
 
 

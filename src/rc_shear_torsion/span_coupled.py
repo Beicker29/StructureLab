@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
@@ -124,14 +124,15 @@ def _evaluate_longitudinal_region(
 
         if demand.d_mm is None or demand.height_mm is None:
             return False, "Longitudinal layering checks require d_mm and height_mm", provided, 0, None
-
         layers = total_count // 2
         available_range = 2.0 * demand.d_mm - demand.height_mm
+        base_layers = 0.5 * float(max(0, base_long_count))
+        s2_denominator = base_layers + 1.0
 
         if layers > 1:
             if available_range <= 0.0:
                 return False, "2*d - h must be > 0 to place multiple longitudinal layers", provided, layers, None
-            s2_mm = available_range / float(layers - 1)
+            s2_mm = available_range / s2_denominator
             if s2_mm > 300.0:
                 return False, f"Longitudinal layer spacing s2={s2_mm:.1f} mm exceeds 300 mm", provided, layers, s2_mm
 
@@ -535,7 +536,53 @@ def optimize_span_coupled(
         selected = feasible_sorted[0]
 
     max_candidates = max(1, int(top_n))
-    top_candidates = feasible_sorted[:max_candidates]
+    top_candidates: list[SpanCandidate] = []
+    if feasible_sorted:
+        by_base: dict[tuple[str, int], list[SpanCandidate]] = {}
+        for candidate in feasible_sorted:
+            key = (candidate.base_long_bar, candidate.base_long_count)
+            by_base.setdefault(key, []).append(candidate)
+
+        # Prioritize base diversity first (up to 10 base arrangements), then fill by objective.
+        base_keys = sorted(by_base.keys(), key=lambda item: by_base[item][0].objective)[:10]
+        per_base_quota = 10
+        per_base_count: dict[tuple[str, int], int] = {key: 0 for key in base_keys}
+
+        for key in base_keys:
+            candidate = by_base[key][0]
+            top_candidates.append(candidate)
+            per_base_count[key] = 1
+            if len(top_candidates) >= max_candidates:
+                break
+
+        depth = 1
+        while len(top_candidates) < max_candidates:
+            added = False
+            for key in base_keys:
+                if per_base_count[key] >= per_base_quota:
+                    continue
+                rows = by_base.get(key, [])
+                if depth >= len(rows):
+                    continue
+                candidate = rows[depth]
+                if candidate in top_candidates:
+                    continue
+                top_candidates.append(candidate)
+                per_base_count[key] += 1
+                added = True
+                if len(top_candidates) >= max_candidates:
+                    break
+            if not added:
+                break
+            depth += 1
+
+        if len(top_candidates) < max_candidates:
+            for candidate in feasible_sorted:
+                if candidate in top_candidates:
+                    continue
+                top_candidates.append(candidate)
+                if len(top_candidates) >= max_candidates:
+                    break
 
     if selected.status == "ok":
         selected_results = [
