@@ -1,10 +1,11 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import io
 import json
 import os
 import time
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import shutil
 from zipfile import ZipFile
@@ -399,6 +400,12 @@ class ApiTests(unittest.TestCase):
             first_transverse = first_region["transverse_options"][0]
             self.assertIn("label", first_transverse)
             self.assertIn("weight_kg", first_transverse)
+            self.assertIn("stirrup_count", first_transverse)
+            self.assertIn("stirrup_unit_weight_kg", first_transverse)
+            for item in first_region["transverse_options"]:
+                if item.get("stirrup_count") is not None and item.get("stirrup_unit_weight_kg") is not None:
+                    expected_weight = float(item["stirrup_count"]) * float(item["stirrup_unit_weight_kg"])
+                    self.assertAlmostEqual(float(item.get("weight_kg") or 0.0), expected_weight, places=2)
         if first_region["longitudinal_options"]:
             first_longitudinal = first_region["longitudinal_options"][0]
             self.assertIn("label", first_longitudinal)
@@ -543,6 +550,73 @@ class ApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(save_response.status_code, 200, save_response.text)
+
+    def test_save_job_selection_accepts_transverse_label_exposed_by_preview(self) -> None:
+        preview_payload = {
+            "job_id": "fake_job",
+            "spans": [
+                {
+                    "span_id": "S1",
+                    "regions": [
+                        {
+                            "region_id": "R3",
+                            "options": [
+                                {
+                                    "option": 1,
+                                    "transverse_label": "1E #3 @ 100 mm",
+                                    "longitudinal_label": "4 x #4",
+                                    "weight_total_kg": 10.0,
+                                    "weight_transverse_kg": 4.0,
+                                    "weight_longitudinal_kg": 6.0,
+                                }
+                            ],
+                            "transverse_options": [
+                                {
+                                    "label": "1E #3 @ 100 mm",
+                                    "weight_kg": 4.0,
+                                    "stirrup_count": 9,
+                                    "stirrup_unit_weight_kg": 0.45,
+                                },
+                                {
+                                    "label": "1E #3 + 3G #3 @ 90 mm",
+                                    "weight_kg": 3.8,
+                                    "stirrup_count": 10,
+                                    "stirrup_unit_weight_kg": 0.38,
+                                },
+                            ],
+                            "longitudinal_options": [
+                                {
+                                    "label": "4 x #4",
+                                    "weight_kg": 6.0,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+
+        with patch("app.routers.jobs.build_job_preview_payload", return_value=preview_payload), patch(
+            "app.routers.jobs.save_selected_options_report",
+            return_value={"artifact_name": "selected_reinforcement_comparison.xlsx", "saved_regions": 1},
+        ):
+            response = self.client.post(
+                "/v1/jobs/fake_job/selection",
+                json={
+                    "selections": [
+                        {
+                            "span_id": "S1",
+                            "region_id": "R3",
+                            "transverse_label": "1E #3 + 3G #3 @ 90 mm",
+                            "longitudinal_label": "4 x #4",
+                        }
+                    ]
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["artifact_name"], "selected_reinforcement_comparison.xlsx")
 
     def test_save_job_selection_rejects_invalid_span_option(self) -> None:
         job_id = self._create_job()
@@ -802,10 +876,39 @@ class ApiTests(unittest.TestCase):
         base_options = first_span.get("longitudinal_base_options", [])
         self.assertLessEqual(len(base_options), 10)
         if base_options:
-            base_weights = [float(opt.get("long_weight_kg") or 0.0) for opt in base_options]
-            self.assertEqual(base_weights, sorted(base_weights))
+            base_total_weights = [float(opt.get("total_weight_kg") or 0.0) for opt in base_options]
+            self.assertEqual(base_total_weights, sorted(base_total_weights))
             base_labels = [str(opt.get("base_label") or "") for opt in base_options]
             self.assertEqual(len(base_labels), len(set(base_labels)))
+            from rc_shear_torsion.design import BAR_AREAS_MM2, longitudinal_mass_kg_per_m
+            import re
+
+            span_length_m = float(first_span.get("length_mm") or 0.0) / 1000.0
+            self.assertGreater(span_length_m, 0.0)
+            for opt in base_options:
+                label = str(opt.get("base_label") or "").strip().lower()
+                reported = float(opt.get("long_weight_kg") or 0.0)
+                if label == "no se requiere":
+                    self.assertAlmostEqual(reported, 0.0, places=3)
+                    continue
+                match = re.match(r"^(\d+)\s*x\s*(#\d+)$", str(opt.get("base_label") or "").strip(), re.IGNORECASE)
+                self.assertIsNotNone(match, msg=f"Formato base no esperado: {opt.get('base_label')}")
+                count = int(match.group(1))
+                bar = match.group(2).upper()
+                expected = longitudinal_mass_kg_per_m(BAR_AREAS_MM2[bar] * count) * span_length_m
+                self.assertAlmostEqual(reported, expected, places=2)
+        span_long_sets = first_span.get("span_longitudinal_option_sets", [])
+        self.assertLessEqual(len(span_long_sets), 10)
+        if span_long_sets:
+            set_weights = [float(item.get("total_longitudinal_weight_kg") or 0.0) for item in span_long_sets]
+            self.assertEqual(set_weights, sorted(set_weights))
+            default_set_value = first_span.get("default_longitudinal_option_set_value")
+            self.assertTrue(any(str(item.get("value")) == str(default_set_value) for item in span_long_sets))
+            for item in span_long_sets:
+                regions_map = item.get("regions", [])
+                self.assertIsInstance(regions_map, list)
+                self.assertTrue(regions_map)
+                self.assertTrue(all(str(region.get("region_id") or "").strip() for region in regions_map))
 
         regions = first_span.get("regions", [])
         self.assertTrue(regions)
@@ -825,7 +928,20 @@ class ApiTests(unittest.TestCase):
                 self.assertEqual(add_weights, sorted(add_weights))
                 add_labels = [str(opt.get("label") or "") for opt in values]
                 self.assertEqual(len(add_labels), len(set(add_labels)))
-
+                region_length_m = float(first_region.get("length_mm") or 0.0) / 1000.0
+                self.assertGreater(region_length_m, 0.0)
+                for opt in values:
+                    label = str(opt.get("label") or "").strip().lower()
+                    reported = float(opt.get("weight_kg") or 0.0)
+                    if label == "no se requiere":
+                        self.assertAlmostEqual(reported, 0.0, places=3)
+                        continue
+                    match = re.match(r"^(\d+)\s*x\s*(#\d+)$", str(opt.get("label") or "").strip(), re.IGNORECASE)
+                    self.assertIsNotNone(match, msg=f"Formato adicional no esperado: {opt.get('label')}")
+                    count = int(match.group(1))
+                    bar = match.group(2).upper()
+                    expected = longitudinal_mass_kg_per_m(BAR_AREAS_MM2[bar] * count) * region_length_m
+                    self.assertAlmostEqual(reported, expected, places=2)
     def test_download_single_artifact_success(self) -> None:
         job_id = self._create_job()
         final_status = self._wait_terminal_status(job_id)

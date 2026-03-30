@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime
 
@@ -348,6 +348,42 @@ def save_job_selection_endpoint(
             best_row = normalized_rows[0]
             trans_map: dict[str, dict] = {}
             long_map: dict[str, dict] = {}
+
+            preview_transverse_options = (
+                region.get("transverse_options") if isinstance(region.get("transverse_options"), list) else []
+            )
+            for option in preview_transverse_options:
+                trans_label = str(option.get("label") or "").strip()
+                if not trans_label:
+                    continue
+                item: dict[str, float | int | str] = {
+                    "label": trans_label,
+                    "weight_kg": float(option.get("weight_kg") or 0.0),
+                }
+                if option.get("stirrup_count") is not None:
+                    try:
+                        item["stirrup_count"] = int(option.get("stirrup_count"))
+                    except (TypeError, ValueError):
+                        pass
+                if option.get("stirrup_unit_weight_kg") is not None:
+                    try:
+                        item["stirrup_unit_weight_kg"] = float(option.get("stirrup_unit_weight_kg"))
+                    except (TypeError, ValueError):
+                        pass
+                trans_map[trans_label] = item
+
+            preview_longitudinal_options = (
+                region.get("longitudinal_options") if isinstance(region.get("longitudinal_options"), list) else []
+            )
+            for option in preview_longitudinal_options:
+                long_label = str(option.get("label") or "").strip()
+                if not long_label:
+                    continue
+                long_map[long_label] = {
+                    "label": long_label,
+                    "weight_kg": float(option.get("weight_kg") or 0.0),
+                }
+
             for row in normalized_rows:
                 trans_label = row["transverse_label"]
                 long_label = row["longitudinal_label"]
@@ -356,12 +392,24 @@ def save_job_selection_endpoint(
 
                 if trans_label:
                     current = trans_map.get(trans_label)
-                    if current is None or trans_weight < float(current["weight_kg"]):
-                        trans_map[trans_label] = {"label": trans_label, "weight_kg": trans_weight}
+                    if current is None or trans_weight < float(current.get("weight_kg") or 0.0):
+                        updated: dict[str, float | int | str] = {
+                            "label": trans_label,
+                            "weight_kg": trans_weight,
+                        }
+                        if current is not None and current.get("stirrup_count") is not None:
+                            updated["stirrup_count"] = int(current["stirrup_count"])
+                        if current is not None and current.get("stirrup_unit_weight_kg") is not None:
+                            updated["stirrup_unit_weight_kg"] = float(current["stirrup_unit_weight_kg"])
+                        trans_map[trans_label] = updated
+
                 if long_label:
                     current = long_map.get(long_label)
-                    if current is None or long_weight < float(current["weight_kg"]):
-                        long_map[long_label] = {"label": long_label, "weight_kg": long_weight}
+                    if current is None or long_weight < float(current.get("weight_kg") or 0.0):
+                        long_map[long_label] = {
+                            "label": long_label,
+                            "weight_kg": long_weight,
+                        }
 
             if not trans_map and best_row["transverse_label"]:
                 trans_map[best_row["transverse_label"]] = {
@@ -373,7 +421,6 @@ def save_job_selection_endpoint(
                     "label": best_row["longitudinal_label"],
                     "weight_kg": float(best_row.get("weight_longitudinal_kg") or 0.0),
                 }
-
             region_data[(span_id, region_id)] = {
                 "best": best_row,
                 "rows": normalized_rows,

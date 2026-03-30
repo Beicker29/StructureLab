@@ -25,12 +25,31 @@ def _load_ui_html() -> str:
     return _TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
-UI_HTML = _load_ui_html()
+def _asset_version(asset_name: str) -> str:
+    asset_path = _STATIC_DIR / asset_name
+    if not asset_path.exists():
+        return "0"
+    return str(int(asset_path.stat().st_mtime))
+
+
+def _render_ui_html() -> str:
+    html = _load_ui_html()
+    for asset_name in _ALLOWED_ASSETS:
+        token = f"/ui/static/{asset_name}"
+        html = html.replace(token, f"{token}?v={_asset_version(asset_name)}")
+    return html
 
 
 @router.get("/ui", response_class=HTMLResponse)
 def ui_page() -> HTMLResponse:
-    return HTMLResponse(content=UI_HTML)
+    return HTMLResponse(
+        content=_render_ui_html(),
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @router.get("/ui/static/{asset_name}")
@@ -43,4 +62,12 @@ def ui_asset(asset_name: str) -> FileResponse:
     if not asset_path.exists():
         raise HTTPException(status_code=404, detail="asset_not_found")
 
-    return FileResponse(asset_path, media_type=media_type)
+    return FileResponse(
+        asset_path,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )

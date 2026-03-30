@@ -1,0 +1,7035 @@
+{
+  "case_name": "debug_case",
+  "inputs": {
+    "seismic_excel": "seismic.xlsx",
+    "gravity_excel": "gravity.xlsx",
+    "sheet_name": "Conc Bm Sum - ACI 318-08"
+  },
+  "units": {
+    "rebar_per_length": "mm2/m"
+  },
+  "beams": [
+    {
+      "beam_id": "B1",
+      "detailing": "DMO",
+      "cover_side_mm": 40.0,
+      "cover_top_mm": 40.0,
+      "cover_bottom_mm": 40.0,
+      "fc_mpa": 28.0,
+      "fy_mpa": 420.0,
+      "spans": [
+        {
+          "id": "B1.1",
+          "seismic": "1",
+          "gravity": "1",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.2",
+          "seismic": "2",
+          "gravity": "2",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.3",
+          "seismic": "6",
+          "gravity": "6",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.4",
+          "seismic": "7",
+          "gravity": "7",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.5",
+          "seismic": "8",
+          "gravity": "8",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.6",
+          "seismic": "10",
+          "gravity": "10",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.7",
+          "seismic": "11",
+          "gravity": "11",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.8",
+          "seismic": "12",
+          "gravity": "12",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.9",
+          "seismic": "17",
+          "gravity": "17",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.10",
+          "seismic": "18",
+          "gravity": "18",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.11",
+          "seismic": "19",
+          "gravity": "19",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.12",
+          "seismic": "22",
+          "gravity": "22",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.13",
+          "seismic": "23",
+          "gravity": "23",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.14",
+          "seismic": "27",
+          "gravity": "27",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.15",
+          "seismic": "28",
+          "gravity": "28",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.16",
+          "seismic": "29",
+          "gravity": "29",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.17",
+          "seismic": "33",
+          "gravity": "33",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.18",
+          "seismic": "35",
+          "gravity": "35",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.19",
+          "seismic": "36",
+          "gravity": "36",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.20",
+          "seismic": "38",
+          "gravity": "38",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.21",
+          "seismic": "39",
+          "gravity": "39",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.22",
+          "seismic": "42",
+          "gravity": "42",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.23",
+          "seismic": "43",
+          "gravity": "43",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.24",
+          "seismic": "44",
+          "gravity": "44",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.25",
+          "seismic": "45",
+          "gravity": "45",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.26",
+          "seismic": "49",
+          "gravity": "49",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.27",
+          "seismic": "50",
+          "gravity": "50",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.28",
+          "seismic": "54",
+          "gravity": "54",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.29",
+          "seismic": "56",
+          "gravity": "56",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.30",
+          "seismic": "57",
+          "gravity": "57",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.31",
+          "seismic": "58",
+          "gravity": "58",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.32",
+          "seismic": "59",
+          "gravity": "59",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.33",
+          "seismic": "61",
+          "gravity": "61",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.34",
+          "seismic": "63",
+          "gravity": "63",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.35",
+          "seismic": "65",
+          "gravity": "65",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.36",
+          "seismic": "67",
+          "gravity": "67",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.37",
+          "seismic": "69",
+          "gravity": "69",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.38",
+          "seismic": "70",
+          "gravity": "70",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.39",
+          "seismic": "72",
+          "gravity": "72",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.40",
+          "seismic": "75",
+          "gravity": "75",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.41",
+          "seismic": "77",
+          "gravity": "77",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.42",
+          "seismic": "79",
+          "gravity": "79",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.43",
+          "seismic": "97",
+          "gravity": "97",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.44",
+          "seismic": "115",
+          "gravity": "115",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.45",
+          "seismic": "121",
+          "gravity": "121",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.46",
+          "seismic": "133",
+          "gravity": "133",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.47",
+          "seismic": "135",
+          "gravity": "135",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.48",
+          "seismic": "136",
+          "gravity": "136",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.49",
+          "seismic": "137",
+          "gravity": "137",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.50",
+          "seismic": "139",
+          "gravity": "139",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.51",
+          "seismic": "141",
+          "gravity": "141",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.52",
+          "seismic": "143",
+          "gravity": "143",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.53",
+          "seismic": "149",
+          "gravity": "149",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.54",
+          "seismic": "159",
+          "gravity": "159",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.55",
+          "seismic": "161",
+          "gravity": "161",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.56",
+          "seismic": "163",
+          "gravity": "163",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.57",
+          "seismic": "164",
+          "gravity": "164",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.58",
+          "seismic": "165",
+          "gravity": "165",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.59",
+          "seismic": "172",
+          "gravity": "172",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.60",
+          "seismic": "174",
+          "gravity": "174",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.61",
+          "seismic": "183",
+          "gravity": "183",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.62",
+          "seismic": "185",
+          "gravity": "185",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.63",
+          "seismic": "186",
+          "gravity": "186",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.64",
+          "seismic": "187",
+          "gravity": "187",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.65",
+          "seismic": "190",
+          "gravity": "190",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.66",
+          "seismic": "194",
+          "gravity": "194",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.67",
+          "seismic": "196",
+          "gravity": "196",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.68",
+          "seismic": "202",
+          "gravity": "202",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.69",
+          "seismic": "203",
+          "gravity": "203",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.70",
+          "seismic": "204",
+          "gravity": "204",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.71",
+          "seismic": "206",
+          "gravity": "206",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.72",
+          "seismic": "208",
+          "gravity": "208",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.73",
+          "seismic": "210",
+          "gravity": "210",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.74",
+          "seismic": "211",
+          "gravity": "211",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.75",
+          "seismic": "212",
+          "gravity": "212",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.76",
+          "seismic": "214",
+          "gravity": "214",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.77",
+          "seismic": "215",
+          "gravity": "215",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.78",
+          "seismic": "216",
+          "gravity": "216",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.79",
+          "seismic": "220",
+          "gravity": "220",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.80",
+          "seismic": "223",
+          "gravity": "223",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.81",
+          "seismic": "224",
+          "gravity": "224",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.82",
+          "seismic": "228",
+          "gravity": "228",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.83",
+          "seismic": "234",
+          "gravity": "234",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.84",
+          "seismic": "236",
+          "gravity": "236",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.85",
+          "seismic": "237",
+          "gravity": "237",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.86",
+          "seismic": "239",
+          "gravity": "239",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.87",
+          "seismic": "240",
+          "gravity": "240",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.88",
+          "seismic": "248",
+          "gravity": "248",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.89",
+          "seismic": "250",
+          "gravity": "250",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.90",
+          "seismic": "254",
+          "gravity": "254",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.91",
+          "seismic": "259",
+          "gravity": "259",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.92",
+          "seismic": "261",
+          "gravity": "261",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.93",
+          "seismic": "262",
+          "gravity": "262",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.94",
+          "seismic": "263",
+          "gravity": "263",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.95",
+          "seismic": "265",
+          "gravity": "265",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.96",
+          "seismic": "266",
+          "gravity": "266",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.97",
+          "seismic": "267",
+          "gravity": "267",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.98",
+          "seismic": "268",
+          "gravity": "268",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.99",
+          "seismic": "269",
+          "gravity": "269",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.100",
+          "seismic": "270",
+          "gravity": "270",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.101",
+          "seismic": "274",
+          "gravity": "274",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.102",
+          "seismic": "279",
+          "gravity": "279",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.103",
+          "seismic": "281",
+          "gravity": "281",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.104",
+          "seismic": "282",
+          "gravity": "282",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.105",
+          "seismic": "283",
+          "gravity": "283",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.106",
+          "seismic": "287",
+          "gravity": "287",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.107",
+          "seismic": "288",
+          "gravity": "288",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.108",
+          "seismic": "289",
+          "gravity": "289",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.109",
+          "seismic": "291",
+          "gravity": "291",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.110",
+          "seismic": "294",
+          "gravity": "294",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.111",
+          "seismic": "295",
+          "gravity": "295",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.112",
+          "seismic": "297",
+          "gravity": "297",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.113",
+          "seismic": "298",
+          "gravity": "298",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.114",
+          "seismic": "301",
+          "gravity": "301",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.115",
+          "seismic": "302",
+          "gravity": "302",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.116",
+          "seismic": "305",
+          "gravity": "305",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.117",
+          "seismic": "306",
+          "gravity": "306",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.118",
+          "seismic": "307",
+          "gravity": "307",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.119",
+          "seismic": "308",
+          "gravity": "308",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.120",
+          "seismic": "312",
+          "gravity": "312",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.121",
+          "seismic": "313",
+          "gravity": "313",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.122",
+          "seismic": "315",
+          "gravity": "315",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.123",
+          "seismic": "316",
+          "gravity": "316",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.124",
+          "seismic": "317",
+          "gravity": "317",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.125",
+          "seismic": "318",
+          "gravity": "318",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.126",
+          "seismic": "320",
+          "gravity": "320",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.127",
+          "seismic": "322",
+          "gravity": "322",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.128",
+          "seismic": "323",
+          "gravity": "323",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.129",
+          "seismic": "325",
+          "gravity": "325",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.130",
+          "seismic": "326",
+          "gravity": "326",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.131",
+          "seismic": "329",
+          "gravity": "329",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.132",
+          "seismic": "330",
+          "gravity": "330",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.133",
+          "seismic": "333",
+          "gravity": "333",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.134",
+          "seismic": "334",
+          "gravity": "334",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.135",
+          "seismic": "335",
+          "gravity": "335",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.136",
+          "seismic": "337",
+          "gravity": "337",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.137",
+          "seismic": "340",
+          "gravity": "340",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.138",
+          "seismic": "343",
+          "gravity": "343",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.139",
+          "seismic": "345",
+          "gravity": "345",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.140",
+          "seismic": "346",
+          "gravity": "346",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.141",
+          "seismic": "348",
+          "gravity": "348",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.142",
+          "seismic": "350",
+          "gravity": "350",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.143",
+          "seismic": "351",
+          "gravity": "351",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.144",
+          "seismic": "373",
+          "gravity": "373",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.145",
+          "seismic": "379",
+          "gravity": "379",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.146",
+          "seismic": "390",
+          "gravity": "390",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.147",
+          "seismic": "400",
+          "gravity": "400",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.148",
+          "seismic": "402",
+          "gravity": "402",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.149",
+          "seismic": "404",
+          "gravity": "404",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.150",
+          "seismic": "406",
+          "gravity": "406",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.151",
+          "seismic": "426",
+          "gravity": "426",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.152",
+          "seismic": "427",
+          "gravity": "427",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.153",
+          "seismic": "428",
+          "gravity": "428",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.154",
+          "seismic": "429",
+          "gravity": "429",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.155",
+          "seismic": "430",
+          "gravity": "430",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.156",
+          "seismic": "432",
+          "gravity": "432",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.157",
+          "seismic": "438",
+          "gravity": "438",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        },
+        {
+          "id": "B1.158",
+          "seismic": "439",
+          "gravity": "439",
+          "is_deep_beam": false,
+          "support_left_mm": 0.0,
+          "support_right_mm": 0.0,
+          "clear_length_mm": null,
+          "regions": [
+            {
+              "id": "R1",
+              "from": 0.0,
+              "to": 0.2,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R2",
+              "from": 0.2,
+              "to": 0.8,
+              "type": "NC",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 2,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            },
+            {
+              "id": "R3",
+              "from": 0.8,
+              "to": 1.0,
+              "type": "C",
+              "d_mm": 540.0,
+              "db_bar": "#6",
+              "min_branches": 4,
+              "width_mm": 300.0,
+              "height_mm": 600.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "optimization": {
+    "enabled": true,
+    "objective": "min_weight",
+    "longitudinal_mode": "span_coupled",
+    "variables": {
+      "E_bars": [
+        "#3",
+        "#4",
+        "#6"
+      ],
+      "G_bars": [
+        "#3",
+        "#4",
+        "#6"
+      ],
+      "G_counts": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "stirrup_spacing_mm": [
+        70,
+        80,
+        90,
+        100,
+        110,
+        120,
+        130,
+        140,
+        150,
+        160,
+        170,
+        180,
+        190,
+        200
+      ],
+      "longitudinal_bars": [
+        "#4",
+        "#5",
+        "#6"
+      ],
+      "longitudinal_bar_counts": [
+        2,
+        4,
+        6,
+        8
+      ]
+    },
+    "genetic_algorithm": {
+      "population_size": 60,
+      "generations": 80,
+      "crossover_rate": 0.9,
+      "mutation_rate": 0.1,
+      "elite_count": 3
+    }
+  }
+}
