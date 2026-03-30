@@ -227,6 +227,8 @@ renderBeam(beamElevationContainer,data);
 }
 function fmtKg(value){if(statusModule.fmtKg)return statusModule.fmtKg(value);const num=Number(value);return Number.isFinite(num)?`${num.toFixed(2)} kg`:'n/d'}
 function fmtPct(value){if(statusModule.fmtPct)return statusModule.fmtPct(value);const num=Number(value);return Number.isFinite(num)?`${num.toFixed(2)} %`:'n/d'}
+function fmtStirrupCount(value){const count=Number(value);if(!Number.isFinite(count)||count<0)return'n/d';const rounded=Math.round(count);return rounded===1?'1 estribo':`${rounded} estribos`}
+function formatTransverseOptionText(opt){const label=String(opt&&opt.label||'').trim();const count=fmtStirrupCount(opt&&opt.stirrup_count);const countPart=count&&count!=='n/d'?` | ${count}`:'';return`${label}${countPart} | ${fmtKg(opt&&opt.weight_kg)}`}
 function uniqueLabelOptions(options,labelKey,weightKey,maxItems=10){const map={};(options||[]).forEach(opt=>{const label=String(opt&&opt[labelKey]||'').trim();if(!label)return;const raw=Number(opt&&opt[weightKey]);const weight=Number.isFinite(raw)?raw:0;const current=map[label];if(!current||weight<current.weight_kg)map[label]={label,weight_kg:weight}});const ordered=Object.values(map).sort((a,b)=>a.weight_kg-b.weight_kg);if(Number.isInteger(maxItems)&&maxItems>0)return ordered.slice(0,maxItems);return ordered}
 function buildLongArrangementLabel(bar,count,emptyLabel=''){const b=String(bar||'').trim();const c=Number(count);if(!b||!Number.isFinite(c)||c<=0)return emptyLabel;return `${Math.round(c)} x ${b}`}
 function normalizeAdditionalLabel(value){const label=String(value||'').trim();return label||'no se requiere'}
@@ -477,7 +479,7 @@ const addSelect=bucket.isSpanCoupled?card.querySelector('.region-opt-additional'
 const longSelect=(bucket.isSpanCoupled||bucket.hasCommonLong)?null:card.querySelector('.region-opt-longitudinal');
 const weightLine=card.querySelector('.region-opt-region-weight');
 
-region.transOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;const stirrupCount=Number.isFinite(Number(opt.stirrup_count))?Math.round(Number(opt.stirrup_count)):null;const countText=stirrupCount!==null?` | ${stirrupCount} estribos`:'';el.textContent=`${opt.label}${countText} | ${fmtKg(opt.weight_kg)}`;transSelect.appendChild(el);});
+region.transOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;el.textContent=formatTransverseOptionText(opt);transSelect.appendChild(el);});
 if(longSelect){region.longOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.label;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}`;longSelect.appendChild(el);});}
 
 const saved=regionOptionSelections[region.key]||{};
