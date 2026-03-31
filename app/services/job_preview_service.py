@@ -1,8 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections import defaultdict
 import re
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 from openpyxl import load_workbook
@@ -10,6 +11,18 @@ from openpyxl import load_workbook
 from app.services.job_service import get_job, get_job_case_payload
 from rc_shear_torsion.design import bar_mass_kg_per_m
 
+_PREVIEW_CACHE_LOCK = RLock()
+_PREVIEW_CACHE: dict[str, tuple[tuple[Any, ...], dict[str, Any]]] = {}
+
+
+
+def _artifact_mtime(path: Path | None) -> float | None:
+    if path is None or not path.exists():
+        return None
+    try:
+        return float(path.stat().st_mtime)
+    except OSError:
+        return None
 
 def _normalize_header(value: Any) -> str:
     return str(value or "").strip().lower()
@@ -1072,12 +1085,23 @@ def _build_span_preview(
         "regions": region_rows,
     }
 
+
 def build_job_preview_payload(job_id: str) -> dict[str, Any]:
     meta = get_job(job_id)
     case_payload = get_job_case_payload(job_id)
     artifacts = meta.get("artifacts", {})
     optimized_path = Path(artifacts["optimized_results.xlsx"]) if "optimized_results.xlsx" in artifacts else None
     schedule_path = Path(artifacts["reinforcement_schedule.xlsx"]) if "reinforcement_schedule.xlsx" in artifacts else None
+
+    cache_key = (
+        str(meta.get("status") or ""),
+        _artifact_mtime(optimized_path),
+        _artifact_mtime(schedule_path),
+    )
+    with _PREVIEW_CACHE_LOCK:
+        cached = _PREVIEW_CACHE.get(job_id)
+    if cached is not None and cached[0] == cache_key:
+        return cached[1]
 
     optimized_map = _read_optimized_regions(optimized_path)
     schedule_map = _read_schedule_rows(schedule_path)
@@ -1113,7 +1137,7 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
         default=0,
     )
 
-    return {
+    payload = {
         "job_id": job_id,
         "status": meta.get("status"),
         "beam": {
@@ -1134,16 +1158,6 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
             "reinforcement_schedule": bool(schedule_map),
         },
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
+    with _PREVIEW_CACHE_LOCK:
+        _PREVIEW_CACHE[job_id] = (cache_key, payload)
+    return payload
