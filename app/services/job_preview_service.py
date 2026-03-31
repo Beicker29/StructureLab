@@ -8,7 +8,7 @@ from typing import Any
 from openpyxl import load_workbook
 
 from app.services.job_service import get_job, get_job_case_payload
-from rc_shear_torsion.design import BAR_AREAS_MM2, longitudinal_mass_kg_per_m
+from rc_shear_torsion.design import bar_mass_kg_per_m
 
 
 def _normalize_header(value: Any) -> str:
@@ -74,11 +74,7 @@ def _longitudinal_weight_from_arrangement(bar: str, count: int | None, length_mm
         return 0.0
     if length_mm is None or length_mm <= 0.0:
         return 0.0
-    area = BAR_AREAS_MM2.get(bar)
-    if area is None or area <= 0.0:
-        return 0.0
-    return longitudinal_mass_kg_per_m(area * float(count)) * (float(length_mm) / 1000.0)
-
+    return bar_mass_kg_per_m(bar, int(count)) * (float(length_mm) / 1000.0)
 
 def _norm_match(value: str) -> str:
     return " ".join(value.lower().split())

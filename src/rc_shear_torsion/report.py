@@ -10,6 +10,50 @@ from .design import BeamSummary, RegionDesignResult, SpanSummary
 from .results_model import to_canonical_region_result
 
 
+SUPPORT_FACE_STIRRUP_OFFSET_MM = 50.0
+
+
+def _region_sort_key(region_id: str) -> tuple[int, str]:
+    text = str(region_id or "")
+    digits = "".join(char for char in text if char.isdigit())
+    return (int(digits) if digits else 10**9, text)
+
+
+def _build_span_edge_regions(results: Iterable[RegionDesignResult]) -> dict[tuple[str, str], tuple[str, str]]:
+    span_regions: dict[tuple[str, str], set[str]] = {}
+    for result in results:
+        key = (result.beam_id, result.span_id)
+        span_regions.setdefault(key, set()).add(result.region_id)
+
+    output: dict[tuple[str, str], tuple[str, str]] = {}
+    for key, region_ids in span_regions.items():
+        ordered = sorted(region_ids, key=_region_sort_key)
+        if ordered:
+            output[key] = (ordered[0], ordered[-1])
+    return output
+
+
+def _stirrup_count_for_reporting(
+    region_length_mm: float,
+    spacing_mm: int,
+    *,
+    is_first_region: bool,
+    is_last_region: bool,
+) -> int:
+    if spacing_mm <= 0 or region_length_mm <= 0.0:
+        return 0
+
+    offset_start_mm = SUPPORT_FACE_STIRRUP_OFFSET_MM if is_first_region else 0.0
+    offset_end_mm = SUPPORT_FACE_STIRRUP_OFFSET_MM if is_last_region else 0.0
+    effective_length_mm = max(0.0, float(region_length_mm) - offset_start_mm - offset_end_mm)
+
+    # En el vano completo se fija el primero a +50 mm (cara apoyo izq.)
+    # y el ultimo a -50 mm (cara izq. apoyo der.).
+    if is_first_region and is_last_region:
+        return max(2, math.ceil(effective_length_mm / float(spacing_mm)) + 1)
+
+    return max(1, math.floor(effective_length_mm / float(spacing_mm)) + 1)
+
 DESIGN_COLUMNS = [
     "beam_id",
     "span_id",
@@ -277,7 +321,8 @@ def write_reinforcement_schedule(
     )
 
     span_acc: dict[tuple[str, str], dict[str, float | int]] = {}
-    ordered_results = sorted(region_results, key=lambda result: (result.beam_id, result.span_id, result.region_id))
+    ordered_results = sorted(region_results, key=lambda result: (result.beam_id, result.span_id, _region_sort_key(result.region_id)))
+    span_edge_regions = _build_span_edge_regions(ordered_results)
     for base_result in ordered_results:
         key_region = (base_result.beam_id, base_result.span_id, base_result.region_id)
         options = alternatives.get(key_region) or [base_result]
@@ -307,9 +352,17 @@ def write_reinforcement_schedule(
 
             estado = "cumple" if result.status == "ok" else "falla"
             longitud_region_mm = lengths_mm.get((result.beam_id, result.span_id, result.region_id), 0.0)
+            span_edge = span_edge_regions.get((result.beam_id, result.span_id))
+            is_first_region = bool(span_edge and result.region_id == span_edge[0])
+            is_last_region = bool(span_edge and result.region_id == span_edge[1])
             if result.spacing_mm > 0 and longitud_region_mm > 0.0:
                 # Estribo: conjunto formado por estribo cerrado exterior + ganchos.
-                cantidad_estribos_region = max(1, math.floor(longitud_region_mm / float(result.spacing_mm)) + 1)
+                cantidad_estribos_region = _stirrup_count_for_reporting(
+                    longitud_region_mm,
+                    result.spacing_mm,
+                    is_first_region=is_first_region,
+                    is_last_region=is_last_region,
+                )
             longitud_region_m = max(0.0, longitud_region_mm / 1000.0)
             peso_unitario_estribo_kg = result.stirrup_unit_weight_kg
             peso_transversal_region_kg = peso_unitario_estribo_kg * cantidad_estribos_region
@@ -415,12 +468,20 @@ def write_reinforcement_schedule(
 
         for beam_id, span_id, region_id in sorted(transverse_by_region.keys()):
             region_length_mm = lengths_mm.get((beam_id, span_id, region_id), 0.0)
+            span_edge = span_edge_regions.get((beam_id, span_id))
+            is_first_region = bool(span_edge and region_id == span_edge[0])
+            is_last_region = bool(span_edge and region_id == span_edge[1])
             feasible_rows = [row for row in (transverse_by_region.get((beam_id, span_id, region_id)) or []) if row.status == "ok"]
             rows_sorted = sorted(
                 feasible_rows,
                 key=lambda row: (
                     float(row.stirrup_unit_weight_kg or 0.0)
-                    * (max(1, math.floor(region_length_mm / float(row.spacing_mm)) + 1) if row.spacing_mm > 0 and region_length_mm > 0.0 else 0),
+                    * _stirrup_count_for_reporting(
+                        region_length_mm,
+                        row.spacing_mm,
+                        is_first_region=is_first_region,
+                        is_last_region=is_last_region,
+                    ),
                     row.e_bar,
                     row.g_bar,
                     row.g_count,
@@ -437,7 +498,12 @@ def write_reinforcement_schedule(
 
                 cantidad_estribos_region = 0
                 if result.spacing_mm > 0 and region_length_mm > 0.0:
-                    cantidad_estribos_region = max(1, math.floor(region_length_mm / float(result.spacing_mm)) + 1)
+                    cantidad_estribos_region = _stirrup_count_for_reporting(
+                        region_length_mm,
+                        result.spacing_mm,
+                        is_first_region=is_first_region,
+                        is_last_region=is_last_region,
+                    )
 
                 peso_unitario_estribo_kg = float(result.stirrup_unit_weight_kg or 0.0)
                 peso_transversal_region_kg = peso_unitario_estribo_kg * cantidad_estribos_region
@@ -456,6 +522,7 @@ def write_reinforcement_schedule(
                         peso_transversal_region_kg,
                     ]
                 )
+
 
     workbook.save(path)
 
@@ -489,6 +556,8 @@ def beam_summary_from_spans(beam_id: str, span_summaries: list[SpanSummary]) -> 
         fail_spans=fail_spans,
         status="ok" if fail_spans == 0 else "fail",
     )
+
+
 
 
 

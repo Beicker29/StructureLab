@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Literal
@@ -9,7 +9,7 @@ from .design import (
     DEAP_INDIVIDUAL_CLASS,
     RegionDemand,
     RegionDesignResult,
-    longitudinal_mass_kg_per_m,
+    bar_mass_kg_per_m,
     requires_longitudinal_design,
     stirrup_count_in_region,
 )
@@ -196,7 +196,7 @@ def _region_result_from_state(
             spacing_mm,
         )
 
-    long_weight_kg_per_m = longitudinal_mass_kg_per_m(state.long_provided_mm2)
+    long_weight_kg_per_m = bar_mass_kg_per_m(span_candidate.base_long_bar, span_candidate.base_long_count) + bar_mass_kg_per_m(state.extra_long_bar, state.extra_long_count)
     long_region_weight_kg = long_weight_kg_per_m * region_length_m
 
     base_bar = span_candidate.base_long_bar if span_candidate.base_long_count > 0 else None
@@ -419,8 +419,7 @@ def optimize_span_coupled(
             return cached
 
         base_long_bar, base_long_count, decoded_regions = decode(individual)
-        base_long_area = BAR_AREAS_MM2.get(base_long_bar, 0.0) * base_long_count
-        objective = longitudinal_mass_kg_per_m(base_long_area) * span_length_m
+        objective = bar_mass_kg_per_m(base_long_bar, base_long_count) * span_length_m
 
         states: list[SpanRegionState] = []
         for demand, decoded in zip(demands, decoded_regions):
@@ -443,9 +442,8 @@ def optimize_span_coupled(
                 evaluation_cache[key] = failed
                 return failed
 
-            extra_long_area = BAR_AREAS_MM2[extra_long_bar] * extra_long_count
             region_length_m = max(0.0, demand.region_length_mm / 1000.0)
-            extra_long_region_kg = longitudinal_mass_kg_per_m(extra_long_area) * region_length_m
+            extra_long_region_kg = bar_mass_kg_per_m(extra_long_bar, extra_long_count) * region_length_m
             objective += extra_long_region_kg
 
             states.append(
@@ -634,3 +632,4 @@ def optimize_span_coupled(
         feasible_candidates=raw_outcome.feasible_candidates,
         failure_counts=raw_outcome.failure_counts,
     )
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import itertools
 import math
@@ -29,8 +29,24 @@ BAR_AREAS_MM2: dict[str, float] = {
     "#9": 645.0,
     "#10": 819.0,
     "#11": 1006.0,
+    "#14": 1452.0,
+    "#18": 2581.0,
 }
 
+BAR_MASS_KG_PER_M: dict[str, float] = {
+    "#2": 0.250,
+    "#3": 0.560,
+    "#4": 0.994,
+    "#5": 1.552,
+    "#6": 2.235,
+    "#7": 3.042,
+    "#8": 3.973,
+    "#9": 5.060,
+    "#10": 6.404,
+    "#11": 7.907,
+    "#14": 11.380,
+    "#18": 20.240,
+}
 BAR_DIAMETERS_MM: dict[str, float] = {
     "#2": 6.4,
     "#3": 9.5,
@@ -42,6 +58,8 @@ BAR_DIAMETERS_MM: dict[str, float] = {
     "#9": 28.7,
     "#10": 32.3,
     "#11": 35.8,
+    "#14": 43.0,
+    "#18": 57.3,
 }
 
 DEAP_FITNESS_CLASS = "RCFitnessMin"
@@ -591,7 +609,7 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
         objective=objective,
         score=objective,
         transverse_weight_kg_per_m=transverse_weight_kg_per_m,
-        longitudinal_weight_kg_per_m=0.0,
+        longitudinal_weight_kg_per_m=bar_mass_kg_per_m(long_bar, long_count),
         stirrup_unit_weight_kg=stirrup_unit_weight_kg,
         controlling_limit=controlling_limit,
     )
@@ -898,9 +916,21 @@ def stirrup_set_unit_weight_kg(
     return closed_weight_kg + max(0, g_count) * single_branch_weight_kg
 
 
+def bar_mass_kg_per_m(bar: str, count: int = 1) -> float:
+    if count <= 0:
+        return 0.0
+    unit_mass = BAR_MASS_KG_PER_M.get(bar)
+    if unit_mass is not None:
+        return float(unit_mass) * float(count)
+
+    area = BAR_AREAS_MM2.get(bar)
+    if area is None or area <= 0.0:
+        return 0.0
+    return longitudinal_mass_kg_per_m(area * float(count))
+
+
 def longitudinal_mass_kg_per_m(long_provided_mm2: float) -> float:
     return long_provided_mm2 * 1000.0 * STEEL_DENSITY_KG_PER_MM3
-
 
 def requires_longitudinal_design(region: RegionDemand) -> bool:
     return bool(region.is_deep_beam or region.l_req > 0.0)

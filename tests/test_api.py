@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import io
 import json
@@ -880,7 +880,7 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(base_total_weights, sorted(base_total_weights))
             base_labels = [str(opt.get("base_label") or "") for opt in base_options]
             self.assertEqual(len(base_labels), len(set(base_labels)))
-            from rc_shear_torsion.design import BAR_AREAS_MM2, longitudinal_mass_kg_per_m
+            from rc_shear_torsion.design import bar_mass_kg_per_m
             import re
 
             span_length_m = float(first_span.get("length_mm") or 0.0) / 1000.0
@@ -895,7 +895,7 @@ class ApiTests(unittest.TestCase):
                 self.assertIsNotNone(match, msg=f"Formato base no esperado: {opt.get('base_label')}")
                 count = int(match.group(1))
                 bar = match.group(2).upper()
-                expected = longitudinal_mass_kg_per_m(BAR_AREAS_MM2[bar] * count) * span_length_m
+                expected = bar_mass_kg_per_m(bar, count) * span_length_m
                 self.assertAlmostEqual(reported, expected, places=2)
         span_long_sets = first_span.get("span_longitudinal_option_sets", [])
         self.assertLessEqual(len(span_long_sets), 10)
@@ -940,7 +940,7 @@ class ApiTests(unittest.TestCase):
                     self.assertIsNotNone(match, msg=f"Formato adicional no esperado: {opt.get('label')}")
                     count = int(match.group(1))
                     bar = match.group(2).upper()
-                    expected = longitudinal_mass_kg_per_m(BAR_AREAS_MM2[bar] * count) * region_length_m
+                    expected = bar_mass_kg_per_m(bar, count) * region_length_m
                     self.assertAlmostEqual(reported, expected, places=2)
     def test_download_single_artifact_success(self) -> None:
         job_id = self._create_job()
@@ -1009,6 +1009,7 @@ class ApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
 
