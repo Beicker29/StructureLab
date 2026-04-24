@@ -373,10 +373,7 @@ const backendDefaultBaseValue=String(sp.default_longitudinal_base_value||'').tri
 const defaultSpanBaseValue=spanBaseOptions.some(opt=>opt.value===backendDefaultBaseValue)?backendDefaultBaseValue:spanBaseOptions[0].value;
 const backendDefaultSetValue=String(sp.default_longitudinal_option_set_value||'').trim();
 const defaultSpanLongSetValue=spanLongOptionSets.some(opt=>opt.value===backendDefaultSetValue)?backendDefaultSetValue:(spanLongOptionSets[0]?spanLongOptionSets[0].value:'__custom__');
-const bestSet=spanLongOptionSets[0]||null;
-const bestLongWeightByRegion={};
-if(bestSet&&bestSet.region_map){Object.keys(bestSet.region_map).forEach(rid=>{bestLongWeightByRegion[rid]=Number(bestSet.region_map[rid].weight_longitudinal_kg)||0;});}
-spanBuckets.push({spanId,regions:regionRows,isSpanCoupled:true,spanBaseOptions,defaultSpanBaseValue,spanLongOptionSets,defaultSpanLongSetValue,bestLongWeightByRegion});
+spanBuckets.push({spanId,regions:regionRows,isSpanCoupled:true,spanBaseOptions,defaultSpanBaseValue,spanLongOptionSets,defaultSpanLongSetValue});
 return;
 }
 
@@ -487,7 +484,7 @@ const initialTrans=region.transOptions.some(opt=>opt.label===saved.transverse_la
 transSelect.value=initialTrans;
 if(longSelect){const initialLong=region.longOptions.some(opt=>opt.label===saved.longitudinal_label)?saved.longitudinal_label:region.longOptions[0].label;longSelect.value=initialLong;}
 
-const state={best:bucket.isSpanCoupled?null:(Number(region.bestWeight)||0),selected:0};
+const state={best:Number(region.bestWeight)||0,selected:0};
 states.push(state);
 let cachedAdditionalOptions=[];
 
@@ -520,7 +517,6 @@ if(bucket.isSpanCoupled){
 const setValue=spanSetSelect?String(spanSetSelect.value||'').trim():'__custom__';
 const isCustom=setValue==='__custom__';
 const activeSet=!isCustom?(bucket.spanLongOptionSets||[]).find(opt=>opt.value===setValue):null;
-if(spanLongSelect)spanLongSelect.disabled=!isCustom;
 let forcedBaseOption=null;
 if(activeSet){forcedBaseOption=bucket.spanBaseOptions.find(opt=>opt.value===activeSet.base_value)||bucket.spanBaseOptions.find(opt=>opt.base_label===activeSet.base_label)||null;if(forcedBaseOption&&spanLongSelect&&spanLongSelect.value!==forcedBaseOption.value){spanLongSelect.value=forcedBaseOption.value;}}
 const selectedBase=forcedBaseOption||bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.value)||bucket.spanBaseOptions[0]||{base_label:'no se requiere',weight_kg:0};
@@ -531,7 +527,7 @@ if(activeSet&&activeSet.region_map&&activeSet.region_map[region.regionId]){
 const preset=activeSet.region_map[region.regionId];
 selectedAdd=addOptions.find(opt=>normalizeAdditionalLabel(opt.label)===normalizeAdditionalLabel(preset.additional_label))||addOptions.find(opt=>String(opt.longitudinal_label||'').trim()===String(preset.longitudinal_label||'').trim())||addOptions[0]||null;
 if(selectedAdd&&addSelect&&addSelect.value!==selectedAdd.value)addSelect.value=selectedAdd.value;
-if(addSelect)addSelect.disabled=true;
+if(addSelect)addSelect.disabled=false;
 }else{
 if(addSelect)addSelect.disabled=false;
 selectedAdd=addOptions.find(opt=>opt.value===addSelect.value)||addOptions[0]||null;
@@ -540,8 +536,6 @@ selectedAdd=addOptions.find(opt=>opt.value===addSelect.value)||addOptions[0]||nu
 if(selectedAdd){selectedAdditionalLabel=selectedAdd.label;selectedLongLabel=String(selectedAdd.longitudinal_label||region.defaultLong).trim()||region.defaultLong;selectedLongWeight=Number(selectedAdd.longitudinal_total_weight_kg);if(!Number.isFinite(selectedLongWeight))selectedLongWeight=Number(selectedAdd.weight_kg)||0;regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel,base_longitudinal_label:baseLabel,additional_longitudinal_label:selectedAdditionalLabel,additional_value:selectedAdd.value};}
 else{selectedAdditionalLabel='sin opcion viable';selectedLongLabel=String(region.defaultLong||'').trim()||'no se requiere';selectedLongWeight=0;regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel,base_longitudinal_label:baseLabel,additional_longitudinal_label:'',additional_value:''};}
 
-const bestLongFromSet=(bucket.bestLongWeightByRegion&&Number.isFinite(Number(bucket.bestLongWeightByRegion[region.regionId])))?Number(bucket.bestLongWeightByRegion[region.regionId]):selectedLongWeight;
-state.best=(Number(trans.weight_kg)||0)+bestLongFromSet;
 reference='GA top';
 if(isCustom){spanLongSelections[bucket.spanId]={mode:'custom',value:selectedBase.value,label:baseLabel,option:selectedBase.option};}
 else{spanLongSelections[bucket.spanId]={mode:'set',value:setValue,option:activeSet&&Number.isFinite(Number(activeSet.option))?Number(activeSet.option):null};}
@@ -569,7 +563,7 @@ weightLine.textContent=`Peso total region seleccionado: ${fmtKg(selectedWeight)}
 };
 
 transSelect.addEventListener('change',()=>{syncRegion();updateSummary();syncBeamPreviewWithSelections();});
-if(addSelect){addSelect.addEventListener('change',()=>{syncRegion();updateSummary();syncBeamPreviewWithSelections();});}
+if(addSelect){addSelect.addEventListener('change',()=>{if(spanSetSelect&&spanSetSelect.value!=='__custom__'){spanSetSelect.value='__custom__';}syncRegion();updateSpanSetHighlight();updateSummary();syncBeamPreviewWithSelections();});}
 if(longSelect){longSelect.addEventListener('change',()=>{syncRegion();updateSummary();syncBeamPreviewWithSelections();});}
 regionSyncFns.push(syncRegion);
 syncRegion();
@@ -578,7 +572,7 @@ body.appendChild(card);
 
 if(bucket.isSpanCoupled){
 if(spanSetSelect){spanSetSelect.addEventListener('change',()=>{regionSyncFns.forEach(fn=>fn());updateSpanSetHighlight();updateSummary();syncBeamPreviewWithSelections();});}
-if(spanLongSelect){spanLongSelect.addEventListener('change',()=>{if(spanSetSelect&&spanSetSelect.value!=='__custom__')return;const selectedBase=bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.value)||bucket.spanBaseOptions[0];spanLongSelections[bucket.spanId]={mode:'custom',value:selectedBase.value,label:selectedBase.base_label,option:selectedBase.option};regionSyncFns.forEach(fn=>fn());updateSpanSetHighlight();updateSummary();syncBeamPreviewWithSelections();});}
+if(spanLongSelect){spanLongSelect.addEventListener('change',()=>{if(spanSetSelect&&spanSetSelect.value!=='__custom__'){spanSetSelect.value='__custom__';}const selectedBase=bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.value)||bucket.spanBaseOptions[0];spanLongSelections[bucket.spanId]={mode:'custom',value:selectedBase.value,label:selectedBase.base_label,option:selectedBase.option};regionSyncFns.forEach(fn=>fn());updateSpanSetHighlight();updateSummary();syncBeamPreviewWithSelections();});}
 }else if(bucket.hasCommonLong){
 spanLongSelect.addEventListener('change',()=>{spanLongSelections[bucket.spanId]={mode:'label',label:spanLongSelect.value};regionSyncFns.forEach(fn=>fn());updateSummary();syncBeamPreviewWithSelections();});
 }

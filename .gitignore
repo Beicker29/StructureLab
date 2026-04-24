@@ -185,7 +185,15 @@ storage/
 *.zip
 
 # Generated local artifacts
+.tmp/
+.tmp_*/
 .tmp_api_storage/
+.tmp_ci_storage/
+.tmp_debug_storage/
 .tmp_smoke_storage/
+.tmp_test_report/
 .tmp_test_runtime/
+.tmp_tests/
 results/
+uvicorn.log
+uvicorn.pid

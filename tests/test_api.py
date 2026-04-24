@@ -11,6 +11,7 @@ import shutil
 from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 
 
 class ApiTests(unittest.TestCase):
@@ -34,9 +35,6 @@ class ApiTests(unittest.TestCase):
         cls.case_json = cls.repo_root / "examples" / "case_0001" / "case.json"
         cls.seismic_excel = cls.repo_root / "examples" / "case_0001" / "sismo.xlsx"
         cls.gravity_excel = cls.repo_root / "examples" / "case_0001" / "gravedad.xlsx"
-        geometry_upper = cls.repo_root / "examples" / "case_0001" / "Geometria.xlsx"
-        geometry_lower = cls.repo_root / "examples" / "case_0001" / "geometria.xlsx"
-        cls.geometry_excel = geometry_upper if geometry_upper.exists() else geometry_lower
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -103,6 +101,70 @@ class ApiTests(unittest.TestCase):
             "zip_path": None,
         }
         (job_dir / "job.json").write_text(json.dumps(meta), encoding="utf-8")
+
+    def _build_geometry_excel_for_pairs(
+        self,
+        *,
+        sheet_name: str,
+        frame_pairs: list[dict[str, str]],
+    ) -> tuple[bytes, dict[tuple[str, str], tuple[float, float]]]:
+        from app.domain.ingestion import extract_design_sections_by_unique_name
+
+        seismic_sections = extract_design_sections_by_unique_name(
+            self.seismic_excel.read_bytes(),
+            sheet_name,
+            "seismic_excel",
+        )
+        gravity_sections = extract_design_sections_by_unique_name(
+            self.gravity_excel.read_bytes(),
+            sheet_name,
+            "gravity_excel",
+        )
+
+        section_dims: dict[str, tuple[float, float]] = {}
+        expected_by_pair: dict[tuple[str, str], tuple[float, float]] = {}
+
+        for pair in frame_pairs:
+            seismic_name = str(pair.get("seismic") or "").strip()
+            gravity_name = str(pair.get("gravity") or "").strip()
+            section_candidates: list[str] = []
+
+            seismic_section = seismic_sections.get(seismic_name)
+            if seismic_section:
+                section_candidates.append(seismic_section)
+            gravity_section = gravity_sections.get(gravity_name)
+            if gravity_section and gravity_section not in section_candidates:
+                section_candidates.append(gravity_section)
+
+            if not section_candidates:
+                self.fail(
+                    "No se pudo resolver DesignSect para "
+                    f"(seismic={seismic_name}, gravity={gravity_name})"
+                )
+
+            for section_name in section_candidates:
+                if section_name in section_dims:
+                    continue
+                side_mm = 450.0 + (len(section_dims) + 1) * 50.0
+                section_dims[section_name] = (side_mm, side_mm)
+
+            selected_section = max(
+                section_candidates,
+                key=lambda name: section_dims[name][0] * section_dims[name][1],
+            )
+            expected_by_pair[(seismic_name, gravity_name)] = section_dims[selected_section]
+
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "geometry"
+        sheet.append(["Name", "Depth", "Width"])
+        for section_name, (width_mm, height_mm) in section_dims.items():
+            sheet.append([section_name, height_mm, width_mm])
+
+        stream = io.BytesIO()
+        workbook.save(stream)
+        workbook.close()
+        return stream.getvalue(), expected_by_pair
 
     def test_healthcheck(self) -> None:
         response = self.client.get("/")
@@ -259,16 +321,40 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(case_payload["optimization"]["longitudinal_mode"], "legacy_region_independent")
 
     def test_create_job_from_form_with_geometry_excel_maps_sections(self) -> None:
+        sheet_name = "Conc Bm Sum - ACI 318-08"
+        from app.domain.ingestion import extract_unique_names_from_excel
+
+        seismic_names = extract_unique_names_from_excel(
+            self.seismic_excel.read_bytes(),
+            sheet_name,
+            "seismic_excel",
+        )
+        gravity_names = extract_unique_names_from_excel(
+            self.gravity_excel.read_bytes(),
+            sheet_name,
+            "gravity_excel",
+        )
+        shared_names = sorted(seismic_names & gravity_names, key=lambda value: (0, int(value)) if value.isdigit() else (1, value))
+        self.assertTrue(shared_names, "No hay UniqueName compartidos entre seismic/gravity para probar mapeo de geometria")
+        frame_pairs = [
+            {"id": f"S{index}", "seismic": name, "gravity": name}
+            for index, name in enumerate(shared_names[:2], start=1)
+        ]
+        geometry_bytes, expected_by_pair = self._build_geometry_excel_for_pairs(
+            sheet_name=sheet_name,
+            frame_pairs=frame_pairs,
+        )
+
         with (
             self.seismic_excel.open("rb") as seismic_stream,
             self.gravity_excel.open("rb") as gravity_stream,
-            self.geometry_excel.open("rb") as geometry_stream,
+            io.BytesIO(geometry_bytes) as geometry_stream,
         ):
             response = self.client.post(
                 "/v1/jobs/from-form",
                 data={
                     "case_name": "case_form_geometry_mapping",
-                    "sheet_name": "Conc Bm Sum - ACI 318-08",
+                    "sheet_name": sheet_name,
                     "detailing": "DMO",
                     "units_rebar_per_length": "mm2/m",
                     "beam_id": "BFORM",
@@ -284,7 +370,7 @@ class ApiTests(unittest.TestCase):
                     "min_branches_c": "4",
                     "min_branches_nc": "2",
                     "region_c_ratio": "0.2",
-                    "frame_pairs_json": '[{"id":"S1","seismic":"190","gravity":"190"},{"id":"S2","seismic":"8","gravity":"8"}]',
+                    "frame_pairs_json": json.dumps(frame_pairs),
                 },
                 files={
                     "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
@@ -300,17 +386,16 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(case_response.status_code, 200, case_response.text)
         case_payload = case_response.json()
         spans = case_payload["beams"][0]["spans"]
+        spans_by_pair = {
+            (str(span.get("seismic") or ""), str(span.get("gravity") or "")): span
+            for span in spans
+        }
 
-        span_190 = next(span for span in spans if span.get("seismic") == "190")
-        span_8 = next(span for span in spans if span.get("seismic") == "8")
-
-        for region in span_190["regions"]:
-            self.assertEqual(region["width_mm"], 700.0)
-            self.assertEqual(region["height_mm"], 700.0)
-
-        for region in span_8["regions"]:
-            self.assertEqual(region["width_mm"], 500.0)
-            self.assertEqual(region["height_mm"], 500.0)
+        for pair_key, (expected_width_mm, expected_height_mm) in expected_by_pair.items():
+            self.assertIn(pair_key, spans_by_pair)
+            for region in spans_by_pair[pair_key]["regions"]:
+                self.assertEqual(region["width_mm"], expected_width_mm)
+                self.assertEqual(region["height_mm"], expected_height_mm)
 
     def test_create_job_from_form_domain_validation_error(self) -> None:
         with (
