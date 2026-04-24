@@ -34,6 +34,8 @@ class RegionOptionSelection(BaseModel):
     option: int | None = Field(default=None, ge=1)
     transverse_label: str | None = None
     longitudinal_label: str | None = None
+    base_longitudinal_label: str | None = None
+    additional_longitudinal_label: str | None = None
 
 
 class SpanOptionSelection(BaseModel):

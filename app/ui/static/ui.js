@@ -232,6 +232,35 @@ function formatTransverseOptionText(opt){const label=String(opt&&opt.label||'').
 function uniqueLabelOptions(options,labelKey,weightKey,maxItems=10){const map={};(options||[]).forEach(opt=>{const label=String(opt&&opt[labelKey]||'').trim();if(!label)return;const raw=Number(opt&&opt[weightKey]);const weight=Number.isFinite(raw)?raw:0;const current=map[label];if(!current||weight<current.weight_kg)map[label]={label,weight_kg:weight}});const ordered=Object.values(map).sort((a,b)=>a.weight_kg-b.weight_kg);if(Number.isInteger(maxItems)&&maxItems>0)return ordered.slice(0,maxItems);return ordered}
 function buildLongArrangementLabel(bar,count,emptyLabel=''){const b=String(bar||'').trim();const c=Number(count);if(!b||!Number.isFinite(c)||c<=0)return emptyLabel;return `${Math.round(c)} x ${b}`}
 function normalizeAdditionalLabel(value){const label=String(value||'').trim();return label||'no se requiere'}
+function normalizeMatchLabel(value){return String(value||'').trim().toLowerCase().replace(/\s+/g,' ')}
+function applyBackendDefaultSelection(previewPayload){
+const def=previewPayload&&previewPayload.default_selection&&typeof previewPayload.default_selection==='object'?previewPayload.default_selection:null;
+if(!def)return;
+const spanRows=Array.isArray(def.spans)?def.spans:[];
+spanRows.forEach(sp=>{
+const spanId=String(sp&&sp.span_id||'').trim();
+if(!spanId)return;
+const spanSetValue=String(sp&&sp.span_option_set_value||'').trim();
+const baseValue=String(sp&&sp.base_value||'').trim();
+const baseLabel=String(sp&&sp.base_label||'').trim();
+if(spanSetValue)spanLongSelections[spanId]={mode:'set',value:spanSetValue,option:Number.isFinite(Number(sp&&sp.option))?Number(sp.option):null};
+else if(baseValue||baseLabel)spanLongSelections[spanId]={mode:'custom',value:baseValue,label:baseLabel,option:Number.isFinite(Number(sp&&sp.option))?Number(sp.option):null};
+const regions=Array.isArray(sp&&sp.regions)?sp.regions:[];
+regions.forEach(rg=>{
+const regionId=String(rg&&rg.region_id||'').trim();
+if(!regionId)return;
+const key=`${spanId}__${regionId}`;
+regionOptionSelections[key]={
+transverse_label:String(rg&&rg.transverse_label||'').trim(),
+longitudinal_label:String(rg&&rg.longitudinal_label||'').trim(),
+base_longitudinal_label:String(rg&&rg.base_longitudinal_label||baseLabel||'').trim(),
+additional_longitudinal_label:normalizeAdditionalLabel(rg&&rg.additional_longitudinal_label),
+additional_value:'',
+option:Number.isFinite(Number(rg&&rg.option))?Number(rg.option):null,
+};
+});
+});
+}
 function getAdditionalOptionsByBaseValue(region,baseValue){
 const key=String(baseValue||'').trim();
 if(!key)return[];
@@ -277,29 +306,54 @@ const option=Number.isFinite(Number(item&&item.option))?Number(item.option):null
 const value=String(item&&item.value||`longset_${option!==null?option:index+1}`).trim();
 const baseLabel=String(item&&item.base_label||'no se requiere').trim()||'no se requiere';
 const baseValue=String(item&&item.base_value||'').trim();
-const totalRaw=Number(item&&item.total_longitudinal_weight_kg);
+const totalRaw=Number(item&&item.total_weight_kg);
+const longTotalRaw=Number(item&&item.total_longitudinal_weight_kg);
+const transTotalRaw=Number(item&&item.total_transverse_weight_kg);
 const rankRaw=Number(item&&item.rank);
 const rows=Array.isArray(item&&item.regions)?item.regions:[];
 const region_map={};
-let sum=0;
+let sumTotal=0;
+let sumLong=0;
+let sumTrans=0;
 rows.forEach(r=>{
 const regionId=String(r&&r.region_id||'').trim();
 if(!regionId)return;
 const additionalLabel=normalizeAdditionalLabel(r&&r.additional_label);
 const longLabel=String(r&&r.longitudinal_label||additionalLabel).trim()||additionalLabel;
+const transLabel=String(r&&r.transverse_label||'').trim();
+const totalW=Number(r&&r.weight_total_kg);
 const longW=Number(r&&r.weight_longitudinal_kg);
+const transW=Number(r&&r.weight_transverse_kg);
 const addW=Number(r&&r.weight_additional_kg);
 const baseW=Number(r&&r.weight_base_region_kg);
 const weightLong=Number.isFinite(longW)?longW:((Number.isFinite(baseW)?baseW:0)+(Number.isFinite(addW)?addW:0));
-sum+=weightLong;
-region_map[regionId]={additional_label:additionalLabel,longitudinal_label:longLabel,weight_longitudinal_kg:weightLong,weight_additional_kg:Number.isFinite(addW)?addW:0,weight_base_region_kg:Number.isFinite(baseW)?baseW:0};
+const weightTrans=Number.isFinite(transW)?transW:0;
+const weightTotal=Number.isFinite(totalW)?totalW:(weightLong+weightTrans);
+sumTotal+=weightTotal;
+sumLong+=weightLong;
+sumTrans+=weightTrans;
+region_map[regionId]={transverse_label:transLabel,additional_label:additionalLabel,longitudinal_label:longLabel,weight_total_kg:weightTotal,weight_transverse_kg:weightTrans,weight_longitudinal_kg:weightLong,weight_additional_kg:Number.isFinite(addW)?addW:0,weight_base_region_kg:Number.isFinite(baseW)?baseW:0};
 });
 const missing=[...regionIds].some(id=>!region_map[id]);
 if(missing)return null;
-const total=Number.isFinite(totalRaw)?totalRaw:sum;
+const total=Number.isFinite(totalRaw)?totalRaw:sumTotal;
+const totalLong=Number.isFinite(longTotalRaw)?longTotalRaw:sumLong;
+const totalTrans=Number.isFinite(transTotalRaw)?transTotalRaw:sumTrans;
 const rank=Number.isFinite(rankRaw)&&rankRaw>0?Math.round(rankRaw):(index+1);
-return{value,option,rank,base_label:baseLabel,base_value:baseValue,total_weight_kg:total,region_map};
-}).filter(Boolean).sort((a,b)=>{if(a.total_weight_kg!==b.total_weight_kg)return a.total_weight_kg-b.total_weight_kg;return (a.option||0)-(b.option||0);});
+return{value,option,rank,base_label:baseLabel,base_value:baseValue,total_weight_kg:total,total_longitudinal_weight_kg:totalLong,total_transverse_weight_kg:totalTrans,region_map};
+}).filter(Boolean).sort((a,b)=>{if(a.total_longitudinal_weight_kg!==b.total_longitudinal_weight_kg)return a.total_longitudinal_weight_kg-b.total_longitudinal_weight_kg;if(a.total_weight_kg!==b.total_weight_kg)return a.total_weight_kg-b.total_weight_kg;return (a.option||0)-(b.option||0);});
+return parsed.slice(0,10);
+}
+function normalizeSpanOptionChoices(spanPayload){
+const raw=spanPayload&&Array.isArray(spanPayload.span_option_choices)?spanPayload.span_option_choices:[];
+if(!raw.length)return[];
+const parsed=raw.map((item,index)=>{
+const option=Number.isFinite(Number(item&&item.option))?Number(item.option):(index+1);
+const total=Number(item&&item.total_weight_kg);
+const longTotal=Number(item&&item.long_weight_kg);
+return{option,total_weight_kg:Number.isFinite(total)?total:Number.POSITIVE_INFINITY,long_weight_kg:Number.isFinite(longTotal)?longTotal:0};
+}).filter(item=>Number.isFinite(item.option)&&item.option>0&&Number.isFinite(item.total_weight_kg));
+parsed.sort((a,b)=>{if(a.total_weight_kg!==b.total_weight_kg)return a.total_weight_kg-b.total_weight_kg;return a.option-b.option;});
 return parsed.slice(0,10);
 }
 
@@ -308,6 +362,8 @@ if(!regionOptionsEl)return;
 if(selectionSaveMsg)selectionSaveMsg.textContent='';
 if(saveSelectionBtn)saveSelectionBtn.disabled=true;
 const spans=previewPayload&&Array.isArray(previewPayload.spans)?previewPayload.spans:[];
+const hasSavedSelections=Object.keys(regionOptionSelections||{}).length>0||Object.keys(spanLongSelections||{}).length>0;
+if(!hasSavedSelections&&previewPayload)applyBackendDefaultSelection(previewPayload);
 const spanBuckets=[];
 
 spans.forEach((sp,sIndex)=>{
@@ -316,6 +372,8 @@ const regions=Array.isArray(sp.regions)?sp.regions:[];
 const regionRows=[];
 regions.forEach((rg,rIndex)=>{
 const regionId=rg.region_id||`R${rIndex+1}`;
+const longModeRaw=String(rg.longitudinal_mode||'').trim().toLowerCase();
+const optionLimit=longModeRaw==='span_coupled'?2000:10;
 const optionsRaw=Array.isArray(rg.options)?rg.options:[];
 const options=optionsRaw.map((opt,optIndex)=>{
 const baseLabel=String(opt.base_longitudinal_label||buildLongArrangementLabel(opt.base_long_bar,opt.base_long_count,'no se requiere')).trim()||'no se requiere';
@@ -334,7 +392,7 @@ weight_total_kg:Number.isFinite(Number(opt.weight_total_kg))?Number(opt.weight_t
 weight_transverse_kg:Number.isFinite(Number(opt.weight_transverse_kg))?Number(opt.weight_transverse_kg):0,
 weight_longitudinal_kg:Number.isFinite(Number(opt.weight_longitudinal_kg))?Number(opt.weight_longitudinal_kg):0,
 };
-}).sort((a,b)=>{const aw=Number.isFinite(Number(a.weight_total_kg))?Number(a.weight_total_kg):Number.POSITIVE_INFINITY;const bw=Number.isFinite(Number(b.weight_total_kg))?Number(b.weight_total_kg):Number.POSITIVE_INFINITY;if(aw!==bw)return aw-bw;return (Number(a.option)||0)-(Number(b.option)||0)}).slice(0,10);
+}).sort((a,b)=>{const aw=Number.isFinite(Number(a.weight_total_kg))?Number(a.weight_total_kg):Number.POSITIVE_INFINITY;const bw=Number.isFinite(Number(b.weight_total_kg))?Number(b.weight_total_kg):Number.POSITIVE_INFINITY;if(aw!==bw)return aw-bw;return (Number(a.option)||0)-(Number(b.option)||0)}).slice(0,optionLimit);
 if(!options.length)return;
 const best=options[0];
 const transOptionsSource=(Array.isArray(rg.transverse_options)?rg.transverse_options:[]).map(opt=>({label:String(opt&&opt.label||'').trim(),weight_kg:Number.isFinite(Number(opt&&opt.weight_kg))?Number(opt.weight_kg):0,stirrup_count:Number.isFinite(Number(opt&&opt.stirrup_count))?Number(opt.stirrup_count):null,stirrup_unit_weight_kg:Number.isFinite(Number(opt&&opt.stirrup_unit_weight_kg))?Number(opt.stirrup_unit_weight_kg):null,})).filter(opt=>opt.label).sort((a,b)=>{const aw=Number.isFinite(Number(a.weight_kg))?Number(a.weight_kg):Number.POSITIVE_INFINITY;const bw=Number.isFinite(Number(b.weight_kg))?Number(b.weight_kg):Number.POSITIVE_INFINITY;if(aw!==bw)return aw-bw;return String(a.label).localeCompare(String(b.label));});
@@ -353,12 +411,13 @@ bestWeight:Number(best.weight_total_kg)||0,
 transOptions,
 longOptions,
 longLookup,
-defaultTrans:transOptions[0].label,
+defaultTrans:String(best.transverse_label||transOptions[0].label||'').trim()||transOptions[0].label,
 options,
-longMode:String(rg.longitudinal_mode||'').trim().toLowerCase(),
+longMode:longModeRaw,
 defaultLong:String(best.longitudinal_label||longOptions[0].label||'').trim(),
 defaultBaseLong:String(best.base_longitudinal_label||'no se requiere').trim()||'no se requiere',
 defaultAdditionalLong:normalizeAdditionalLabel(best.additional_longitudinal_label),
+referenceBestWeight:Number(best.weight_total_kg)||0,
 additionalOptionsByBase:(rg&&typeof rg.additional_options_by_base==='object'&&rg.additional_options_by_base)?rg.additional_options_by_base:{},
 });
 });
@@ -369,11 +428,29 @@ if(isSpanCoupled){
 const spanBaseOptions=normalizeSpanBaseOptions(sp);
 if(!spanBaseOptions.length)return;
 const spanLongOptionSets=normalizeSpanLongitudinalOptionSets(sp,regionRows);
-const backendDefaultBaseValue=String(sp.default_longitudinal_base_value||'').trim();
-const defaultSpanBaseValue=spanBaseOptions.some(opt=>opt.value===backendDefaultBaseValue)?backendDefaultBaseValue:spanBaseOptions[0].value;
+const spanOptionChoices=normalizeSpanOptionChoices(sp);
 const backendDefaultSetValue=String(sp.default_longitudinal_option_set_value||'').trim();
-const defaultSpanLongSetValue=spanLongOptionSets.some(opt=>opt.value===backendDefaultSetValue)?backendDefaultSetValue:(spanLongOptionSets[0]?spanLongOptionSets[0].value:'__custom__');
-spanBuckets.push({spanId,regions:regionRows,isSpanCoupled:true,spanBaseOptions,defaultSpanBaseValue,spanLongOptionSets,defaultSpanLongSetValue});
+const defaultSet=spanLongOptionSets.find(opt=>String(opt.value)===backendDefaultSetValue)||spanLongOptionSets[0]||null;
+if(defaultSet&&defaultSet.region_map){
+regionRows.forEach(region=>{
+const preset=defaultSet.region_map[region.regionId];
+if(!preset)return;
+const preferredTrans=String(preset.transverse_label||'').trim();
+const preferredLong=String(preset.longitudinal_label||'').trim();
+if(preferredTrans&&region.transOptions.some(opt=>opt.label===preferredTrans))region.defaultTrans=preferredTrans;
+if(preferredLong&&region.longOptions.some(opt=>opt.label===preferredLong))region.defaultLong=preferredLong;
+region.defaultBaseLong=String(defaultSet.base_label||region.defaultBaseLong||'no se requiere').trim()||'no se requiere';
+region.defaultAdditionalLong=normalizeAdditionalLabel(preset.additional_label||region.defaultAdditionalLong);
+const rowWeight=Number(preset.weight_total_kg);
+if(Number.isFinite(rowWeight)&&rowWeight>0)region.referenceBestWeight=rowWeight;
+});
+}
+const defaultBaseFromSet=defaultSet?String(defaultSet.base_label||'').trim():'';
+const defaultBaseBySet=defaultBaseFromSet?spanBaseOptions.find(opt=>String(opt.base_label||'').trim()===defaultBaseFromSet):null;
+const backendDefaultBaseValue=String(sp.default_longitudinal_base_value||'').trim();
+const defaultSpanBaseValue=defaultBaseBySet?defaultBaseBySet.value:(spanBaseOptions.some(opt=>opt.value===backendDefaultBaseValue)?backendDefaultBaseValue:spanBaseOptions[0].value);
+const defaultSpanLongSetValue=defaultSet?defaultSet.value:(spanLongOptionSets.some(opt=>opt.value===backendDefaultSetValue)?backendDefaultSetValue:'__custom__');
+spanBuckets.push({spanId,regions:regionRows,isSpanCoupled:true,spanBaseOptions,defaultSpanBaseValue,spanLongOptionSets,defaultSpanLongSetValue,spanOptionChoices,defaultSpanOptionNumber:null});
 return;
 }
 
@@ -399,7 +476,8 @@ const summary=document.createElement('div');
 summary.className='region-opt-summary';
 regionOptionsEl.appendChild(summary);
 const states=[];
-const updateSummary=()=>{const bestSum=states.reduce((acc,item)=>acc+(Number.isFinite(item.best)?item.best:0),0);const selectedSum=states.reduce((acc,item)=>acc+(Number.isFinite(item.selected)?item.selected:0),0);const pct=bestSum>0?((selectedSum-bestSum)/bestSum)*100:null;summary.innerHTML=`Peso opcion optima (viga completa): <strong>${fmtKg(bestSum)}</strong> | Peso opcion seleccionada (viga completa): <strong>${fmtKg(selectedSum)}</strong> | Diferencia: <strong>${fmtPct(pct)}</strong>`;};
+const optimalBeamWeight=Number(previewPayload&&previewPayload.optimal_beam_weight_kg);
+const updateSummary=()=>{const fallbackBestSum=states.reduce((acc,item)=>acc+(Number.isFinite(item.best)?item.best:0),0);const bestSum=Number.isFinite(optimalBeamWeight)?optimalBeamWeight:fallbackBestSum;const hasInvalidSelection=states.some(item=>!Number.isFinite(item.selected));if(hasInvalidSelection){summary.innerHTML=`Peso opcion optima (viga completa): <strong>${fmtKg(bestSum)}</strong> | Peso opcion seleccionada (viga completa): <strong>n/d</strong> | Diferencia: <strong>n/d</strong> | <strong>Seleccion inconsistente</strong>`;if(saveSelectionBtn)saveSelectionBtn.disabled=true;return;}const selectedSum=states.reduce((acc,item)=>acc+(Number.isFinite(item.selected)?item.selected:0),0);const pct=bestSum>0?((selectedSum-bestSum)/bestSum)*100:null;summary.innerHTML=`Peso opcion optima (viga completa): <strong>${fmtKg(bestSum)}</strong> | Peso opcion seleccionada (viga completa): <strong>${fmtKg(selectedSum)}</strong> | Diferencia: <strong>${fmtPct(pct)}</strong>`;if(saveSelectionBtn)saveSelectionBtn.disabled=!currentJobId;};
 
 spanBuckets.forEach((bucket,bIndex)=>{
 const details=document.createElement('details');
@@ -416,7 +494,7 @@ if(bucket.isSpanCoupled){
 spanCard.innerHTML=`<div class="region-opt-head"><strong>Vano ${bucket.spanId}</strong></div><div class="field"><label>Top 10 opciones longitudinales del vano (backend)</label><select class="span-opt-set"></select></div><div class="span-set-highlight" aria-live="polite"></div><div class="field"><label>Refuerzo longitudinal base del vano</label><select class="span-opt-longitudinal"></select></div><p class="help">Selecciona una opcion pre-calculada o usa Personalizada para elegir base + adicional por region.</p>`;
 spanSetSelect=spanCard.querySelector('.span-opt-set');
 spanLongSelect=spanCard.querySelector('.span-opt-longitudinal');
-(bucket.spanLongOptionSets||[]).forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`#${opt.rank} | ${opt.base_label} | total long ${fmtKg(opt.total_weight_kg)}`;spanSetSelect.appendChild(el);});
+(bucket.spanLongOptionSets||[]).forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`#${opt.rank} | ${opt.base_label} | total ${fmtKg(opt.total_weight_kg)} | long ${fmtKg(opt.total_longitudinal_weight_kg)}`;spanSetSelect.appendChild(el);});
 const customOpt=document.createElement('option');customOpt.value='__custom__';customOpt.textContent='Personalizada';spanSetSelect.appendChild(customOpt);
 bucket.spanBaseOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`${opt.base_label} | ${fmtKg(opt.weight_kg)} (long. vano) | total ${fmtKg(opt.total_weight_kg)}`;spanLongSelect.appendChild(el);});
 const savedSpan=spanLongSelections[bucket.spanId]||{};
@@ -455,9 +533,9 @@ spanSetHighlight.className='span-set-highlight is-custom';
 spanSetHighlight.innerHTML=`<span class="rank-pill">Personalizada</span> Base actual: <strong>${baseOption.base_label}</strong>.`;
 return;
 }
-const delta=(best&&Number(best.total_weight_kg)>0)?((Number(selected.total_weight_kg)-Number(best.total_weight_kg))/Number(best.total_weight_kg))*100:0;
+const delta=(best&&Number(best.total_longitudinal_weight_kg)>0)?((Number(selected.total_longitudinal_weight_kg)-Number(best.total_longitudinal_weight_kg))/Number(best.total_longitudinal_weight_kg))*100:0;
 spanSetHighlight.className='span-set-highlight is-ranked';
-spanSetHighlight.innerHTML=`<span class="rank-pill">#${selected.rank}</span> Seleccion actual: <strong>${selected.base_label}</strong> | Total long: <strong>${fmtKg(selected.total_weight_kg)}</strong> | Delta vs #1: <strong>${fmtPct(delta)}</strong>`;
+spanSetHighlight.innerHTML=`<span class="rank-pill">#${selected.rank}</span> Seleccion actual: <strong>${selected.base_label}</strong> | Peso long: <strong>${fmtKg(selected.total_longitudinal_weight_kg)}</strong> | Peso total ref.: <strong>${fmtKg(selected.total_weight_kg)}</strong> | Delta vs #1: <strong>${fmtPct(delta)}</strong>`;
 };
 
 bucket.regions.forEach(region=>{
@@ -484,7 +562,7 @@ const initialTrans=region.transOptions.some(opt=>opt.label===saved.transverse_la
 transSelect.value=initialTrans;
 if(longSelect){const initialLong=region.longOptions.some(opt=>opt.label===saved.longitudinal_label)?saved.longitudinal_label:region.longOptions[0].label;longSelect.value=initialLong;}
 
-const state={best:Number(region.bestWeight)||0,selected:0};
+const state={best:Number(region.referenceBestWeight)||Number(region.bestWeight)||0,selected:0};
 states.push(state);
 let cachedAdditionalOptions=[];
 
@@ -494,12 +572,14 @@ const selectedBase=bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.v
 const baseValue=String((selectedBase&&selectedBase.value)||'').trim();
 if(card.dataset.baseValue!==baseValue||!cachedAdditionalOptions.length){
 cachedAdditionalOptions=getAdditionalOptionsByBaseValue(region,baseValue);
-const keep=(regionOptionSelections[region.key]||{}).additional_value||addSelect.value;
+const savedSelection=regionOptionSelections[region.key]||{};
+const keep=savedSelection.additional_value||addSelect.value;
 addSelect.innerHTML='';
 if(!cachedAdditionalOptions.length){const el=document.createElement('option');el.value='';el.textContent='Sin opcion adicional viable para esta base (backend)';addSelect.appendChild(el);addSelect.value='';addSelect.disabled=true;card.dataset.baseValue=baseValue;return cachedAdditionalOptions;}
 addSelect.disabled=false;
 cachedAdditionalOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`${opt.label} | ${fmtKg(opt.weight_kg)}`;addSelect.appendChild(el);});
-const selectedValue=cachedAdditionalOptions.some(opt=>opt.value===keep)?keep:cachedAdditionalOptions[0].value;
+const preferredAdditional=cachedAdditionalOptions.find(opt=>normalizeAdditionalLabel(opt.label)===normalizeAdditionalLabel(region.defaultAdditionalLong));
+const selectedValue=cachedAdditionalOptions.some(opt=>opt.value===keep)?keep:((preferredAdditional&&preferredAdditional.value)||cachedAdditionalOptions[0].value);
 addSelect.value=selectedValue;
 card.dataset.baseValue=baseValue;
 }
@@ -511,7 +591,10 @@ const trans=region.transOptions.find(opt=>opt.label===transSelect.value)||region
 let selectedLongLabel='';
 let selectedLongWeight=0;
 let selectedAdditionalLabel='no se requiere';
+let selectedAdditionalValue='';
+let selectedBaseLabel='';
 let reference='region';
+let activeAdditionalOptions=[];
 
 if(bucket.isSpanCoupled){
 const setValue=spanSetSelect?String(spanSetSelect.value||'').trim():'__custom__';
@@ -521,7 +604,9 @@ let forcedBaseOption=null;
 if(activeSet){forcedBaseOption=bucket.spanBaseOptions.find(opt=>opt.value===activeSet.base_value)||bucket.spanBaseOptions.find(opt=>opt.base_label===activeSet.base_label)||null;if(forcedBaseOption&&spanLongSelect&&spanLongSelect.value!==forcedBaseOption.value){spanLongSelect.value=forcedBaseOption.value;}}
 const selectedBase=forcedBaseOption||bucket.spanBaseOptions.find(opt=>opt.value===spanLongSelect.value)||bucket.spanBaseOptions[0]||{base_label:'no se requiere',weight_kg:0};
 const baseLabel=String(selectedBase.base_label||'').trim();
+selectedBaseLabel=baseLabel;
 const addOptions=refreshAdditionalChoices();
+activeAdditionalOptions=addOptions;
 let selectedAdd=null;
 if(activeSet&&activeSet.region_map&&activeSet.region_map[region.regionId]){
 const preset=activeSet.region_map[region.regionId];
@@ -533,8 +618,8 @@ if(addSelect)addSelect.disabled=false;
 selectedAdd=addOptions.find(opt=>opt.value===addSelect.value)||addOptions[0]||null;
 }
 
-if(selectedAdd){selectedAdditionalLabel=selectedAdd.label;selectedLongLabel=String(selectedAdd.longitudinal_label||region.defaultLong).trim()||region.defaultLong;selectedLongWeight=Number(selectedAdd.longitudinal_total_weight_kg);if(!Number.isFinite(selectedLongWeight))selectedLongWeight=Number(selectedAdd.weight_kg)||0;regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel,base_longitudinal_label:baseLabel,additional_longitudinal_label:selectedAdditionalLabel,additional_value:selectedAdd.value};}
-else{selectedAdditionalLabel='sin opcion viable';selectedLongLabel=String(region.defaultLong||'').trim()||'no se requiere';selectedLongWeight=0;regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel,base_longitudinal_label:baseLabel,additional_longitudinal_label:'',additional_value:''};}
+if(selectedAdd){selectedAdditionalLabel=selectedAdd.label;selectedAdditionalValue=selectedAdd.value;selectedLongLabel=String(selectedAdd.longitudinal_label||region.defaultLong).trim()||region.defaultLong;selectedLongWeight=Number(selectedAdd.longitudinal_total_weight_kg);if(!Number.isFinite(selectedLongWeight))selectedLongWeight=Number(selectedAdd.weight_kg)||0;}
+else{selectedAdditionalLabel='sin opcion viable';selectedAdditionalValue='';selectedLongLabel=String(region.defaultLong||'').trim()||'no se requiere';selectedLongWeight=0;}
 
 reference='GA top';
 if(isCustom){spanLongSelections[bucket.spanId]={mode:'custom',value:selectedBase.value,label:baseLabel,option:selectedBase.option};}
@@ -546,16 +631,55 @@ const long=region.longLookup[currentLongLabel]||region.longOptions[0];
 selectedLongLabel=String(long.label||'').trim();
 selectedLongWeight=Number(long.weight_kg)||0;
 reference='vano';
-regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel};
 }else{
 const currentLongLabel=longSelect&&longSelect.value?longSelect.value:region.longOptions[0].label;
 const long=region.longLookup[currentLongLabel]||region.longOptions[0];
 selectedLongLabel=String(long.label||'').trim();
 selectedLongWeight=Number(long.weight_kg)||0;
-regionOptionSelections[region.key]={transverse_label:trans.label,longitudinal_label:selectedLongLabel};
 }
 
-const selectedWeight=(Number(trans.weight_kg)||0)+selectedLongWeight;
+const selectedTransLabel=String(trans&&trans.label||'').trim();
+const selectedTransNorm=normalizeMatchLabel(selectedTransLabel);
+const selectedLongNorm=normalizeMatchLabel(String(selectedLongLabel||'').trim());
+const selectedBaseNorm=selectedBaseLabel?normalizeMatchLabel(selectedBaseLabel):'';
+const selectedAdditionalNorm=normalizeAdditionalLabel(selectedAdditionalLabel);
+const exactRows=(region.options||[]).filter(row=>{
+if(normalizeMatchLabel(row&&row.longitudinal_label)!==selectedLongNorm)return false;
+if(selectedBaseNorm){
+const rowBase=normalizeMatchLabel(row&&row.base_longitudinal_label);
+if(rowBase!==selectedBaseNorm)return false;
+}
+if(selectedAdditionalNorm){
+const rowAdditional=normalizeAdditionalLabel(row&&row.additional_longitudinal_label);
+if(rowAdditional!==selectedAdditionalNorm)return false;
+}
+return true;
+});
+if(!exactRows.length){
+state.selected=Number.NaN;
+weightLine.textContent='Seleccion inconsistente: la combinacion elegida no existe en backend para esta region.';
+return;
+}
+const byWeight=(a,b)=>{const aw=Number(a&&a.weight_total_kg);const bw=Number(b&&b.weight_total_kg);if(Number.isFinite(aw)&&Number.isFinite(bw)&&aw!==bw)return aw-bw;return Number(a&&a.option||0)-Number(b&&b.option||0);};
+const currentRows=exactRows.filter(row=>normalizeMatchLabel(row&&row.transverse_label)===selectedTransNorm).sort(byWeight);
+const resolvedRow=(currentRows[0]||[...exactRows].sort(byWeight)[0]);
+const resolvedTransLabel=String(resolvedRow&&resolvedRow.transverse_label||selectedTransLabel).trim();
+if(transSelect&&transSelect.value!==resolvedTransLabel)transSelect.value=resolvedTransLabel;
+const resolvedLongLabel=String(resolvedRow&&resolvedRow.longitudinal_label||selectedLongLabel).trim()||selectedLongLabel;
+const resolvedBaseLabel=String(resolvedRow&&resolvedRow.base_longitudinal_label||selectedBaseLabel||'').trim();
+const resolvedAdditionalLabel=normalizeAdditionalLabel(resolvedRow&&resolvedRow.additional_longitudinal_label||selectedAdditionalLabel);
+let resolvedAdditionalValue=selectedAdditionalValue;
+if(bucket.isSpanCoupled&&activeAdditionalOptions.length){
+const foundAdd=activeAdditionalOptions.find(opt=>normalizeAdditionalLabel(opt.label)===normalizeAdditionalLabel(resolvedAdditionalLabel)&&normalizeMatchLabel(opt.longitudinal_label)===normalizeMatchLabel(resolvedLongLabel))||activeAdditionalOptions.find(opt=>normalizeAdditionalLabel(opt.label)===normalizeAdditionalLabel(resolvedAdditionalLabel))||null;
+if(foundAdd)resolvedAdditionalValue=foundAdd.value;
+}
+const selectedWeight=Number.isFinite(Number(resolvedRow&&resolvedRow.weight_total_kg))?Number(resolvedRow.weight_total_kg):((Number(resolvedRow&&resolvedRow.weight_transverse_kg)||0)+(Number(resolvedRow&&resolvedRow.weight_longitudinal_kg)||0));
+if(Number.isFinite(Number(resolvedRow&&resolvedRow.weight_longitudinal_kg)))selectedLongWeight=Number(resolvedRow.weight_longitudinal_kg);
+if(bucket.isSpanCoupled){
+regionOptionSelections[region.key]={transverse_label:resolvedTransLabel,longitudinal_label:resolvedLongLabel,base_longitudinal_label:resolvedBaseLabel,additional_longitudinal_label:resolvedAdditionalLabel,additional_value:resolvedAdditionalValue};
+}else{
+regionOptionSelections[region.key]={transverse_label:resolvedTransLabel,longitudinal_label:resolvedLongLabel,base_longitudinal_label:resolvedBaseLabel,additional_longitudinal_label:resolvedAdditionalLabel,additional_value:''};
+}
 const bestWeight=Number.isFinite(Number(state.best))?Number(state.best):(Number(region.bestWeight)||0);
 const deltaPct=bestWeight>0?((selectedWeight-bestWeight)/bestWeight)*100:null;
 state.selected=selectedWeight;
@@ -606,6 +730,8 @@ const saved=regionOptionSelections[key]||{};
 const transverse_label=saved.transverse_label||String(fallback.transverse_label||'');
 const row={span_id:spanId,region_id:regionId,transverse_label};
 row.longitudinal_label=saved.longitudinal_label||String(fallback.longitudinal_label||'');
+row.base_longitudinal_label=saved.base_longitudinal_label||String(fallback.base_longitudinal_label||'');
+row.additional_longitudinal_label=saved.additional_longitudinal_label||String(fallback.additional_longitudinal_label||'');
 selections.push(row);
 });
 const savedSpan=spanLongSelections[spanId];

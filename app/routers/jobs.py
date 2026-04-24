@@ -333,6 +333,8 @@ def save_job_selection_endpoint(
                         "option": int(opt.get("option")),
                         "transverse_label": str(opt.get("transverse_label") or "").strip(),
                         "longitudinal_label": str(opt.get("longitudinal_label") or "").strip(),
+                        "base_longitudinal_label": str(opt.get("base_longitudinal_label") or "").strip(),
+                        "additional_longitudinal_label": str(opt.get("additional_longitudinal_label") or "").strip(),
                         "weight_total_kg": float(opt.get("weight_total_kg") or 0.0),
                         "weight_transverse_kg": float(opt.get("weight_transverse_kg") or 0.0),
                         "weight_longitudinal_kg": float(opt.get("weight_longitudinal_kg") or 0.0),
@@ -340,7 +342,10 @@ def save_job_selection_endpoint(
                     for opt in options
                     if opt.get("option") is not None
                 ],
-                key=lambda item: item["option"],
+                key=lambda item: (
+                    float(item.get("weight_total_kg") or 0.0),
+                    int(item.get("option") or 0),
+                ),
             )
             if not region_id or not normalized_rows:
                 continue
@@ -569,12 +574,18 @@ def save_job_selection_endpoint(
         span_req = requested_span_map.get(span_id)
         selected_transverse_label: str | None = None
         selected_longitudinal_label: str | None = None
+        selected_base_longitudinal_label: str | None = None
+        selected_additional_longitudinal_label: str | None = None
 
         if req is not None:
             if req.transverse_label:
                 selected_transverse_label = req.transverse_label.strip()
             if req.longitudinal_label:
                 selected_longitudinal_label = req.longitudinal_label.strip()
+            if req.base_longitudinal_label:
+                selected_base_longitudinal_label = req.base_longitudinal_label.strip()
+            if req.additional_longitudinal_label:
+                selected_additional_longitudinal_label = req.additional_longitudinal_label.strip()
             if req.option is not None and (not selected_transverse_label or not selected_longitudinal_label):
                 option_row = next((row for row in data["rows"] if int(row["option"]) == int(req.option)), None)
                 if option_row is None:
@@ -585,6 +596,12 @@ def save_job_selection_endpoint(
                     )
                 selected_transverse_label = selected_transverse_label or option_row["transverse_label"]
                 selected_longitudinal_label = selected_longitudinal_label or option_row["longitudinal_label"]
+                selected_base_longitudinal_label = selected_base_longitudinal_label or str(
+                    option_row.get("base_longitudinal_label") or ""
+                ).strip()
+                selected_additional_longitudinal_label = selected_additional_longitudinal_label or str(
+                    option_row.get("additional_longitudinal_label") or ""
+                ).strip()
 
         if not selected_longitudinal_label and span_req is not None:
             span_options = span_longitudinal_options.get(span_id, [])
@@ -596,6 +613,12 @@ def save_job_selection_endpoint(
                 option_row = (option_rows.get(span_option_number) or {}).get(region_id)
                 if option_row is not None:
                     selected_longitudinal_label = str(option_row.get("longitudinal_label") or "").strip()
+                    selected_base_longitudinal_label = selected_base_longitudinal_label or str(
+                        option_row.get("base_longitudinal_label") or ""
+                    ).strip()
+                    selected_additional_longitudinal_label = selected_additional_longitudinal_label or str(
+                        option_row.get("additional_longitudinal_label") or ""
+                    ).strip()
                 else:
                     option_index = span_option_number - 1
                     if option_index < 0 or option_index >= len(span_options):
@@ -606,8 +629,37 @@ def save_job_selection_endpoint(
                         )
                     selected_longitudinal_label = str(span_options[option_index]["label"])
 
-        selected_transverse_label = selected_transverse_label or str(best.get("transverse_label") or "").strip()
         selected_longitudinal_label = selected_longitudinal_label or str(best.get("longitudinal_label") or "").strip()
+        if not selected_transverse_label:
+            compatible_rows = [
+                row
+                for row in data["rows"]
+                if row["longitudinal_label"] == selected_longitudinal_label
+            ]
+            if selected_base_longitudinal_label:
+                compatible_rows = [
+                    row
+                    for row in compatible_rows
+                    if str(row.get("base_longitudinal_label") or "").strip() == selected_base_longitudinal_label
+                ]
+            if selected_additional_longitudinal_label:
+                compatible_rows = [
+                    row
+                    for row in compatible_rows
+                    if str(row.get("additional_longitudinal_label") or "").strip()
+                    == selected_additional_longitudinal_label
+                ]
+            if compatible_rows:
+                compatible_rows = sorted(
+                    compatible_rows,
+                    key=lambda row: (
+                        float(row.get("weight_total_kg") or 0.0),
+                        int(row.get("option") or 0),
+                    ),
+                )
+                selected_transverse_label = str(compatible_rows[0].get("transverse_label") or "").strip()
+            else:
+                selected_transverse_label = str(best.get("transverse_label") or "").strip()
 
         if selected_transverse_label not in trans_lookup:
             raise AppError(
@@ -625,20 +677,59 @@ def save_job_selection_endpoint(
         selected_transverse = trans_lookup[selected_transverse_label]
         selected_longitudinal = long_lookup[selected_longitudinal_label]
 
-        selected_combo = next(
-            (
+        selected_combo_candidates = [
+            row
+            for row in data["rows"]
+            if row["transverse_label"] == selected_transverse_label
+            and row["longitudinal_label"] == selected_longitudinal_label
+        ]
+        if selected_base_longitudinal_label:
+            selected_combo_candidates = [
                 row
-                for row in data["rows"]
-                if row["transverse_label"] == selected_transverse_label
-                and row["longitudinal_label"] == selected_longitudinal_label
-            ),
-            None,
+                for row in selected_combo_candidates
+                if str(row.get("base_longitudinal_label") or "").strip() == selected_base_longitudinal_label
+            ]
+        if selected_additional_longitudinal_label:
+            selected_combo_candidates = [
+                row
+                for row in selected_combo_candidates
+                if str(row.get("additional_longitudinal_label") or "").strip() == selected_additional_longitudinal_label
+            ]
+        selected_combo = (
+            sorted(
+                selected_combo_candidates,
+                key=lambda row: (
+                    float(row.get("weight_total_kg") or 0.0),
+                    int(row.get("option") or 0),
+                ),
+            )[0]
+            if selected_combo_candidates
+            else None
         )
+        if selected_combo is None:
+            raise AppError(
+                message=(
+                    f"La combinacion seleccionada no existe para la region {span_id}/{region_id} "
+                    f"(transversal='{selected_transverse_label}', longitudinal='{selected_longitudinal_label}')."
+                ),
+                status_code=422,
+                code="invalid_selection",
+            )
 
         best_weight = float(best.get("weight_total_kg") or 0.0)
-        selected_weight = float(selected_transverse.get("weight_kg") or 0.0) + float(
-            selected_longitudinal.get("weight_kg") or 0.0
-        )
+        selected_transverse_weight = float(selected_transverse.get("weight_kg") or 0.0)
+        selected_longitudinal_weight = float(selected_longitudinal.get("weight_kg") or 0.0)
+        combo_transverse_weight = selected_combo.get("weight_transverse_kg")
+        combo_longitudinal_weight = selected_combo.get("weight_longitudinal_kg")
+        combo_total_weight = selected_combo.get("weight_total_kg")
+        if combo_transverse_weight is not None:
+            selected_transverse_weight = float(combo_transverse_weight or 0.0)
+        if combo_longitudinal_weight is not None:
+            selected_longitudinal_weight = float(combo_longitudinal_weight or 0.0)
+        if combo_total_weight is not None:
+            selected_weight = float(combo_total_weight or 0.0)
+        else:
+            selected_weight = selected_transverse_weight + selected_longitudinal_weight
         diff_pct = ((selected_weight - best_weight) / best_weight * 100.0) if best_weight > 0 else None
 
         resolved_rows.append(
@@ -651,10 +742,14 @@ def save_job_selection_endpoint(
                 "best_longitudinal_label": best.get("longitudinal_label") or "",
                 "selected_transverse_label": selected_transverse_label,
                 "selected_longitudinal_label": selected_longitudinal_label,
+                "selected_base_longitudinal_label": str(selected_combo.get("base_longitudinal_label") or "").strip(),
+                "selected_additional_longitudinal_label": str(
+                    selected_combo.get("additional_longitudinal_label") or ""
+                ).strip(),
                 "best_weight_kg": best_weight,
                 "selected_weight_kg": selected_weight,
-                "selected_transverse_weight_kg": float(selected_transverse.get("weight_kg") or 0.0),
-                "selected_longitudinal_weight_kg": float(selected_longitudinal.get("weight_kg") or 0.0),
+                "selected_transverse_weight_kg": selected_transverse_weight,
+                "selected_longitudinal_weight_kg": selected_longitudinal_weight,
                 "difference_kg": selected_weight - best_weight,
                 "difference_pct": diff_pct,
             }

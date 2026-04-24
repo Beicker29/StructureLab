@@ -566,7 +566,13 @@ def _build_span_option_choices(region_rows: list[dict[str, Any]], max_items: int
             option_value = _as_int(option_row.get("option"))
             if option_value is None:
                 continue
-            by_option[option_value] = option_row
+            current = by_option.get(option_value)
+            current_weight = _as_non_negative_float((current or {}).get("weight_total_kg"))
+            option_weight = _as_non_negative_float(option_row.get("weight_total_kg"))
+            current_sort = current_weight if current_weight is not None else float("inf")
+            option_sort = option_weight if option_weight is not None else float("inf")
+            if current is None or option_sort < current_sort:
+                by_option[option_value] = option_row
         if not by_option:
             return []
         options_by_region.append(by_option)
@@ -595,6 +601,69 @@ def _build_span_option_choices(region_rows: list[dict[str, Any]], max_items: int
 
     output.sort(key=lambda item: (item["total_weight_kg"], item["option"]))
     return output[:max_items]
+
+
+def _expand_span_coupled_options(
+    *,
+    longitudinal_rows: list[dict[str, Any]],
+    transverse_options: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not longitudinal_rows:
+        return []
+    if not transverse_options:
+        return longitudinal_rows
+
+    long_sorted = sorted(
+        longitudinal_rows,
+        key=lambda item: (
+            item.get("weight_total_kg") if item.get("weight_total_kg") is not None else float("inf"),
+            item.get("option") if item.get("option") is not None else 999_999,
+        ),
+    )
+    trans_sorted = sorted(
+        transverse_options,
+        key=lambda item: (
+            _as_non_negative_float(item.get("weight_kg"))
+            if _as_non_negative_float(item.get("weight_kg")) is not None
+            else float("inf"),
+            _as_text(item.get("label")),
+        ),
+    )
+
+    expanded: list[dict[str, Any]] = []
+    for long_row in long_sorted:
+        long_weight = _resolve_region_longitudinal_weight_kg(
+            long_row,
+            _as_float(long_row.get("length_mm")),
+        )
+        long_option = _as_int(long_row.get("option"))
+        for trans_rank, trans in enumerate(trans_sorted, start=1):
+            label = _as_text(trans.get("label"))
+            if not label:
+                continue
+            trans_weight = float(_as_non_negative_float(trans.get("weight_kg")) or 0.0)
+            item = dict(long_row)
+            item["option"] = long_option
+            item["longitudinal_option"] = long_option
+            item["transverse_option_rank"] = trans_rank
+            item["transverse_label"] = label
+            item["stirrup_count"] = _as_non_negative_int(trans.get("stirrup_count"))
+            item["stirrup_unit_weight_kg"] = _as_non_negative_float(trans.get("stirrup_unit_weight_kg"))
+            item["weight_transverse_kg"] = trans_weight
+            item["weight_longitudinal_kg"] = long_weight
+            item["weight_total_kg"] = trans_weight + long_weight
+            expanded.append(item)
+
+    if not expanded:
+        return long_sorted
+    expanded.sort(
+        key=lambda item: (
+            item.get("weight_total_kg") if item.get("weight_total_kg") is not None else float("inf"),
+            item.get("option") if item.get("option") is not None else 999_999,
+            item.get("transverse_option_rank") if item.get("transverse_option_rank") is not None else 999_999,
+        )
+    )
+    return expanded
 
 
 def _build_span_longitudinal_base_options(
@@ -713,60 +782,99 @@ def _build_span_longitudinal_option_sets(
             continue
 
         regions_payload: list[dict[str, Any]] = []
+        total_weight = 0.0
+        total_transverse = 0.0
         total_longitudinal = 0.0
         total_base = 0.0
         total_additional = 0.0
         feasible = True
+        option_candidates: list[int] = []
 
         for row in coupled_rows:
             region_id = _as_text(row.get("region_id"))
-            by_base = row.get("additional_options_by_base") if isinstance(row.get("additional_options_by_base"), dict) else {}
-            add_options = by_base.get(base_value) if isinstance(by_base, dict) else None
-            if not isinstance(add_options, list) or not add_options:
+            region_length_mm = _as_float(row.get("length_mm"))
+            options = row.get("options") if isinstance(row.get("options"), list) else []
+            base_rows = [
+                option_row
+                for option_row in options
+                if (_as_text(option_row.get("base_longitudinal_label")) or "no se requiere") == base_label
+            ]
+            if not base_rows:
                 feasible = False
                 break
 
-            best_add = sorted(
-                add_options,
+            best_row = sorted(
+                base_rows,
                 key=lambda item: (
-                    _as_non_negative_float(item.get("weight_longitudinal_total_kg"))
-                    if _as_non_negative_float(item.get("weight_longitudinal_total_kg")) is not None
+                    _as_non_negative_float(item.get("weight_total_kg"))
+                    if _as_non_negative_float(item.get("weight_total_kg")) is not None
                     else float("inf"),
-                    _as_non_negative_float(item.get("weight_kg"))
-                    if _as_non_negative_float(item.get("weight_kg")) is not None
+                    _as_non_negative_float(item.get("weight_transverse_kg"))
+                    if _as_non_negative_float(item.get("weight_transverse_kg")) is not None
+                    else float("inf"),
+                    _as_non_negative_float(item.get("weight_additional_kg"))
+                    if _as_non_negative_float(item.get("weight_additional_kg")) is not None
                     else float("inf"),
                     _as_int(item.get("option")) if _as_int(item.get("option")) is not None else 999_999,
                 ),
             )[0]
 
-            long_w = float(_as_non_negative_float(best_add.get("weight_longitudinal_total_kg")) or 0.0)
-            base_w = float(_as_non_negative_float(best_add.get("weight_base_region_kg")) or 0.0)
-            add_w = float(_as_non_negative_float(best_add.get("weight_kg")) or 0.0)
+            trans_w = float(_as_non_negative_float(best_row.get("weight_transverse_kg")) or 0.0)
+            long_w = float(_as_non_negative_float(best_row.get("weight_longitudinal_kg")) or 0.0)
+            if long_w <= 0.0:
+                long_w = _resolve_region_longitudinal_weight_kg(best_row, region_length_mm)
+            total_w = _as_non_negative_float(best_row.get("weight_total_kg"))
+            if total_w is None:
+                total_w = trans_w + long_w
+            else:
+                total_w = float(total_w)
 
+            base_w = _as_non_negative_float(best_row.get("weight_base_kg"))
+            if base_w is None:
+                base_w = _longitudinal_weight_from_arrangement(
+                    _as_text(best_row.get("base_long_bar")),
+                    _as_int(best_row.get("base_long_count")),
+                    region_length_mm,
+                )
+            add_w = _as_non_negative_float(best_row.get("weight_additional_kg"))
+            if add_w is None:
+                add_w = max(float(long_w) - float(base_w or 0.0), 0.0)
+            option_value = _as_int(best_row.get("option"))
+            if option_value is not None:
+                option_candidates.append(option_value)
+
+            total_weight += float(total_w)
+            total_transverse += float(trans_w)
             total_longitudinal += long_w
-            total_base += base_w
-            total_additional += add_w
+            total_base += float(base_w or 0.0)
+            total_additional += float(add_w or 0.0)
             regions_payload.append(
                 {
                     "region_id": region_id,
-                    "additional_label": _as_text(best_add.get("label")) or "no se requiere",
-                    "longitudinal_label": _as_text(best_add.get("longitudinal_label")) or "no se requiere",
-                    "weight_longitudinal_kg": long_w,
-                    "weight_base_region_kg": base_w,
-                    "weight_additional_kg": add_w,
+                    "transverse_label": _as_text(best_row.get("transverse_label")),
+                    "additional_label": _as_text(best_row.get("additional_longitudinal_label")) or "no se requiere",
+                    "longitudinal_label": _as_text(best_row.get("longitudinal_label")) or "no se requiere",
+                    "weight_total_kg": float(total_w),
+                    "weight_transverse_kg": float(trans_w),
+                    "weight_longitudinal_kg": float(long_w),
+                    "weight_base_region_kg": float(base_w or 0.0),
+                    "weight_additional_kg": float(add_w or 0.0),
+                    "option": option_value,
                 }
             )
 
         if not feasible or not regions_payload:
             continue
 
-        option_value = _as_int(base.get("option"))
+        option_value = min(option_candidates) if option_candidates else _as_int(base.get("option"))
         sets.append(
             {
                 "value": f"longset_{base_value}",
                 "option": option_value,
                 "base_label": base_label,
                 "base_value": base_value,
+                "total_weight_kg": float(total_weight),
+                "total_transverse_weight_kg": float(total_transverse),
                 "total_longitudinal_weight_kg": float(total_longitudinal),
                 "total_base_weight_kg": float(total_base),
                 "total_additional_weight_kg": float(total_additional),
@@ -777,6 +885,7 @@ def _build_span_longitudinal_option_sets(
     sets.sort(
         key=lambda item: (
             item["total_longitudinal_weight_kg"],
+            item.get("total_weight_kg") if item.get("total_weight_kg") is not None else float("inf"),
             item.get("option") if item.get("option") is not None else 999_999,
             item.get("base_label") or "",
         )
@@ -785,6 +894,128 @@ def _build_span_longitudinal_option_sets(
         item["rank"] = index
 
     return sets[:max_items]
+
+
+def _resolve_span_default_selection(span_row: dict[str, Any]) -> tuple[dict[str, Any], float]:
+    span_id = _as_text(span_row.get("span_id")) or "S1"
+    regions = span_row.get("regions") if isinstance(span_row.get("regions"), list) else []
+    span_total_weight = 0.0
+    span_default: dict[str, Any] = {
+        "span_id": span_id,
+        "longitudinal_mode": (
+            _as_text((regions[0] if regions else {}).get("longitudinal_mode")) if regions else ""
+        ),
+        "span_option_set_value": None,
+        "base_value": None,
+        "base_label": None,
+        "regions": [],
+    }
+    if not regions:
+        return span_default, span_total_weight
+
+    is_span_coupled = any(_as_text(region.get("longitudinal_mode")).lower() == "span_coupled" for region in regions)
+    span_sets = (
+        span_row.get("span_longitudinal_option_sets")
+        if isinstance(span_row.get("span_longitudinal_option_sets"), list)
+        else []
+    )
+    base_options = (
+        span_row.get("longitudinal_base_options")
+        if isinstance(span_row.get("longitudinal_base_options"), list)
+        else []
+    )
+    best_set_by_total = (
+        min(
+            span_sets,
+            key=lambda item: (
+                _as_non_negative_float(item.get("total_weight_kg"))
+                if _as_non_negative_float(item.get("total_weight_kg")) is not None
+                else float("inf"),
+                _as_non_negative_float(item.get("total_longitudinal_weight_kg"))
+                if _as_non_negative_float(item.get("total_longitudinal_weight_kg")) is not None
+                else float("inf"),
+            ),
+        )
+        if is_span_coupled and span_sets
+        else None
+    )
+    set_region_map: dict[str, dict[str, Any]] = {}
+    if isinstance(best_set_by_total, dict):
+        for item in best_set_by_total.get("regions") or []:
+            region_id = _as_text((item or {}).get("region_id"))
+            if not region_id:
+                continue
+            set_region_map[region_id] = item or {}
+        span_default["span_option_set_value"] = _as_text(best_set_by_total.get("value")) or None
+        span_default["base_label"] = _as_text(best_set_by_total.get("base_label")) or None
+        span_default["base_value"] = _as_text(best_set_by_total.get("base_value")) or None
+        if not span_default["base_value"] and span_default["base_label"]:
+            matched_base = next(
+                (
+                    item
+                    for item in base_options
+                    if _as_text(item.get("base_label")) == _as_text(span_default.get("base_label"))
+                ),
+                None,
+            )
+            span_default["base_value"] = _as_text((matched_base or {}).get("value")) or None
+
+    for region in regions:
+        region_id = _as_text(region.get("region_id"))
+        options = region.get("options") if isinstance(region.get("options"), list) else []
+        if not region_id or not options:
+            continue
+
+        selected_row: dict[str, Any] | None = None
+        if set_region_map:
+            set_row = set_region_map.get(region_id) or {}
+            selected_row = next(
+                (
+                    row
+                    for row in options
+                    if _norm_match(_as_text(row.get("transverse_label")))
+                    == _norm_match(_as_text(set_row.get("transverse_label")))
+                    and _norm_match(_as_text(row.get("longitudinal_label")))
+                    == _norm_match(_as_text(set_row.get("longitudinal_label")))
+                    and _norm_match(_as_text(row.get("base_longitudinal_label")))
+                    == _norm_match(_as_text(span_default.get("base_label")))
+                    and _norm_match(_as_text(row.get("additional_longitudinal_label")))
+                    == _norm_match(_as_text(set_row.get("additional_label")))
+                ),
+                None,
+            )
+        if selected_row is None:
+            selected_row = min(
+                options,
+                key=lambda row: (
+                    _as_non_negative_float(row.get("weight_total_kg"))
+                    if _as_non_negative_float(row.get("weight_total_kg")) is not None
+                    else float("inf"),
+                    _as_int(row.get("option")) if _as_int(row.get("option")) is not None else 999_999,
+                ),
+            )
+
+        weight_total = float(_as_non_negative_float(selected_row.get("weight_total_kg")) or 0.0)
+        span_total_weight += weight_total
+        span_default["regions"].append(
+            {
+                "region_id": region_id,
+                "option": _as_int(selected_row.get("option")),
+                "transverse_label": _as_text(selected_row.get("transverse_label")),
+                "longitudinal_label": _as_text(selected_row.get("longitudinal_label")),
+                "base_longitudinal_label": _as_text(selected_row.get("base_longitudinal_label")) or "no se requiere",
+                "additional_longitudinal_label": (
+                    _as_text(selected_row.get("additional_longitudinal_label")) or "no se requiere"
+                ),
+                "weight_total_kg": weight_total,
+                "weight_transverse_kg": float(_as_non_negative_float(selected_row.get("weight_transverse_kg")) or 0.0),
+                "weight_longitudinal_kg": float(
+                    _as_non_negative_float(selected_row.get("weight_longitudinal_kg")) or 0.0
+                ),
+            }
+        )
+
+    return span_default, span_total_weight
 
 
 def _build_region_additional_options_by_base(
@@ -896,6 +1127,27 @@ def _build_span_preview(
                 sorted_schedule_rows,
                 max_items=10,
             )
+        if (longitudinal_mode or "").lower() == "span_coupled":
+            schedule_options = _expand_span_coupled_options(
+                longitudinal_rows=schedule_options,
+                transverse_options=transverse_options,
+            )
+            if schedule_options:
+                if schedule_row is not None:
+                    matched_selected = next(
+                        (
+                            row
+                            for row in schedule_options
+                            if _norm_match(_as_text(row.get("transverse_label")))
+                            == _norm_match(_as_text(schedule_row.get("transverse_label")))
+                            and _norm_match(_as_text(row.get("longitudinal_label")))
+                            == _norm_match(_as_text(schedule_row.get("longitudinal_label")))
+                        ),
+                        None,
+                    )
+                    schedule_row = matched_selected or schedule_options[0]
+                else:
+                    schedule_row = schedule_options[0]
         longitudinal_options = _build_component_options(
             sorted_schedule_rows,
             label_key="longitudinal_label",
@@ -1060,6 +1312,26 @@ def _build_span_preview(
         region_rows,
         longitudinal_base_options,
     )
+    default_longitudinal_set_value: str | None = None
+    default_longitudinal_base_value: str | None = None
+    if span_longitudinal_option_sets:
+        best_set_by_total = min(
+            span_longitudinal_option_sets,
+            key=lambda item: (
+                _as_non_negative_float(item.get("total_weight_kg"))
+                if _as_non_negative_float(item.get("total_weight_kg")) is not None
+                else float("inf"),
+                _as_non_negative_float(item.get("total_longitudinal_weight_kg"))
+                if _as_non_negative_float(item.get("total_longitudinal_weight_kg")) is not None
+                else float("inf"),
+            ),
+        )
+        default_longitudinal_set_value = _as_text(best_set_by_total.get("value")) or None
+        default_longitudinal_base_value = _as_text(best_set_by_total.get("base_value")) or None
+    if not default_longitudinal_base_value:
+        default_longitudinal_base_value = (
+            _as_text(longitudinal_base_options[0].get("value")) if longitudinal_base_options else None
+        )
 
     span_length_mm = int(round(sum(region_lengths))) if region_lengths else int(span_default_length_mm)
     if not region_rows and clear_length_mm is None:
@@ -1078,9 +1350,9 @@ def _build_span_preview(
         "d_mm": int(round(span_d_mm)) if span_d_mm is not None else None,
         "is_deep_beam": is_deep_beam,
         "longitudinal_base_options": longitudinal_base_options,
-        "default_longitudinal_base_value": (longitudinal_base_options[0]["value"] if longitudinal_base_options else None),
+        "default_longitudinal_base_value": default_longitudinal_base_value,
         "span_longitudinal_option_sets": span_longitudinal_option_sets,
-        "default_longitudinal_option_set_value": (span_longitudinal_option_sets[0]["value"] if span_longitudinal_option_sets else None),
+        "default_longitudinal_option_set_value": default_longitudinal_set_value,
         "span_option_choices": _build_span_option_choices(region_rows),
         "regions": region_rows,
     }
@@ -1119,6 +1391,12 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
         )
         for span in spans
     ]
+    default_spans: list[dict[str, Any]] = []
+    optimal_beam_weight_kg = 0.0
+    for span_row in span_rows:
+        span_default, span_weight = _resolve_span_default_selection(span_row)
+        default_spans.append(span_default)
+        optimal_beam_weight_kg += float(span_weight or 0.0)
 
     total_span_mm = sum(span_row.get("length_mm", 0) for span_row in span_rows)
     total_support_mm = sum(
@@ -1149,6 +1427,11 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
             "height_mm": beam.get("height_mm") or (beam_height_from_spans or None),
         },
         "spans": span_rows,
+        "optimal_beam_weight_kg": float(optimal_beam_weight_kg),
+        "default_selection": {
+            "spans": default_spans,
+            "total_weight_kg": float(optimal_beam_weight_kg),
+        },
         "total_span_mm": int(round(total_span_mm)),
         "total_support_mm": int(round(total_support_mm)),
         "total_system_mm": int(round(total_span_mm + total_support_mm)),

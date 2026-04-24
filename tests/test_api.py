@@ -453,6 +453,12 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(payload["job_id"], job_id)
         self.assertIn("spans", payload)
         self.assertTrue(payload["spans"])
+        self.assertIn("optimal_beam_weight_kg", payload)
+        self.assertGreaterEqual(float(payload.get("optimal_beam_weight_kg") or 0.0), 0.0)
+        self.assertIn("default_selection", payload)
+        self.assertIsInstance(payload["default_selection"], dict)
+        self.assertIn("spans", payload["default_selection"])
+        self.assertTrue(payload["default_selection"]["spans"])
         first_span = payload["spans"][0]
         self.assertIn("regions", first_span)
         self.assertTrue(first_span["regions"])
@@ -636,7 +642,7 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(save_response.status_code, 200, save_response.text)
 
-    def test_save_job_selection_accepts_transverse_label_exposed_by_preview(self) -> None:
+    def test_save_job_selection_rejects_transverse_label_without_exact_combo(self) -> None:
         preview_payload = {
             "job_id": "fake_job",
             "spans": [
@@ -650,6 +656,8 @@ class ApiTests(unittest.TestCase):
                                     "option": 1,
                                     "transverse_label": "1E #3 @ 100 mm",
                                     "longitudinal_label": "4 x #4",
+                                    "base_longitudinal_label": "4 x #4",
+                                    "additional_longitudinal_label": "no se requiere",
                                     "weight_total_kg": 10.0,
                                     "weight_transverse_kg": 4.0,
                                     "weight_longitudinal_kg": 6.0,
@@ -681,10 +689,7 @@ class ApiTests(unittest.TestCase):
             ],
         }
 
-        with patch("app.routers.jobs.build_job_preview_payload", return_value=preview_payload), patch(
-            "app.routers.jobs.save_selected_options_report",
-            return_value={"artifact_name": "selected_reinforcement_comparison.xlsx", "saved_regions": 1},
-        ):
+        with patch("app.routers.jobs.build_job_preview_payload", return_value=preview_payload):
             response = self.client.post(
                 "/v1/jobs/fake_job/selection",
                 json={
@@ -699,9 +704,9 @@ class ApiTests(unittest.TestCase):
                 },
             )
 
-        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.status_code, 422, response.text)
         payload = response.json()
-        self.assertEqual(payload["artifact_name"], "selected_reinforcement_comparison.xlsx")
+        self.assertEqual(payload["error"], "invalid_selection")
 
     def test_save_job_selection_rejects_invalid_span_option(self) -> None:
         job_id = self._create_job()
@@ -989,11 +994,38 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(set_weights, sorted(set_weights))
             default_set_value = first_span.get("default_longitudinal_option_set_value")
             self.assertTrue(any(str(item.get("value")) == str(default_set_value) for item in span_long_sets))
+            best_total = min(float(item.get("total_weight_kg") or 0.0) for item in span_long_sets)
+            default_item = next(
+                (item for item in span_long_sets if str(item.get("value")) == str(default_set_value)),
+                None,
+            )
+            self.assertIsNotNone(default_item)
+            self.assertAlmostEqual(float(default_item.get("total_weight_kg") or 0.0), best_total, places=3)
             for item in span_long_sets:
                 regions_map = item.get("regions", [])
                 self.assertIsInstance(regions_map, list)
                 self.assertTrue(regions_map)
                 self.assertTrue(all(str(region.get("region_id") or "").strip() for region in regions_map))
+                total_regions_sum = sum(float(region.get("weight_total_kg") or 0.0) for region in regions_map)
+                self.assertAlmostEqual(float(item.get("total_weight_kg") or 0.0), total_regions_sum, places=3)
+                self.assertGreaterEqual(
+                    float(item.get("total_weight_kg") or 0.0),
+                    float(item.get("total_longitudinal_weight_kg") or 0.0),
+                )
+                self.assertTrue(all(str(region.get("transverse_label") or "").strip() for region in regions_map))
+        default_selection = preview_payload.get("default_selection", {})
+        self.assertIsInstance(default_selection, dict)
+        default_spans = default_selection.get("spans", [])
+        self.assertTrue(default_spans)
+        default_total = sum(
+            sum(float(region.get("weight_total_kg") or 0.0) for region in (span.get("regions") or []))
+            for span in default_spans
+        )
+        self.assertAlmostEqual(
+            float(preview_payload.get("optimal_beam_weight_kg") or 0.0),
+            default_total,
+            places=3,
+        )
 
         regions = first_span.get("regions", [])
         self.assertTrue(regions)
