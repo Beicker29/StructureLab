@@ -72,6 +72,60 @@ rules:
     tested: true
     test_file: tests/test_phase2_aci_engine.py
     notes: Maximum spacing component 300 mm; inactive torsion is NOT_APPLICABLE.
+  - rule_id: ACI318_25_9_7_6_4_2_TRANSVERSE_SIZE
+    module: rc_shear_torsion.codes.aci318_25.ties
+    function: check_transverse_reinforcement_size
+    aci_section: "9.7.6.4.2"
+    applicability: Longitudinal compression reinforcement is required by design.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase3_longitudinal_detailing.py
+    notes: No. 10 encloses individual No. 32 or smaller bars; No. 13 encloses individual No. 36 or larger bars. Bundled longitudinal bars are outside module scope.
+  - rule_id: ACI318_25_9_7_6_4_3_SIXTEEN_DB_LONGITUDINAL
+    module: rc_shear_torsion.codes.aci318_25.ties
+    function: tie_rule_checks
+    aci_section: "9.7.6.4.3(a)"
+    applicability: Longitudinal compression reinforcement is required by design.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase3_longitudinal_detailing.py
+    notes: Maximum spacing component 16 times the individual longitudinal-bar diameter.
+  - rule_id: ACI318_25_9_7_6_4_3_FORTY_EIGHT_DB_TRANSVERSE
+    module: rc_shear_torsion.codes.aci318_25.ties
+    function: tie_rule_checks
+    aci_section: "9.7.6.4.3(b)"
+    applicability: Longitudinal compression reinforcement is required by design.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase3_longitudinal_detailing.py
+    notes: Maximum spacing component 48 times the transverse reinforcing-bar diameter.
+  - rule_id: ACI318_25_9_7_6_4_3_LEAST_BEAM_DIMENSION
+    module: rc_shear_torsion.codes.aci318_25.ties
+    function: tie_rule_checks
+    aci_section: "9.7.6.4.3(c)"
+    applicability: Longitudinal compression reinforcement is required by design.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase3_longitudinal_detailing.py
+    notes: Maximum spacing component is the least beam dimension.
+  - rule_id: ACI318_25_9_7_6_4_4_LONGITUDINAL_BAR_ARRANGEMENT
+    module: rc_shear_torsion.codes.aci318_25.ties
+    function: tie_rule_checks
+    aci_section: "9.7.6.4.4"
+    applicability: Longitudinal compression reinforcement is required by design.
+    implemented: false
+    tested: true
+    test_file: tests/test_phase3_longitudinal_detailing.py
+    notes: NOT_EVALUATED when applicable; longitudinal bar count and transverse arrangement are outside current scope.
+  - rule_id: ACI318_25_18_6_4_2_LATERAL_SUPPORT
+    module: rc_shear_torsion.codes.aci318_25.ties
+    function: tie_rule_checks
+    aci_section: "18.6.4.2 and 25.7.2.3"
+    applicability: DES region where hoops or closed stirrups are required by 18.6.4.1.
+    implemented: false
+    tested: true
+    test_file: tests/test_phase3_longitudinal_detailing.py
+    notes: NOT_EVALUATED; longitudinal bar positions, supported bars, crossties, and clear distances are outside current scope.
   - rule_id: ACI318_25_18_4_2_4_D_OVER_4
     module: rc_shear_torsion.codes.aci318_25.seismic
     function: seismic_spacing_limits
@@ -108,6 +162,26 @@ rules:
     tested: true
     test_file: tests/test_phase2_aci_engine.py
     notes: Corrected maximum spacing component is 300 mm, not 150 mm.
+  - rule_id: ACI318_25_18_4_2_4_END_ZONE_LENGTH
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: check_seismic_transverse_zone_extent
+    aci_section: "18.4.2.4"
+    applicability: DMO confined region at either beam end, measured from the face of the supporting member toward midspan.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    test_name: test_dmo_end_zone_length_passes_when_two_h_is_provided
+    notes: Minimum extent is 2h, using total beam height; missing actual region length is NOT_EVALUATED.
+  - rule_id: ACI318_25_18_4_2_4_FIRST_TRANSVERSE_LOCATION
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: check_first_seismic_transverse_reinforcement_location
+    aci_section: "18.4.2.4"
+    applicability: DMO confined region at either beam end.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    test_name: test_dmo_first_stirrup_at_limit_passes
+    notes: Maximum distance from the supporting-member face is 50 mm; missing actual position is NOT_EVALUATED.
   - rule_id: ACI318_25_18_4_2_5_D_OVER_2
     module: rc_shear_torsion.codes.aci318_25.seismic
     function: seismic_spacing_limits
@@ -117,6 +191,36 @@ rules:
     tested: true
     test_file: tests/test_phase2_aci_engine.py
     notes: Maximum transverse reinforcement spacing d/2.
+  - rule_id: ACI318_25_18_6_4_1_A_END_ZONE_LENGTH
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: check_seismic_transverse_zone_extent
+    aci_section: "18.6.4.1(a)"
+    applicability: DES region at either beam end, measured from the face of the supporting column toward midspan.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    test_name: test_des_beam_end_region_is_identified_and_checked
+    notes: Minimum extent is 2h, using total beam height; an explicit BEAM_END basis and actual region length are required.
+  - rule_id: ACI318_25_18_6_4_1_B_YIELD_ZONE_EXTENSION
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: check_seismic_transverse_zone_extent
+    aci_section: "18.6.4.1(b)"
+    applicability: DES section where inelastic flexural yielding is likely due to lateral displacement beyond the elastic range.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    test_name: test_des_probable_yielding_region_checks_two_h_on_each_side
+    notes: Minimum extension is 2h on each side, using total beam height; missing region basis or side extensions is NOT_EVALUATED.
+  - rule_id: ACI318_25_18_6_4_4_FIRST_TRANSVERSE_LOCATION
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: check_first_seismic_transverse_reinforcement_location
+    aci_section: "18.6.4.4"
+    applicability: DES beam-end region at the face of a supporting column.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    test_name: test_des_first_hoop_at_limit_passes
+    notes: Maximum distance from the supporting-column face is 50 mm; missing actual position is NOT_EVALUATED.
   - rule_id: ACI318_25_18_6_4_4_D_OVER_4
     module: rc_shear_torsion.codes.aci318_25.seismic
     function: seismic_spacing_limits

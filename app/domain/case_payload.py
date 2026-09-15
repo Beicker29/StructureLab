@@ -5,6 +5,7 @@ from typing import Any
 from app.core.errors import DomainValidationAppError, InvalidUploadError
 from rc_shear_torsion.domain.errors import DomainValidationError
 from rc_shear_torsion.domain.validation import validate_case_payload
+from rc_shear_torsion.models import BAR_DIAMETERS_MM
 
 
 def _to_non_negative_support(value: Any) -> float:
@@ -51,7 +52,8 @@ def _build_default_regions(
     span_width_mm: float,
     span_height_mm: float,
     span_d_mm: float,
-    db_bar: str,
+    span_d_source: str,
+    span_d_ratio: float,
     min_branches_c: int,
     min_branches_nc: int,
 ) -> list[dict[str, Any]]:
@@ -63,7 +65,8 @@ def _build_default_regions(
             "to": ratio,
             "type": "C",
             "d_mm": span_d_mm,
-            "db_bar": db_bar,
+            "d_source": span_d_source,
+            "d_ratio": span_d_ratio,
             "min_branches": min_branches_c,
             "width_mm": span_width_mm,
             "height_mm": span_height_mm,
@@ -74,7 +77,8 @@ def _build_default_regions(
             "to": middle_to,
             "type": "NC",
             "d_mm": span_d_mm,
-            "db_bar": db_bar,
+            "d_source": span_d_source,
+            "d_ratio": span_d_ratio,
             "min_branches": min_branches_nc,
             "width_mm": span_width_mm,
             "height_mm": span_height_mm,
@@ -85,7 +89,8 @@ def _build_default_regions(
             "to": 1.0,
             "type": "C",
             "d_mm": span_d_mm,
-            "db_bar": db_bar,
+            "d_source": span_d_source,
+            "d_ratio": span_d_ratio,
             "min_branches": min_branches_c,
             "width_mm": span_width_mm,
             "height_mm": span_height_mm,
@@ -99,7 +104,8 @@ def _build_regions_for_span(
     span_width_mm: float,
     span_height_mm: float,
     span_d_mm: float,
-    db_bar: str,
+    span_d_source: str,
+    span_d_ratio: float,
     min_branches_c: int,
     min_branches_nc: int,
     region_c_ratio: float,
@@ -110,7 +116,8 @@ def _build_regions_for_span(
             span_width_mm=span_width_mm,
             span_height_mm=span_height_mm,
             span_d_mm=span_d_mm,
-            db_bar=db_bar,
+            span_d_source=span_d_source,
+            span_d_ratio=span_d_ratio,
             min_branches_c=min_branches_c,
             min_branches_nc=min_branches_nc,
         )
@@ -120,22 +127,26 @@ def _build_regions_for_span(
         output_regions: list[dict[str, Any]] = []
         for region in configured_regions:
             region_type = str(region["type"]).upper()
+            has_explicit_d = region.get("d_mm") is not None
             min_branches_value = region.get("min_branches")
             if min_branches_value is None:
                 min_branches_value = min_branches_c if region_type == "C" else min_branches_nc
-            output_regions.append(
-                {
+            region_payload = {
                     "id": region["id"],
                     "from": region["from"],
                     "to": region["to"],
                     "type": region_type,
                     "d_mm": region.get("d_mm") if region.get("d_mm") is not None else span_d_mm,
-                    "db_bar": region.get("db_bar") if region.get("db_bar") else db_bar,
+                    "d_source": "EXPLICIT" if has_explicit_d else span_d_source,
+                    "d_ratio": None if has_explicit_d else span_d_ratio,
                     "min_branches": min_branches_value,
                     "width_mm": region.get("width_mm") if region.get("width_mm") is not None else span_width_mm,
                     "height_mm": region.get("height_mm") if region.get("height_mm") is not None else span_height_mm,
                 }
-            )
+            if region.get("db_bar"):
+                # Compatibility boundary for legacy region-level cases.
+                region_payload["db_bar"] = region["db_bar"]
+            output_regions.append(region_payload)
         return output_regions
 
     ratio = span_meta.get("c_ratio_extremos")
@@ -147,7 +158,8 @@ def _build_regions_for_span(
         span_width_mm=span_width_mm,
         span_height_mm=span_height_mm,
         span_d_mm=span_d_mm,
-        db_bar=db_bar,
+        span_d_source=span_d_source,
+        span_d_ratio=span_d_ratio,
         min_branches_c=min_branches_c,
         min_branches_nc=min_branches_nc,
     )
@@ -177,6 +189,7 @@ def build_validated_case_payload(
     span_layout: list[dict[str, Any]] | None,
     optimization_payload: dict[str, Any],
     span_dimensions_by_pair: dict[tuple[str, str, str], tuple[float, float]] | None = None,
+    compression_rebar_required: bool = False,
 ) -> dict[str, Any]:
     normalized_case_name = case_name.strip() or "case_from_form"
     normalized_sheet_name = sheet_name.strip()
@@ -192,6 +205,9 @@ def build_validated_case_payload(
             raise InvalidUploadError("height_mm debe ser > 0 para inferir d_ratio_default")
         d_ratio_default = d_mm / height_mm
     default_d_ratio = _to_positive_ratio(d_ratio_default, field_name="d_ratio_default")
+    if db_bar not in BAR_DIAMETERS_MM:
+        raise InvalidUploadError("db_bar no es una barra longitudinal soportada")
+    default_longitudinal_bar_diameter_mm = BAR_DIAMETERS_MM[db_bar]
 
     span_layout_by_id: dict[str, dict[str, Any]] = {}
     if span_layout:
@@ -213,22 +229,37 @@ def build_validated_case_payload(
         span_width_mm, span_height_mm = pair_dimensions.get(pair_key, (float(width_mm), float(height_mm)))
 
         span_d_ratio_raw = span_meta.get("d_ratio") if span_meta else None
+        span_d_source = "DEFAULT_RATIO" if span_d_ratio_raw is None else "SPAN_RATIO"
         span_d_ratio = _to_positive_ratio(
             default_d_ratio if span_d_ratio_raw is None else span_d_ratio_raw,
             field_name=f"d_ratio vano {span_id}",
         )
         span_d_mm = span_height_mm * span_d_ratio
+        span_longitudinal_bar_diameter_mm = (
+            span_meta.get("longitudinal_bar_diameter_mm")
+            if span_meta and span_meta.get("longitudinal_bar_diameter_mm") is not None
+            else default_longitudinal_bar_diameter_mm
+        )
+        span_compression_rebar_required = (
+            span_meta.get("compression_rebar_required")
+            if span_meta and span_meta.get("compression_rebar_required") is not None
+            else compression_rebar_required
+        )
 
         span_payload: dict[str, Any] = {
             "id": span_id,
             "seismic": pair["seismic"],
             "gravity": pair["gravity"],
+            "longitudinal_bar_diameter_mm": span_longitudinal_bar_diameter_mm,
+            "compression_rebar_required": bool(span_compression_rebar_required),
+            "longitudinal_bars_bundled": False,
             "regions": _build_regions_for_span(
                 span_meta=span_meta,
                 span_width_mm=span_width_mm,
                 span_height_mm=span_height_mm,
                 span_d_mm=span_d_mm,
-                db_bar=db_bar,
+                span_d_source=span_d_source,
+                span_d_ratio=span_d_ratio,
                 min_branches_c=min_branches_c,
                 min_branches_nc=min_branches_nc,
                 region_c_ratio=region_c_ratio,
@@ -258,7 +289,6 @@ def build_validated_case_payload(
             {
                 "beam_id": normalized_beam_id,
                 "detailing": detailing,
-                "compression_rebar_required": False,
                 "cover_side_mm": cover_side_mm,
                 "cover_top_mm": cover_top_mm,
                 "cover_bottom_mm": cover_bottom_mm,

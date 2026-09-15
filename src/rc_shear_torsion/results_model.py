@@ -36,7 +36,7 @@ class CanonicalRegionResult:
     at: float
     at_over_s: float
     av_over_s: float
-    long_bar: str
+    long_bar: str | None
     long_count: int
     long_provided_mm2: float
     base_long_bar: str | None
@@ -64,6 +64,16 @@ class CanonicalRegionResult:
     longitudinal_governing_source: str | None = None
     longitudinal_governing_station: float | None = None
     scenario_count: int = 0
+    governing_code_rule: str | None = None
+    governing_code_limit_mm: float | None = None
+    governing_demand_check: str | None = None
+    governing_demand_spacing_limit_mm: float | None = None
+    governing_demand_source: str | None = None
+    governing_demand_station_mm: float | None = None
+    governing_project_spacing_limit_mm: float | None = None
+    d_mm: float | None = None
+    d_source: str | None = None
+    d_ratio: float | None = None
 
 
 def _longitudinal_provided_mm2(result: RegionDesignResult) -> float:
@@ -146,6 +156,16 @@ def to_canonical_region_result(result: RegionDesignResult) -> CanonicalRegionRes
         longitudinal_governing_source=result.longitudinal_governing_source,
         longitudinal_governing_station=result.longitudinal_governing_station,
         scenario_count=result.scenario_count,
+        governing_code_rule=result.governing_code_rule,
+        governing_code_limit_mm=result.governing_code_limit_mm,
+        governing_demand_check=result.governing_demand_check,
+        governing_demand_spacing_limit_mm=result.governing_demand_spacing_limit_mm,
+        governing_demand_source=result.governing_demand_source,
+        governing_demand_station_mm=result.governing_demand_station_mm,
+        governing_project_spacing_limit_mm=result.governing_project_spacing_limit_mm,
+        d_mm=result.d_mm,
+        d_source=result.d_source,
+        d_ratio=result.d_ratio,
     )
 
 

@@ -110,7 +110,7 @@ def _evaluate_longitudinal_region(
 
     needs_longitudinal = requires_longitudinal_design(demand)
     if not needs_longitudinal:
-        return True, "no se requiere", provided, 0, None
+        return True, "no se requiere", 0.0, 0, None
 
     failing_scenario = next(
         (scenario for scenario in demand.scenarios if scenario.t_longitudinal_mm2 > provided),
@@ -207,16 +207,26 @@ def _region_result_from_state(
             spacing_mm,
         )
 
-    long_weight_kg_per_m = bar_mass_kg_per_m(span_candidate.base_long_bar, span_candidate.base_long_count) + bar_mass_kg_per_m(state.extra_long_bar, state.extra_long_count)
+    needs_longitudinal = requires_longitudinal_design(demand)
+    long_weight_kg_per_m = (
+        bar_mass_kg_per_m(span_candidate.base_long_bar, span_candidate.base_long_count)
+        + bar_mass_kg_per_m(state.extra_long_bar, state.extra_long_count)
+        if needs_longitudinal
+        else 0.0
+    )
     long_region_weight_kg = long_weight_kg_per_m * region_length_m
 
-    base_bar = span_candidate.base_long_bar if span_candidate.base_long_count > 0 else None
-    base_count = span_candidate.base_long_count if span_candidate.base_long_count > 0 else None
-    extra_bar = state.extra_long_bar if state.extra_long_count > 0 else None
-    extra_count = state.extra_long_count if state.extra_long_count > 0 else None
+    base_bar = span_candidate.base_long_bar if needs_longitudinal and span_candidate.base_long_count > 0 else None
+    base_count = span_candidate.base_long_count if needs_longitudinal and span_candidate.base_long_count > 0 else None
+    extra_bar = state.extra_long_bar if needs_longitudinal and state.extra_long_count > 0 else None
+    extra_count = state.extra_long_count if needs_longitudinal and state.extra_long_count > 0 else None
 
-    effective_long_count = max(0, span_candidate.base_long_count) + max(0, state.extra_long_count)
-    effective_long_bar = ""
+    effective_long_count = (
+        max(0, span_candidate.base_long_count) + max(0, state.extra_long_count)
+        if needs_longitudinal
+        else 0
+    )
+    effective_long_bar: str | None = None
     if effective_long_count > 0:
         effective_long_bar = span_candidate.base_long_bar if span_candidate.base_long_count > 0 else (state.extra_long_bar or "")
 
@@ -305,6 +315,34 @@ def _region_result_from_state(
         detailing_status=(transverse_template.detailing_status if transverse_template is not None else "NOT_EVALUATED"),
         overall_status=(transverse_template.overall_status if transverse_template is not None else "NOT_EVALUATED"),
         rule_checks=(transverse_template.rule_checks if transverse_template is not None else ()),
+        governing_code_rule=(
+            transverse_template.governing_code_rule if transverse_template is not None else None
+        ),
+        governing_code_limit_mm=(
+            transverse_template.governing_code_limit_mm if transverse_template is not None else None
+        ),
+        governing_demand_check=(
+            transverse_template.governing_demand_check if transverse_template is not None else None
+        ),
+        governing_demand_spacing_limit_mm=(
+            transverse_template.governing_demand_spacing_limit_mm
+            if transverse_template is not None
+            else None
+        ),
+        governing_demand_source=(
+            transverse_template.governing_demand_source if transverse_template is not None else None
+        ),
+        governing_demand_station_mm=(
+            transverse_template.governing_demand_station_mm if transverse_template is not None else None
+        ),
+        governing_project_spacing_limit_mm=(
+            transverse_template.governing_project_spacing_limit_mm
+            if transverse_template is not None
+            else None
+        ),
+        d_mm=demand.d_mm,
+        d_source=demand.d_source,
+        d_ratio=demand.d_ratio,
     )
 
 
@@ -365,7 +403,7 @@ def _failed_region_result(
         at=at,
         at_over_s=at_over_s,
         av_over_s=av_over_s,
-        long_bar="",
+        long_bar=None,
         long_count=0,
         controlling_limit=controlling_limit,
         failure_mode=failure_mode,
@@ -423,6 +461,9 @@ def _failed_region_result(
         detailing_status=(template.detailing_status if template is not None else "NOT_EVALUATED"),
         overall_status="FAIL",
         rule_checks=(template.rule_checks if template is not None else ()),
+        d_mm=demand.d_mm,
+        d_source=demand.d_source,
+        d_ratio=demand.d_ratio,
     )
 
 
@@ -485,7 +526,6 @@ def optimize_span_coupled(
         domain_sizes.extend([len(extra_long_bars), len(extra_counts)])
 
     evaluation_cache: dict[tuple[int, ...], SpanCandidate] = {}
-    span_length_m = max(0.0, span_length_mm / 1000.0)
 
     def decode(individual: list[int]) -> tuple[str, int, list[tuple[str, int]]]:
         offset = 0
@@ -511,7 +551,7 @@ def optimize_span_coupled(
             return cached
 
         base_long_bar, base_long_count, decoded_regions = decode(individual)
-        objective = bar_mass_kg_per_m(base_long_bar, base_long_count) * span_length_m
+        objective = 0.0
 
         states: list[SpanRegionState] = []
         for demand, decoded in zip(demands, decoded_regions):
@@ -535,8 +575,11 @@ def optimize_span_coupled(
                 return failed
 
             region_length_m = max(0.0, demand.region_length_mm / 1000.0)
-            extra_long_region_kg = bar_mass_kg_per_m(extra_long_bar, extra_long_count) * region_length_m
-            objective += extra_long_region_kg
+            if requires_longitudinal_design(demand):
+                objective += (
+                    bar_mass_kg_per_m(base_long_bar, base_long_count)
+                    + bar_mass_kg_per_m(extra_long_bar, extra_long_count)
+                ) * region_length_m
 
             states.append(
                 SpanRegionState(

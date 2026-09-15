@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from .common import AciRuleEvaluation, RuleCheck, RuleStatus, SpacingLimit, select_controlling_spacing_limit
-from .seismic import seismic_spacing_limits
+from .seismic import (
+    SeismicTransverseRegionKind,
+    seismic_spacing_limits,
+    seismic_transverse_region_checks,
+)
 from .shear import check_minimum_shear_reinforcement, maximum_shear_spacing_limits
 from .ties import TieRuleScope, select_tie_rule_scope, tie_rule_checks
 from .torsion import (
@@ -35,6 +39,11 @@ def evaluate_region_rules(
     shear_station: float | None,
     provided_combined_transverse_mm2_per_m: float | None = None,
     closed_stirrup_bar_diameter_mm: float | None = None,
+    seismic_zone_length_mm: float | None = None,
+    first_seismic_transverse_distance_mm: float | None = None,
+    seismic_region_kind: SeismicTransverseRegionKind | str | None = None,
+    des_yielding_extension_before_mm: float | None = None,
+    des_yielding_extension_after_mm: float | None = None,
 ) -> AciRuleEvaluation:
     checks: list[RuleCheck] = []
     spacing_limits: list[SpacingLimit] = []
@@ -97,6 +106,18 @@ def evaluate_region_rules(
     )
     spacing_limits.extend(seismic_limits)
     checks.extend(seismic_checks)
+    checks.extend(
+        seismic_transverse_region_checks(
+            system=system,
+            zone=zone,
+            h_mm=height_mm,
+            provided_zone_length_mm=seismic_zone_length_mm,
+            first_distance_mm=first_seismic_transverse_distance_mm,
+            region_kind=seismic_region_kind,
+            yielding_extension_before_mm=des_yielding_extension_before_mm,
+            yielding_extension_after_mm=des_yielding_extension_after_mm,
+        )
+    )
 
     tie_scope = select_tie_rule_scope(
         compression_rebar_required=compression_rebar_required,
@@ -105,6 +126,8 @@ def evaluate_region_rules(
     )
     tie_limits, tie_checks = tie_rule_checks(
         scope=tie_scope,
+        system=system,
+        zone=zone,
         spacing_mm=spacing_mm,
         longitudinal_bar_diameter_mm=longitudinal_bar_diameter_mm,
         tie_bar_diameter_mm=transverse_bar_diameter_mm,
@@ -126,6 +149,7 @@ __all__ = [
     "AciRuleEvaluation",
     "RuleCheck",
     "RuleStatus",
+    "SeismicTransverseRegionKind",
     "SpacingLimit",
     "TieRuleScope",
     "evaluate_region_rules",

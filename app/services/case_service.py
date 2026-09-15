@@ -7,6 +7,10 @@ from typing import Any
 from fastapi import UploadFile
 
 from app.core.errors import InvalidUploadError
+from rc_shear_torsion.models import (
+    DEFAULT_STIRRUP_SPACING_MIN_MM,
+    DEFAULT_STIRRUP_SPACING_STEP_MM,
+)
 
 
 def read_upload_bytes(upload: UploadFile, max_bytes: int) -> bytes:
@@ -75,7 +79,8 @@ def merge_optimization_defaults(overrides: dict[str, Any] | None) -> dict[str, A
             "E_bars": ["#3", "#4", "#6"],
             "G_bars": ["#3", "#4", "#6"],
             "G_counts": [0, 1, 2, 3, 4, 5],
-            "stirrup_spacing_mm": [70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
+            "stirrup_spacing_min_mm": DEFAULT_STIRRUP_SPACING_MIN_MM,
+            "stirrup_spacing_step_mm": DEFAULT_STIRRUP_SPACING_STEP_MM,
             "longitudinal_bars": ["#4", "#5", "#6"],
             "longitudinal_bar_counts": [2, 4, 6, 8, 10, 12, 14],
         },

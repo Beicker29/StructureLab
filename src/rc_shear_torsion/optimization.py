@@ -3,7 +3,7 @@
 import itertools
 import random
 from dataclasses import dataclass
-from typing import Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 from deap import base, creator, tools
 
@@ -18,6 +18,21 @@ class SearchHooks(Generic[CandidateT]):
     objective: Callable[[CandidateT], float]
     is_feasible: Callable[[CandidateT], bool]
     failure_mode: Callable[[CandidateT], str]
+    tie_break: Callable[[CandidateT], Any] | None = None
+
+
+def _has_better_objective(
+    candidate: CandidateT,
+    current: CandidateT,
+    hooks: SearchHooks[CandidateT],
+) -> bool:
+    candidate_objective = hooks.objective(candidate)
+    current_objective = hooks.objective(current)
+    if candidate_objective < current_objective:
+        return True
+    if candidate_objective != current_objective or hooks.tie_break is None:
+        return False
+    return hooks.tie_break(candidate) < hooks.tie_break(current)
 
 
 @dataclass(frozen=True)
@@ -48,7 +63,7 @@ def run_exhaustive_search(
 
         if hooks.is_feasible(candidate):
             feasible += 1
-            if best_feasible is None or hooks.objective(candidate) < hooks.objective(best_feasible):
+            if best_feasible is None or _has_better_objective(candidate, best_feasible, hooks):
                 best_feasible = candidate
 
         if best_seen is None or hooks.score(candidate) < hooks.score(best_seen):
@@ -87,6 +102,7 @@ def run_genetic_search(
 
     toolbox = base.Toolbox()
     individual_cls = getattr(creator, individual_class_name)
+    candidates_by_genome: dict[tuple[int, ...], CandidateT] = {}
 
     def create_individual() -> Genome:
         return [rng.randrange(size) for size in domain_sizes]
@@ -108,7 +124,14 @@ def run_genetic_search(
 
     def tournament_pick(population: list[Genome], k: int = 3) -> Genome:
         pool = [rng.choice(population) for _ in range(k)]
-        return min(pool, key=lambda item: item.fitness.values[0])
+        return min(pool, key=individual_rank)
+
+    def individual_rank(individual: Genome) -> tuple[Any, ...]:
+        fitness = individual.fitness.values[0]
+        if hooks.tie_break is None:
+            return (fitness,)
+        candidate = candidates_by_genome[tuple(int(gene) for gene in individual)]
+        return fitness, hooks.tie_break(candidate)
 
     toolbox.register("individual", tools.initIterate, individual_cls, create_individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
@@ -126,6 +149,7 @@ def run_genetic_search(
     for _ in range(generations):
         for individual in population:
             candidate = hooks.evaluate(individual)
+            candidates_by_genome[tuple(int(gene) for gene in individual)] = candidate
             evaluated += 1
             individual.fitness.values = (hooks.score(candidate),)
             failure_key = hooks.failure_mode(candidate)
@@ -133,13 +157,16 @@ def run_genetic_search(
 
             if hooks.is_feasible(candidate):
                 feasible += 1
-                if best_feasible is None or hooks.objective(candidate) < hooks.objective(best_feasible):
+                if best_feasible is None or _has_better_objective(candidate, best_feasible, hooks):
                     best_feasible = candidate
 
             if best_seen is None or hooks.score(candidate) < hooks.score(best_seen):
                 best_seen = candidate
 
-        elites = [toolbox.clone(individual) for individual in tools.selBest(population, elite_count)]
+        elites = [
+            toolbox.clone(individual)
+            for individual in sorted(population, key=individual_rank)[:elite_count]
+        ]
         next_population = elites
         while len(next_population) < population_size:
             parent_a = toolbox.clone(tournament_pick(population))

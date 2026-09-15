@@ -124,6 +124,60 @@ El sistema soporta dos modos en `optimization.longitudinal_mode`:
 
 Si no se envia el campo, se mantiene compatibilidad con `legacy_region_independent`.
 
+El acero longitudinal calculado por este flujo corresponde exclusivamente a
+torsion. Una region sin escenarios `ACTIVE` reporta area, barra y cantidad
+longitudinal torsional nulas, incluso cuando siga requiriendo refuerzo
+transversal por cortante o detallado sismico.
+
+## Dominio dinamico de espaciamientos
+
+Cuando `optimization.variables.stirrup_spacing_mm` se omite, el motor genera
+los candidatos de cada region desde `stirrup_spacing_min_mm` (70 mm por
+defecto), con incremento `stirrup_spacing_step_mm` (10 mm por defecto), hasta
+el mayor multiplo del incremento que no exceda `s_max_real`. Este ultimo es el
+menor entre los limites ACI evaluados, el limite de demanda del esquema de
+barras y `stirrup_spacing_project_max_mm` si se configuro explicitamente.
+
+No existe un maximo global de espaciamiento. El antiguo catalogo implicito
+70..200 mm se reconoce como entrada heredada y se sustituye por el dominio
+dinamico. Una lista distinta en `stirrup_spacing_mm` se conserva como catalogo
+discreto explicito por compatibilidad.
+
+## Procedencia de la altura efectiva
+
+Los casos construidos desde el formulario calculan `d_mm` como
+`height_mm * d_ratio`. Si el vano no define una razon propia, se usa
+`d_ratio_default=0.9` y se conserva `d_source=DEFAULT_RATIO` junto con
+`d_ratio=0.9`. Por tanto, ese valor es una aproximacion y no una geometria
+exacta obtenida del arreglo de refuerzo. Un `d_mm` regional suministrado
+explicitamente se identifica con `d_source=EXPLICIT`; una razon propia del
+vano, con `d_source=SPAN_RATIO`. Los casos JSON heredados pueden no tener
+procedencia porque los campos nuevos son opcionales.
+
+El diametro longitudinal y la condicion de refuerzo a compresion no modifican
+`d`. El modulo no calcula `d` a partir del recubrimiento, diametro del estribo
+o diametro/disposicion de barras longitudinales.
+
+## Datos longitudinales para detallado de ties
+
+Cada vano admite `longitudinal_bar_diameter_mm` y
+`compression_rebar_required` (por defecto `false`). El diametro representa una
+barra longitudinal individual, igual para el refuerzo superior e inferior, y
+solo aporta contexto a las reglas de detallado y a los limites sismicos que
+dependen de `db`. No es refuerzo longitudinal disenado por StructureLab y se
+mantiene separado del refuerzo longitudinal requerido por torsion.
+
+`compression_rebar_required=true` significa exclusivamente que el refuerzo
+longitudinal se contabiliza como refuerzo a compresion requerido por diseno.
+Activa las verificaciones de ACI 318M-25 9.7.6.4.2 y 9.7.6.4.3. No significa
+solo que existan barras superiores o barras en la cara comprimida.
+
+Las barras longitudinales agrupadas quedan fuera del alcance y el contrato
+fija `longitudinal_bars_bundled=false`. ACI 9.7.6.4.4 y la comprobacion
+geometrica remitida por 18.6.4.2 a 25.7.2.3 permanecen `NOT_EVALUATED` cuando
+aplican, porque el modulo no conoce la cantidad ni la posicion transversal de
+las barras, crossties o distancias libres.
+
 ### Seleccion de resultados (API)
 
 Endpoint: `POST /v1/jobs/{job_id}/selection`

@@ -7,6 +7,23 @@ from typing import Literal
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 ALLOWED_BAR_LABELS = ("#2", "#3", "#4", "#5", "#6", "#7", "#8", "#9", "#10", "#11")
+BAR_DIAMETERS_MM: dict[str, float] = {
+    "#2": 6.4,
+    "#3": 9.5,
+    "#4": 12.7,
+    "#5": 15.9,
+    "#6": 19.1,
+    "#7": 22.2,
+    "#8": 25.4,
+    "#9": 28.7,
+    "#10": 32.3,
+    "#11": 35.8,
+    "#14": 43.0,
+    "#18": 57.3,
+}
+DEFAULT_STIRRUP_SPACING_MIN_MM = 70
+DEFAULT_STIRRUP_SPACING_STEP_MM = 10
+LEGACY_FIXED_STIRRUP_SPACING_MM = tuple(range(70, 201, 10))
 
 
 class RegionConfig(BaseModel):
@@ -19,6 +36,11 @@ class RegionConfig(BaseModel):
     min_branches: int | None = None
     width_mm: float | None = None
     height_mm: float | None = None
+    # Effective-depth provenance is optional for legacy JSON cases.  New form
+    # payloads identify ratio-derived values explicitly so d_mm is not mistaken
+    # for a measured or fully detailed geometry.
+    d_source: Literal["EXPLICIT", "DEFAULT_RATIO", "SPAN_RATIO"] | None = None
+    d_ratio: float | None = None
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
@@ -36,6 +58,10 @@ class RegionConfig(BaseModel):
             raise ValueError(f"Region '{self.id}' width_mm must be > 0")
         if self.height_mm is not None and self.height_mm <= 0.0:
             raise ValueError(f"Region '{self.id}' height_mm must be > 0")
+        if self.d_ratio is not None and not (0.0 < self.d_ratio <= 1.0):
+            raise ValueError(f"Region '{self.id}' d_ratio must be inside (0, 1]")
+        if self.d_source in {"DEFAULT_RATIO", "SPAN_RATIO"} and self.d_ratio is None:
+            raise ValueError(f"Region '{self.id}' {self.d_source} requires d_ratio")
         return self
 
 
@@ -87,7 +113,6 @@ class SpanConfig(BaseModel):
 class BeamConfig(BaseModel):
     beam_id: str
     detailing: Literal["DES", "DMO", "DMI"] = "DES"
-    compression_rebar_required: bool = False
     cover_side_mm: float | None = None
     cover_top_mm: float | None = None
     cover_bottom_mm: float | None = None
@@ -130,7 +155,13 @@ class VariablesConfig(BaseModel):
     E_bars: list[str]
     G_bars: list[str]
     G_counts: list[int]
-    stirrup_spacing_mm: list[int]
+    # A supplied list is an explicit legacy/custom catalog.  When omitted (or
+    # when it is the former implicit 70..200 default), the engine builds the
+    # catalog dynamically from the real code, demand, and project limits.
+    stirrup_spacing_mm: list[int] | None = None
+    stirrup_spacing_min_mm: int = DEFAULT_STIRRUP_SPACING_MIN_MM
+    stirrup_spacing_step_mm: int = DEFAULT_STIRRUP_SPACING_STEP_MM
+    stirrup_spacing_project_max_mm: float | None = None
     longitudinal_bars: list[str]
     longitudinal_bar_counts: list[int]
 
@@ -142,13 +173,14 @@ class VariablesConfig(BaseModel):
             ("E_bars", self.E_bars),
             ("G_bars", self.G_bars),
             ("G_counts", self.G_counts),
-            ("stirrup_spacing_mm", self.stirrup_spacing_mm),
             ("longitudinal_bars", self.longitudinal_bars),
             ("longitudinal_bar_counts", self.longitudinal_bar_counts),
         )
         for field_name, values in fields:
             if not values:
                 raise ValueError(f"optimization.variables.{field_name} cannot be empty")
+        if self.stirrup_spacing_mm is not None and not self.stirrup_spacing_mm:
+            raise ValueError("optimization.variables.stirrup_spacing_mm cannot be empty when supplied")
         return self
 
 
@@ -176,15 +208,164 @@ class CaseConfig(BaseModel):
     case_name: str
     inputs: InputsConfig
     units: UnitsConfig
+    longitudinal_bar_diameter_mm: float | None = None
+    compression_rebar_required: bool = False
+    longitudinal_bars_bundled: Literal[False] = False
     beams: list[BeamConfig]
     optimization: OptimizationConfig
 
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_global_longitudinal_detailing(cls, data: object) -> object:
+        """Consolidate legacy beam/span detailing values into one case value.
+
+        Phase 3 initially allowed span overrides.  They remain readable only
+        when every explicit legacy value agrees; conflicting values are never
+        resolved by order or by selecting an arbitrary span.
+        """
+        if not isinstance(data, dict) or not isinstance(data.get("beams"), list):
+            return data
+        migrated = dict(data)
+        diameter_values: list[tuple[str, float]] = []
+        compression_values: list[tuple[str, bool]] = []
+
+        def add_diameter(path: str, value: object) -> None:
+            if value is None:
+                return
+            try:
+                diameter = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{path} must be a numeric diameter in mm") from exc
+            diameter_values.append((path, diameter))
+
+        def add_compression(path: str, value: object) -> None:
+            if not isinstance(value, bool):
+                raise ValueError(f"{path} must be boolean")
+            compression_values.append((path, value))
+
+        if migrated.get("longitudinal_bar_diameter_mm") is not None:
+            add_diameter(
+                "longitudinal_bar_diameter_mm",
+                migrated["longitudinal_bar_diameter_mm"],
+            )
+        if "compression_rebar_required" in migrated:
+            add_compression(
+                "compression_rebar_required",
+                migrated["compression_rebar_required"],
+            )
+
+        migrated_beams: list[object] = []
+        for beam_index, beam_value in enumerate(data["beams"]):
+            if not isinstance(beam_value, dict):
+                migrated_beams.append(beam_value)
+                continue
+            beam = dict(beam_value)
+            beam_path = f"beams[{beam_index}]"
+            if beam.get("longitudinal_bar_diameter_mm") is not None:
+                add_diameter(
+                    f"{beam_path}.longitudinal_bar_diameter_mm",
+                    beam.pop("longitudinal_bar_diameter_mm"),
+                )
+            if "compression_rebar_required" in beam:
+                add_compression(
+                    f"{beam_path}.compression_rebar_required",
+                    beam.pop("compression_rebar_required"),
+                )
+            if "longitudinal_bars_bundled" in beam:
+                bundled = beam.pop("longitudinal_bars_bundled")
+                if bundled is not False:
+                    raise ValueError(
+                        f"{beam_path}.longitudinal_bars_bundled conflicts with global false"
+                    )
+            spans_value = beam.get("spans")
+            if isinstance(spans_value, list):
+                spans: list[object] = []
+                for span_index, span_value in enumerate(spans_value):
+                    if not isinstance(span_value, dict):
+                        spans.append(span_value)
+                        continue
+                    span = dict(span_value)
+                    span_path = f"{beam_path}.spans[{span_index}]"
+                    if span.get("longitudinal_bar_diameter_mm") is not None:
+                        add_diameter(
+                            f"{span_path}.longitudinal_bar_diameter_mm",
+                            span.pop("longitudinal_bar_diameter_mm"),
+                        )
+                    if "compression_rebar_required" in span:
+                        add_compression(
+                            f"{span_path}.compression_rebar_required",
+                            span.pop("compression_rebar_required"),
+                        )
+                    if "longitudinal_bars_bundled" in span:
+                        bundled = span.pop("longitudinal_bars_bundled")
+                        if bundled is not False:
+                            raise ValueError(
+                                f"{span_path}.longitudinal_bars_bundled conflicts with global false"
+                            )
+                    regions_value = span.get("regions")
+                    if isinstance(regions_value, list):
+                        for region_index, region_value in enumerate(regions_value):
+                            if not isinstance(region_value, dict):
+                                continue
+                            db_bar = region_value.get("db_bar")
+                            if db_bar in BAR_DIAMETERS_MM:
+                                add_diameter(
+                                    f"{span_path}.regions[{region_index}].db_bar",
+                                    BAR_DIAMETERS_MM[db_bar],
+                                )
+                    spans.append(span)
+                beam["spans"] = spans
+            migrated_beams.append(beam)
+        migrated["beams"] = migrated_beams
+
+        if diameter_values:
+            expected_path, expected = diameter_values[0]
+            conflicts = [
+                (path, value)
+                for path, value in diameter_values[1:]
+                if abs(value - expected) > 1.0e-9
+            ]
+            if conflicts:
+                details = ", ".join(
+                    [f"{expected_path}={expected:g}"]
+                    + [f"{path}={value:g}" for path, value in conflicts]
+                )
+                raise ValueError(
+                    "Conflicting legacy longitudinal_bar_diameter_mm values; "
+                    f"global case configuration is required: {details}"
+                )
+            migrated["longitudinal_bar_diameter_mm"] = expected
+
+        if compression_values:
+            expected_path, expected = compression_values[0]
+            conflicts = [
+                (path, value)
+                for path, value in compression_values[1:]
+                if value != expected
+            ]
+            if conflicts:
+                details = ", ".join(
+                    [f"{expected_path}={str(expected).lower()}"]
+                    + [f"{path}={str(value).lower()}" for path, value in conflicts]
+                )
+                raise ValueError(
+                    "Conflicting legacy compression_rebar_required values; "
+                    f"global case configuration is required: {details}"
+                )
+            migrated["compression_rebar_required"] = expected
+        return migrated
+
     @model_validator(mode="after")
     def validate_beams(self) -> "CaseConfig":
         if not self.beams:
             raise ValueError("At least one beam must be provided")
+        if (
+            self.longitudinal_bar_diameter_mm is not None
+            and self.longitudinal_bar_diameter_mm <= 0.0
+        ):
+            raise ValueError("longitudinal_bar_diameter_mm must be > 0")
         beam_ids = [beam.beam_id for beam in self.beams]
         if len(beam_ids) != len(set(beam_ids)):
             raise ValueError("beam_id values must be unique")

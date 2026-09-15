@@ -8,6 +8,7 @@ from openpyxl import load_workbook
 
 from app.core.errors import InvalidUploadError
 from rc_shear_torsion.io import REQUIRED_COLUMNS, as_text, find_header
+from rc_shear_torsion.models import ALLOWED_BAR_LABELS, BAR_DIAMETERS_MM
 
 
 def _natural_name_key(value: str) -> tuple[int, Any]:
@@ -222,6 +223,36 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
                 f"span_layout_json[{span_index}].d_ratio debe estar en (0, 1]"
             )
 
+        longitudinal_bar_raw = item.get("longitudinal_bar")
+        if longitudinal_bar_raw is None:
+            longitudinal_bar_raw = item.get("db_bar")
+        longitudinal_bar = (
+            str(longitudinal_bar_raw).strip()
+            if longitudinal_bar_raw not in (None, "")
+            else None
+        )
+        if longitudinal_bar is not None and longitudinal_bar not in ALLOWED_BAR_LABELS:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].longitudinal_bar no es una barra soportada"
+            )
+        longitudinal_bar_diameter_mm = _parse_optional_float(
+            item.get("longitudinal_bar_diameter_mm"),
+            f"span_layout_json[{span_index}].longitudinal_bar_diameter_mm",
+        )
+        if longitudinal_bar_diameter_mm is None and longitudinal_bar is not None:
+            longitudinal_bar_diameter_mm = BAR_DIAMETERS_MM[longitudinal_bar]
+        if longitudinal_bar_diameter_mm is not None and longitudinal_bar_diameter_mm <= 0.0:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].longitudinal_bar_diameter_mm debe ser > 0"
+            )
+
+        compression_raw = item.get("compression_rebar_required")
+        compression_rebar_required = _parse_confined_flag(compression_raw)
+        if compression_raw is not None and compression_rebar_required is None:
+            raise InvalidUploadError(
+                f"span_layout_json[{span_index}].compression_rebar_required debe ser booleano"
+            )
+
         support_left_mm = _parse_optional_float(
             item.get("support_left_mm")
             if item.get("support_left_mm") is not None
@@ -410,6 +441,8 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
                 "gravity": gravity,
                 "c_ratio_extremos": c_ratio_extremos,
                 "d_ratio": d_ratio,
+                "longitudinal_bar_diameter_mm": longitudinal_bar_diameter_mm,
+                "compression_rebar_required": compression_rebar_required,
                 "support_left_mm": support_left_mm,
                 "support_right_mm": support_right_mm,
                 "clear_length_mm": clear_length_mm,

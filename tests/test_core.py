@@ -786,7 +786,10 @@ class CoreTests(unittest.TestCase):
         )
         self.assertEqual(candidate.status, "fail")
         self.assertEqual(candidate.failure_mode, "region_detail_fail")
-        self.assertEqual(candidate.controlling_limit, "6db")
+        self.assertEqual(
+            candidate.controlling_limit,
+            "ACI318_25_18_6_4_4_SIX_DB_GRADE_420",
+        )
         self.assertIn("DES region C spacing limit failed", candidate.message)
 
     def test_dmo_non_confined_spacing_rule_uses_ph_over_8_when_torsion_exists(self) -> None:
@@ -1178,7 +1181,7 @@ class CoreTests(unittest.TestCase):
 
         long_bar, long_count, long_provided, long_ok = select_longitudinal_independent(region, variables)
 
-        self.assertEqual(long_bar, "")
+        self.assertIsNone(long_bar)
         self.assertEqual(long_count, 0)
         self.assertEqual(long_provided, 0.0)
         self.assertTrue(long_ok)
@@ -1237,7 +1240,7 @@ class CoreTests(unittest.TestCase):
         result = outcome.results[0]
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.long_count, 0)
-        self.assertEqual(result.long_bar, "")
+        self.assertIsNone(result.long_bar)
         self.assertEqual(result.long_provided_mm2_override, 0.0)
         self.assertIsNone(result.base_long_count)
         self.assertIsNone(result.base_long_bar)

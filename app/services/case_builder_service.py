@@ -125,6 +125,7 @@ def build_case_payload_from_form(
     frame_pairs_json: str | None,
     optimization_overrides_json: str | None,
     span_layout_json: str | None = None,
+    compression_rebar_required: bool = False,
 ) -> dict[str, Any]:
     normalized_sheet_name = sheet_name.strip()
     if not normalized_sheet_name:
@@ -230,4 +231,5 @@ def build_case_payload_from_form(
         span_layout=span_layout,
         optimization_payload=optimization_payload,
         span_dimensions_by_pair=span_dimensions_by_pair,
+        compression_rebar_required=compression_rebar_required,
     )

@@ -7,9 +7,16 @@ from typing import Literal
 
 from .codes.aci318_25 import AciRuleEvaluation, RuleCheck, RuleStatus, evaluate_region_rules
 from .io import EtabsFrameData, EtabsStationRow
-from .models import OptimizationConfig, RegionConfig, SpanConfig, VariablesConfig
+from .models import (
+    BAR_DIAMETERS_MM,
+    LEGACY_FIXED_STIRRUP_SPACING_MM,
+    OptimizationConfig,
+    RegionConfig,
+    SpanConfig,
+    VariablesConfig,
+)
 from .optimization import SearchHooks, run_exhaustive_search, run_genetic_search
-from .tolerances import torsion_zero_tolerance
+from .tolerances import dimensional_comparison_tolerance_mm, torsion_zero_tolerance
 
 FailureMode = Literal[
     "torsion_fail",
@@ -49,21 +56,6 @@ BAR_MASS_KG_PER_M: dict[str, float] = {
     "#14": 11.380,
     "#18": 20.240,
 }
-BAR_DIAMETERS_MM: dict[str, float] = {
-    "#2": 6.4,
-    "#3": 9.5,
-    "#4": 12.7,
-    "#5": 15.9,
-    "#6": 19.1,
-    "#7": 22.2,
-    "#8": 25.4,
-    "#9": 28.7,
-    "#10": 32.3,
-    "#11": 35.8,
-    "#14": 43.0,
-    "#18": 57.3,
-}
-
 DEAP_FITNESS_CLASS = "RCFitnessMin"
 DEAP_INDIVIDUAL_CLASS = "RCIndividual"
 STEEL_DENSITY_KG_PER_MM3 = 7.85e-6
@@ -112,6 +104,10 @@ class RegionDemand:
     fy_mpa: float | None = None
     region_length_mm: float = 0.0
     compression_rebar_required: bool = False
+    d_source: Literal["EXPLICIT", "DEFAULT_RATIO", "SPAN_RATIO"] | None = None
+    d_ratio: float | None = None
+    longitudinal_bar_diameter_mm: float | None = None
+    longitudinal_bars_bundled: Literal[False] = False
 
     @property
     def governing_t_transverse_scenario(self) -> DemandScenario | None:
@@ -171,12 +167,20 @@ class RegionDemand:
 
 
 @dataclass(frozen=True)
+class DemandSpacingLimit:
+    check_id: str
+    maximum_mm: float
+    source: DemandSource
+    station_mm: float
+
+
+@dataclass(frozen=True)
 class Candidate:
     e_bar: str
     g_bar: str
     g_count: int
     spacing_mm: int
-    long_bar: str
+    long_bar: str | None
     long_count: int
     at: float
     at_over_s: float
@@ -199,6 +203,13 @@ class Candidate:
     detailing_status: RuleStatus = RuleStatus.NOT_EVALUATED
     overall_status: RuleStatus = RuleStatus.NOT_EVALUATED
     rule_checks: tuple[RuleCheck, ...] = ()
+    governing_code_rule: str | None = None
+    governing_code_limit_mm: float | None = None
+    governing_demand_check: str | None = None
+    governing_demand_spacing_limit_mm: float | None = None
+    governing_demand_source: DemandSource | None = None
+    governing_demand_station_mm: float | None = None
+    governing_project_spacing_limit_mm: float | None = None
 
 
 @dataclass(frozen=True)
@@ -222,7 +233,7 @@ class RegionDesignResult:
     at: float
     at_over_s: float
     av_over_s: float
-    long_bar: str
+    long_bar: str | None
     long_count: int
     controlling_limit: str
     failure_mode: FailureMode
@@ -256,6 +267,16 @@ class RegionDesignResult:
     detailing_status: RuleStatus = RuleStatus.NOT_EVALUATED
     overall_status: RuleStatus = RuleStatus.NOT_EVALUATED
     rule_checks: tuple[RuleCheck, ...] = ()
+    governing_code_rule: str | None = None
+    governing_code_limit_mm: float | None = None
+    governing_demand_check: str | None = None
+    governing_demand_spacing_limit_mm: float | None = None
+    governing_demand_source: DemandSource | None = None
+    governing_demand_station_mm: float | None = None
+    governing_project_spacing_limit_mm: float | None = None
+    d_mm: float | None = None
+    d_source: str | None = None
+    d_ratio: float | None = None
 
 
 @dataclass(frozen=True)
@@ -300,6 +321,7 @@ def build_region_demands(
     seismic_frame: EtabsFrameData,
     gravity_frame: EtabsFrameData,
     compression_rebar_required: bool = False,
+    longitudinal_bar_diameter_mm: float | None = None,
     torsion_tolerance: float = torsion_zero_tolerance,
 ) -> tuple[list[RegionDemand], list[str]]:
     if torsion_tolerance < 0.0:
@@ -380,6 +402,14 @@ def build_region_demands(
                 fy_mpa=beam_fy_mpa,
                 region_length_mm=(region.to - region.from_) * span_length_mm,
                 compression_rebar_required=compression_rebar_required,
+                d_source=region.d_source,
+                d_ratio=region.d_ratio,
+                longitudinal_bar_diameter_mm=(
+                    longitudinal_bar_diameter_mm
+                    if longitudinal_bar_diameter_mm is not None
+                    else BAR_DIAMETERS_MM.get(region.db_bar or "")
+                ),
+                longitudinal_bars_bundled=False,
             )
         )
 
@@ -418,6 +448,76 @@ def scenario_reference(scenario: DemandScenario) -> str:
     return f"source={scenario.source}, station_mm={scenario.station_mm}{row}"
 
 
+def governing_demand_spacing_limit(
+    region: RegionDemand,
+    *,
+    at_mm2: float,
+    ag_mm2: float,
+    g_count: int,
+) -> DemandSpacingLimit | None:
+    """Return the physical-demand upper bound on spacing for one bar scheme."""
+    limits: list[DemandSpacingLimit] = []
+    combined_area_mm2 = (2.0 * at_mm2) + (g_count * ag_mm2)
+
+    for scenario in region.scenarios:
+        if scenario.torsion_state == "INCONSISTENT":
+            continue
+
+        if scenario.t_transverse_mm2_per_m > torsion_zero_tolerance:
+            limits.append(
+                DemandSpacingLimit(
+                    check_id="TORSION_TRANSVERSE_DEMAND",
+                    maximum_mm=at_mm2 * 1000.0 / scenario.t_transverse_mm2_per_m,
+                    source=scenario.source,
+                    station_mm=scenario.station_mm,
+                )
+            )
+
+        combined_demand = (
+            scenario.v_rebar_mm2_per_m
+            + 2.0 * scenario.t_transverse_mm2_per_m
+        )
+        if combined_demand <= torsion_zero_tolerance:
+            continue
+        if scenario.t_transverse_mm2_per_m <= torsion_zero_tolerance:
+            check_id = "SHEAR_DEMAND"
+        elif scenario.v_rebar_mm2_per_m <= torsion_zero_tolerance:
+            check_id = "TORSION_TRANSVERSE_DEMAND"
+        else:
+            check_id = "SHEAR_TORSION_COMBINED_DEMAND"
+        limits.append(
+            DemandSpacingLimit(
+                check_id=check_id,
+                maximum_mm=combined_area_mm2 * 1000.0 / combined_demand,
+                source=scenario.source,
+                station_mm=scenario.station_mm,
+            )
+        )
+
+    return min(limits, key=lambda item: item.maximum_mm) if limits else None
+
+
+def _spacing_control_trace(
+    *,
+    rule_evaluation: AciRuleEvaluation,
+    demand_limit: DemandSpacingLimit | None,
+    project_limit_mm: float | None,
+) -> str:
+    code_limit = rule_evaluation.controlling_limit
+    options: list[tuple[float, int, str]] = []
+    if code_limit is not None:
+        options.append((code_limit.maximum_mm, 0, code_limit.check.rule_id))
+    if demand_limit is not None:
+        options.append((demand_limit.maximum_mm, 1, demand_limit.check_id))
+    if project_limit_mm is not None:
+        options.append((project_limit_mm, 2, "PROJECT_SPACING_LIMIT"))
+    if not options:
+        return "N/A"
+
+    _, _, controlling = min(options, key=lambda item: (item[0], item[1]))
+    return controlling
+
+
 def evaluate_candidate(
     region: RegionDemand,
     *,
@@ -425,11 +525,17 @@ def evaluate_candidate(
     g_bar: str,
     g_count: int,
     spacing_mm: int,
-    long_bar: str,
+    long_bar: str | None,
     long_count: int,
     check_longitudinal: bool = False,
+    project_spacing_limit_mm: float | None = None,
 ) -> Candidate:
-    if e_bar not in BAR_AREAS_MM2 or g_bar not in BAR_AREAS_MM2 or long_bar not in BAR_AREAS_MM2:
+    invalid_longitudinal = (
+        long_count < 0
+        or (long_count > 0 and long_bar not in BAR_AREAS_MM2)
+        or (long_count == 0 and long_bar not in {None, "", *BAR_AREAS_MM2})
+    )
+    if e_bar not in BAR_AREAS_MM2 or g_bar not in BAR_AREAS_MM2 or invalid_longitudinal:
         return failed_candidate(
             e_bar=e_bar,
             g_bar=g_bar,
@@ -451,10 +557,31 @@ def evaluate_candidate(
             failure_mode="input_fail",
             message="Spacing must be > 0",
         )
+    if (
+        project_spacing_limit_mm is not None
+        and spacing_mm
+        > project_spacing_limit_mm + dimensional_comparison_tolerance_mm
+    ):
+        return failed_candidate(
+            e_bar=e_bar,
+            g_bar=g_bar,
+            g_count=g_count,
+            spacing_mm=spacing_mm,
+            long_bar=long_bar,
+            long_count=long_count,
+            failure_mode="region_detail_fail",
+            message=(
+                f"Project spacing limit failed: s={spacing_mm} mm > "
+                f"{project_spacing_limit_mm:.1f} mm"
+            ),
+            controlling_limit="PROJECT_SPACING_LIMIT",
+            governing_project_spacing_limit_mm=project_spacing_limit_mm,
+            detailing_status=RuleStatus.FAIL,
+        )
 
     at = BAR_AREAS_MM2[e_bar]
     ag = BAR_AREAS_MM2[g_bar]
-    along = BAR_AREAS_MM2[long_bar] * long_count
+    along = BAR_AREAS_MM2.get(long_bar, 0.0) * long_count
     at_over_s = at * 1000.0 / spacing_mm
     f_free = 1.0 - (region.t_req / at_over_s if at_over_s > 0 else math.inf)
     av1 = max(0.0, f_free) * at * 2.0
@@ -633,12 +760,19 @@ def evaluate_candidate(
         e_bar=e_bar,
         g_bar=g_bar,
     )
-    controlling_limit = (
-        rule_evaluation.controlling_limit.label
-        if rule_evaluation.controlling_limit is not None
-        else "N/A"
+    demand_spacing_limit = governing_demand_spacing_limit(
+        region,
+        at_mm2=at,
+        ag_mm2=ag,
+        g_count=g_count,
     )
-    if not rule_evaluation.passes_enforced_rules:
+    controlling_limit = _spacing_control_trace(
+        rule_evaluation=rule_evaluation,
+        demand_limit=demand_spacing_limit,
+        project_limit_mm=project_spacing_limit_mm,
+    )
+    code_spacing_limit = rule_evaluation.controlling_limit
+    if not rule_evaluation.passes_candidate_dependent_rules:
         return failed_candidate(
             e_bar=e_bar,
             g_bar=g_bar,
@@ -664,9 +798,33 @@ def evaluate_candidate(
             demand_status=RuleStatus.PASS,
             detailing_status=RuleStatus.FAIL,
             rule_checks=rule_evaluation.checks,
+            governing_code_rule=(
+                code_spacing_limit.check.rule_id if code_spacing_limit is not None else None
+            ),
+            governing_code_limit_mm=(
+                code_spacing_limit.maximum_mm if code_spacing_limit is not None else None
+            ),
+            governing_demand_check=(
+                demand_spacing_limit.check_id if demand_spacing_limit is not None else None
+            ),
+            governing_demand_spacing_limit_mm=(
+                demand_spacing_limit.maximum_mm if demand_spacing_limit is not None else None
+            ),
+            governing_demand_source=(
+                demand_spacing_limit.source if demand_spacing_limit is not None else None
+            ),
+            governing_demand_station_mm=(
+                demand_spacing_limit.station_mm if demand_spacing_limit is not None else None
+            ),
+            governing_project_spacing_limit_mm=project_spacing_limit_mm,
         )
 
-    if rule_evaluation.detailing_status == RuleStatus.NOT_EVALUATED:
+    if rule_evaluation.detailing_status == RuleStatus.FAIL:
+        success_message = (
+            "Candidate satisfies physical demands and candidate-dependent ACI detailing rules; "
+            "one or more fixed regional detailing checks fail"
+        )
+    elif rule_evaluation.detailing_status == RuleStatus.NOT_EVALUATED:
         success_message = (
             "Candidate satisfies physical demands and evaluated ACI detailing rules; "
             "unresolved ACI rules remain NOT_EVALUATED"
@@ -710,6 +868,25 @@ def evaluate_candidate(
             else rule_evaluation.detailing_status
         ),
         rule_checks=rule_evaluation.checks,
+        governing_code_rule=(
+            code_spacing_limit.check.rule_id if code_spacing_limit is not None else None
+        ),
+        governing_code_limit_mm=(
+            code_spacing_limit.maximum_mm if code_spacing_limit is not None else None
+        ),
+        governing_demand_check=(
+            demand_spacing_limit.check_id if demand_spacing_limit is not None else None
+        ),
+        governing_demand_spacing_limit_mm=(
+            demand_spacing_limit.maximum_mm if demand_spacing_limit is not None else None
+        ),
+        governing_demand_source=(
+            demand_spacing_limit.source if demand_spacing_limit is not None else None
+        ),
+        governing_demand_station_mm=(
+            demand_spacing_limit.station_mm if demand_spacing_limit is not None else None
+        ),
+        governing_project_spacing_limit_mm=project_spacing_limit_mm,
     )
 
 
@@ -719,7 +896,7 @@ def failed_candidate(
     g_bar: str,
     g_count: int,
     spacing_mm: int,
-    long_bar: str,
+    long_bar: str | None,
     long_count: int,
     failure_mode: FailureMode,
     message: str,
@@ -740,6 +917,13 @@ def failed_candidate(
     demand_status: RuleStatus | None = None,
     detailing_status: RuleStatus | None = None,
     rule_checks: tuple[RuleCheck, ...] = (),
+    governing_code_rule: str | None = None,
+    governing_code_limit_mm: float | None = None,
+    governing_demand_check: str | None = None,
+    governing_demand_spacing_limit_mm: float | None = None,
+    governing_demand_source: DemandSource | None = None,
+    governing_demand_station_mm: float | None = None,
+    governing_project_spacing_limit_mm: float | None = None,
 ) -> Candidate:
     penalty = 1.0e6 * (1.0 + max(deficit, 0.0))
     resolved_demand_status = demand_status
@@ -782,6 +966,13 @@ def failed_candidate(
         detailing_status=resolved_detailing_status,
         overall_status=RuleStatus.FAIL,
         rule_checks=rule_checks,
+        governing_code_rule=governing_code_rule,
+        governing_code_limit_mm=governing_code_limit_mm,
+        governing_demand_check=governing_demand_check,
+        governing_demand_spacing_limit_mm=governing_demand_spacing_limit_mm,
+        governing_demand_source=governing_demand_source,
+        governing_demand_station_mm=governing_demand_station_mm,
+        governing_project_spacing_limit_mm=governing_project_spacing_limit_mm,
     )
 
 
@@ -793,7 +984,11 @@ def evaluate_region_rule_checks(
     e_bar: str,
     g_bar: str,
 ) -> AciRuleEvaluation:
-    longitudinal_diameter = BAR_DIAMETERS_MM.get(region.db_bar or "")
+    longitudinal_diameter = (
+        region.longitudinal_bar_diameter_mm
+        if region.longitudinal_bar_diameter_mm is not None
+        else BAR_DIAMETERS_MM.get(region.db_bar or "")
+    )
     e_diameter = BAR_DIAMETERS_MM.get(e_bar)
     g_diameter = BAR_DIAMETERS_MM.get(g_bar) if g_count > 0 else None
     e_area = BAR_AREAS_MM2.get(e_bar)
@@ -836,6 +1031,9 @@ def evaluate_region_rule_checks(
             else None
         ),
         closed_stirrup_bar_diameter_mm=e_diameter,
+        seismic_zone_length_mm=(
+            region.region_length_mm if region.region_length_mm > 0.0 else None
+        ),
     )
 
 
@@ -872,7 +1070,11 @@ def format_rule_evaluation_message(
         )
 
     failure = next(
-        (check for check in evaluation.checks if check.status == RuleStatus.FAIL),
+        (
+            check
+            for check in evaluation.checks
+            if check.status == RuleStatus.FAIL and check.candidate_dependent
+        ),
         None,
     )
     return failure.applicability_reason if failure is not None else "ACI detailing rules satisfied"
@@ -940,7 +1142,7 @@ def stirrup_set_unit_weight_kg(
     return closed_weight_kg + max(0, g_count) * single_branch_weight_kg
 
 
-def bar_mass_kg_per_m(bar: str, count: int = 1) -> float:
+def bar_mass_kg_per_m(bar: str | None, count: int = 1) -> float:
     if count <= 0:
         return 0.0
     unit_mass = BAR_MASS_KG_PER_M.get(bar)
@@ -957,15 +1159,15 @@ def longitudinal_mass_kg_per_m(long_provided_mm2: float) -> float:
     return long_provided_mm2 * 1000.0 * STEEL_DENSITY_KG_PER_MM3
 
 def requires_longitudinal_design(region: RegionDemand) -> bool:
-    return any(scenario.t_longitudinal_mm2 > 0.0 for scenario in region.scenarios)
+    return any(scenario.torsion_state == "ACTIVE" for scenario in region.scenarios)
 
 
 def select_longitudinal_independent(
     region: RegionDemand,
     variables: VariablesConfig,
-) -> tuple[str, int, float, bool]:
+) -> tuple[str | None, int, float, bool]:
     if not requires_longitudinal_design(region):
-        return "", 0, 0.0, True
+        return None, 0, 0.0, True
 
     options: list[tuple[float, str, int]] = []
     for long_bar in variables.longitudinal_bars:
@@ -980,6 +1182,98 @@ def select_longitudinal_independent(
 
     provided, long_bar, long_count = options[-1]
     return long_bar, long_count, provided, False
+
+
+def uses_dynamic_spacing_catalog(variables: VariablesConfig) -> bool:
+    configured = variables.stirrup_spacing_mm
+    return configured is None or tuple(configured) == LEGACY_FIXED_STIRRUP_SPACING_MM
+
+
+def _discrete_spacings_through(
+    maximum_mm: float,
+    *,
+    minimum_mm: int,
+    step_mm: int,
+) -> list[int]:
+    if minimum_mm <= 0 or step_mm <= 0 or maximum_mm <= 0.0:
+        return []
+    first = int(math.ceil(minimum_mm / step_mm) * step_mm)
+    last = int(
+        math.floor(
+            (maximum_mm + dimensional_comparison_tolerance_mm) / step_mm
+        )
+        * step_mm
+    )
+    if last < first:
+        return []
+    return list(range(first, last + step_mm, step_mm))
+
+
+def spacing_domain_for_region(
+    region: RegionDemand,
+    variables: VariablesConfig,
+    allowed_g_counts: list[int],
+) -> list[int]:
+    """Build the spacing search domain without an implicit global maximum."""
+    project_limit_mm = variables.stirrup_spacing_project_max_mm
+    if not uses_dynamic_spacing_catalog(variables):
+        configured = sorted(set(variables.stirrup_spacing_mm or []))
+        if project_limit_mm is None:
+            return configured
+        return [
+            spacing
+            for spacing in configured
+            if spacing <= project_limit_mm + dimensional_comparison_tolerance_mm
+        ]
+
+    generated: set[int] = set()
+    probe_spacing = variables.stirrup_spacing_min_mm
+    for e_bar, g_bar, g_count in itertools.product(
+        variables.E_bars,
+        variables.G_bars,
+        allowed_g_counts,
+    ):
+        at = BAR_AREAS_MM2.get(e_bar)
+        ag = BAR_AREAS_MM2.get(g_bar)
+        if at is None or ag is None:
+            continue
+        demand_limit = governing_demand_spacing_limit(
+            region,
+            at_mm2=at,
+            ag_mm2=ag,
+            g_count=g_count,
+        )
+        rule_evaluation = evaluate_region_rule_checks(
+            region,
+            spacing_mm=probe_spacing,
+            g_count=g_count,
+            e_bar=e_bar,
+            g_bar=g_bar,
+        )
+        real_limits = [
+            limit
+            for limit in (
+                (
+                    rule_evaluation.controlling_limit.maximum_mm
+                    if rule_evaluation.controlling_limit is not None
+                    else None
+                ),
+                demand_limit.maximum_mm if demand_limit is not None else None,
+                project_limit_mm,
+            )
+            if limit is not None
+        ]
+        if not real_limits:
+            continue
+        s_max_real = min(real_limits)
+        generated.update(
+            _discrete_spacings_through(
+                s_max_real,
+                minimum_mm=variables.stirrup_spacing_min_mm,
+                step_mm=variables.stirrup_spacing_step_mm,
+            )
+        )
+    return sorted(generated)
 
 
 def optimize_region(region: RegionDemand, optimization: OptimizationConfig) -> OptimizationOutcome:
@@ -1005,7 +1299,7 @@ def optimize_region_exhaustive(
             e_bar=variables.E_bars[0],
             g_bar=variables.G_bars[0],
             g_count=0,
-            spacing_mm=variables.stirrup_spacing_mm[0],
+            spacing_mm=(variables.stirrup_spacing_mm or [variables.stirrup_spacing_min_mm])[0],
             long_bar=variables.longitudinal_bars[0],
             long_count=0,
             failure_mode="input_fail",
@@ -1024,11 +1318,36 @@ def optimize_region_exhaustive(
             failure_counts={"input_fail": 1},
         )
 
+    spacing_domain = spacing_domain_for_region(region, variables, allowed_g_counts)
+    if not spacing_domain:
+        selected = failed_candidate(
+            e_bar=variables.E_bars[0],
+            g_bar=variables.G_bars[0],
+            g_count=allowed_g_counts[0],
+            spacing_mm=variables.stirrup_spacing_min_mm,
+            long_bar=None,
+            long_count=0,
+            failure_mode="input_fail",
+            message=(
+                "No spacing candidate can be generated from evaluated ACI, demand, "
+                "or explicit project limits"
+            ),
+            objective=1.0e9,
+            deficit=1.0,
+        )
+        return OptimizationOutcome(
+            selected=selected,
+            evaluated_candidates=0,
+            feasible_candidates=0,
+            method="exhaustive",
+            failure_counts={"input_fail": 1},
+        )
+
     domain: list[list[str | int]] = [
         variables.E_bars,
         variables.G_bars,
         allowed_g_counts,
-        variables.stirrup_spacing_mm,
+        spacing_domain,
     ]
     if check_longitudinal:
         default_long_bar, default_long_count, _, _ = select_longitudinal_independent(region, variables)
@@ -1055,6 +1374,7 @@ def optimize_region_exhaustive(
             long_bar=default_long_bar,
             long_count=default_long_count,
             check_longitudinal=check_longitudinal,
+            project_spacing_limit_mm=variables.stirrup_spacing_project_max_mm,
         )
         return candidate
 
@@ -1064,6 +1384,7 @@ def optimize_region_exhaustive(
         objective=lambda candidate: candidate.objective,
         is_feasible=lambda candidate: candidate.status == "ok",
         failure_mode=lambda candidate: candidate.failure_mode,
+        tie_break=lambda candidate: -candidate.spacing_mm,
     )
     outcome = run_exhaustive_search(
         domain_sizes=[len(values) for values in domain],
@@ -1094,7 +1415,7 @@ def optimize_region_ga(
             e_bar=variables.E_bars[0],
             g_bar=variables.G_bars[0],
             g_count=0,
-            spacing_mm=variables.stirrup_spacing_mm[0],
+            spacing_mm=(variables.stirrup_spacing_mm or [variables.stirrup_spacing_min_mm])[0],
             long_bar=variables.longitudinal_bars[0],
             long_count=0,
             failure_mode="input_fail",
@@ -1113,11 +1434,36 @@ def optimize_region_ga(
             failure_counts={"input_fail": 1},
         )
 
+    spacing_domain = spacing_domain_for_region(region, variables, allowed_g_counts)
+    if not spacing_domain:
+        selected = failed_candidate(
+            e_bar=variables.E_bars[0],
+            g_bar=variables.G_bars[0],
+            g_count=allowed_g_counts[0],
+            spacing_mm=variables.stirrup_spacing_min_mm,
+            long_bar=None,
+            long_count=0,
+            failure_mode="input_fail",
+            message=(
+                "No spacing candidate can be generated from evaluated ACI, demand, "
+                "or explicit project limits"
+            ),
+            objective=1.0e9,
+            deficit=1.0,
+        )
+        return OptimizationOutcome(
+            selected=selected,
+            evaluated_candidates=0,
+            feasible_candidates=0,
+            method="genetic",
+            failure_counts={"input_fail": 1},
+        )
+
     domain: list[list[str | int]] = [
         variables.E_bars,
         variables.G_bars,
         allowed_g_counts,
-        variables.stirrup_spacing_mm,
+        spacing_domain,
     ]
     domain_sizes = [len(values) for values in domain]
     if check_longitudinal:
@@ -1152,6 +1498,7 @@ def optimize_region_ga(
             long_bar=default_long_bar,
             long_count=default_long_count,
             check_longitudinal=check_longitudinal,
+            project_spacing_limit_mm=variables.stirrup_spacing_project_max_mm,
         )
         evaluation_cache[key] = candidate
         return candidate
@@ -1162,6 +1509,7 @@ def optimize_region_ga(
         objective=lambda candidate: candidate.objective,
         is_feasible=lambda candidate: candidate.status == "ok",
         failure_mode=lambda candidate: candidate.failure_mode,
+        tie_break=lambda candidate: -candidate.spacing_mm,
     )
     outcome = run_genetic_search(
         domain_sizes=domain_sizes,
@@ -1221,7 +1569,7 @@ def candidate_to_region_result(
         at=candidate.at,
         at_over_s=candidate.at_over_s,
         av_over_s=candidate.av_over_s,
-        long_bar=(candidate.long_bar if candidate.long_count > 0 else ""),
+        long_bar=(candidate.long_bar if candidate.long_count > 0 else None),
         long_count=(candidate.long_count if candidate.long_count > 0 else 0),
         controlling_limit=candidate.controlling_limit,
         failure_mode=candidate.failure_mode,
@@ -1255,6 +1603,16 @@ def candidate_to_region_result(
         detailing_status=candidate.detailing_status,
         overall_status=candidate.overall_status,
         rule_checks=candidate.rule_checks,
+        governing_code_rule=candidate.governing_code_rule,
+        governing_code_limit_mm=candidate.governing_code_limit_mm,
+        governing_demand_check=candidate.governing_demand_check,
+        governing_demand_spacing_limit_mm=candidate.governing_demand_spacing_limit_mm,
+        governing_demand_source=candidate.governing_demand_source,
+        governing_demand_station_mm=candidate.governing_demand_station_mm,
+        governing_project_spacing_limit_mm=candidate.governing_project_spacing_limit_mm,
+        d_mm=demand.d_mm,
+        d_source=demand.d_source,
+        d_ratio=demand.d_ratio,
     )
 
 
@@ -1267,6 +1625,9 @@ def top_region_alternatives(
 ) -> list[RegionDesignResult]:
     allowed_g_counts, _ = g_count_domain_for_region(region, variables.G_counts)
     if not allowed_g_counts:
+        return []
+    spacing_domain = spacing_domain_for_region(region, variables, allowed_g_counts)
+    if not spacing_domain:
         return []
 
     limit: int | None
@@ -1286,7 +1647,7 @@ def top_region_alternatives(
         variables.E_bars,
         variables.G_bars,
         allowed_g_counts,
-        variables.stirrup_spacing_mm,
+        spacing_domain,
     ):
         candidate = evaluate_candidate(
             region,
@@ -1297,6 +1658,7 @@ def top_region_alternatives(
             long_bar=default_long_bar,
             long_count=default_long_count,
             check_longitudinal=check_longitudinal,
+            project_spacing_limit_mm=variables.stirrup_spacing_project_max_mm,
         )
         evaluated.append(candidate)
 
@@ -1305,10 +1667,10 @@ def top_region_alternatives(
         key=lambda candidate: (
             candidate.objective,
             candidate.transverse_weight_kg_per_m,
+            -candidate.spacing_mm,
             candidate.e_bar,
             candidate.g_bar,
             candidate.g_count,
-            candidate.spacing_mm,
         ),
     )
     feasible_count = len(feasible)
@@ -1372,7 +1734,7 @@ def make_failed_region_result(
         g_bar="",
         g_count=0,
         spacing_mm=0,
-        long_bar="",
+        long_bar=None,
         long_count=0,
         failure_mode=failure_mode,
         message=message,

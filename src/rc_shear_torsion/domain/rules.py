@@ -14,7 +14,9 @@ def validate_case_rules(config: CaseConfig) -> list[DomainIssue]:
     variables = config.optimization.variables
     ga = config.optimization.genetic_algorithm
 
-    if any(value <= 0 for value in variables.stirrup_spacing_mm):
+    if variables.stirrup_spacing_mm is not None and any(
+        value <= 0 for value in variables.stirrup_spacing_mm
+    ):
         issues.append(
             _issue(
                 "invalid_range",
@@ -36,6 +38,33 @@ def validate_case_rules(config: CaseConfig) -> list[DomainIssue]:
                 "invalid_range",
                 "optimization.variables.longitudinal_bar_counts",
                 "All values must be > 0",
+            )
+        )
+    if variables.stirrup_spacing_min_mm <= 0:
+        issues.append(
+            _issue(
+                "invalid_range",
+                "optimization.variables.stirrup_spacing_min_mm",
+                "stirrup_spacing_min_mm must be > 0",
+            )
+        )
+    if variables.stirrup_spacing_step_mm <= 0:
+        issues.append(
+            _issue(
+                "invalid_range",
+                "optimization.variables.stirrup_spacing_step_mm",
+                "stirrup_spacing_step_mm must be > 0",
+            )
+        )
+    if (
+        variables.stirrup_spacing_project_max_mm is not None
+        and variables.stirrup_spacing_project_max_mm <= 0.0
+    ):
+        issues.append(
+            _issue(
+                "invalid_range",
+                "optimization.variables.stirrup_spacing_project_max_mm",
+                "stirrup_spacing_project_max_mm must be > 0 when supplied",
             )
         )
     if config.optimization.longitudinal_mode == "span_coupled":
@@ -163,12 +192,18 @@ def validate_case_rules(config: CaseConfig) -> list[DomainIssue]:
                 for region in span.regions:
                     if region.type != "C":
                         continue
-                    if region.d_mm is None or region.db_bar is None:
+                    if (
+                        region.d_mm is None
+                        or (
+                            config.longitudinal_bar_diameter_mm is None
+                            and region.db_bar is None
+                        )
+                    ):
                         issues.append(
                             _issue(
                                 "missing_required",
                                 f"beams[{beam.beam_id}].spans[{span.id}].regions[{region.id}]",
-                                "DES with region type C requires d_mm and db_bar",
+                                "DES with region type C requires d_mm and longitudinal bar diameter",
                             )
                         )
 
@@ -187,22 +222,34 @@ def validate_case_rules(config: CaseConfig) -> list[DomainIssue]:
                                 "DMO with region type NC requires beam fc_mpa and fy_mpa",
                             )
                         )
-                    if region.d_mm is None or region.db_bar is None:
+                    if (
+                        region.d_mm is None
+                        or (
+                            config.longitudinal_bar_diameter_mm is None
+                            and region.db_bar is None
+                        )
+                    ):
                         issues.append(
                             _issue(
                                 "missing_required",
                                 region_path,
-                                "DMO with region type NC requires d_mm and db_bar",
+                                "DMO with region type NC requires d_mm and longitudinal bar diameter",
                             )
                         )
                 if region.type != "C":
                     continue
-                if region.d_mm is None or region.db_bar is None:
+                if (
+                    region.d_mm is None
+                    or (
+                        config.longitudinal_bar_diameter_mm is None
+                        and region.db_bar is None
+                    )
+                ):
                     issues.append(
                         _issue(
                             "missing_required",
                             region_path,
-                            "DMO with region type C requires d_mm and db_bar",
+                            "DMO with region type C requires d_mm and longitudinal bar diameter",
                         )
                     )
                     continue

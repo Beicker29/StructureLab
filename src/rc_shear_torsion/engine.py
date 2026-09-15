@@ -91,7 +91,11 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                 scenarios=tuple(),
                 fc_mpa=beam.fc_mpa,
                 fy_mpa=beam.fy_mpa,
-                compression_rebar_required=beam.compression_rebar_required,
+                compression_rebar_required=config.compression_rebar_required,
+                d_source=region.d_source,
+                d_ratio=region.d_ratio,
+                longitudinal_bar_diameter_mm=config.longitudinal_bar_diameter_mm,
+                longitudinal_bars_bundled=False,
             )
             failed_result = make_failed_region_result(
                 demand,
@@ -156,7 +160,8 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                     span=span,
                     seismic_frame=seismic_frame,
                     gravity_frame=gravity_frame,
-                    compression_rebar_required=beam.compression_rebar_required,
+                    compression_rebar_required=config.compression_rebar_required,
+                    longitudinal_bar_diameter_mm=config.longitudinal_bar_diameter_mm,
                 )
                 if errors:
                     message = "; ".join(errors)

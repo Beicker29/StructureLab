@@ -17,13 +17,25 @@ from rc_shear_torsion.codes.aci318_25.common import (
     spacing_limit_check,
 )
 from rc_shear_torsion.codes.aci318_25.shear import maximum_shear_spacing_limits
+from rc_shear_torsion.codes.aci318_25.seismic import (
+    SeismicTransverseRegionKind,
+    check_first_seismic_transverse_reinforcement_location,
+    check_seismic_transverse_zone_extent,
+)
 from rc_shear_torsion.codes.aci318_25.ties import TieRuleScope, select_tie_rule_scope
 from rc_shear_torsion.codes.aci318_25.torsion import (
     check_minimum_transverse_reinforcement_for_torsion,
     torsion_spacing_limits,
 )
 from rc_shear_torsion import optimization
-from rc_shear_torsion.design import Candidate, RegionDesignResult
+from rc_shear_torsion.design import (
+    Candidate,
+    DemandScenario,
+    RegionDemand,
+    RegionDesignResult,
+    optimize_region_exhaustive,
+)
+from rc_shear_torsion.models import VariablesConfig
 
 
 def _evaluate(
@@ -34,12 +46,17 @@ def _evaluate(
     compression_rebar_required: bool = False,
     spacing_mm: float = 100.0,
     include_geometry: bool = True,
+    d_mm: float = 600.0,
+    height_mm: float = 600.0,
+    seismic_zone_length_mm: float | None = None,
+    first_seismic_transverse_distance_mm: float | None = None,
+    seismic_region_kind: SeismicTransverseRegionKind | None = None,
 ):
     return evaluate_region_rules(
         system=system,
         zone=zone,
         spacing_mm=spacing_mm,
-        d_mm=600.0,
+        d_mm=d_mm,
         longitudinal_bar_diameter_mm=15.9,
         transverse_bar_diameter_mm=9.5,
         minimum_branches=2,
@@ -48,7 +65,7 @@ def _evaluate(
         torsion_states=("ACTIVE" if torsion_active else "INACTIVE",),
         torsion_station=2000.0,
         width_mm=300.0 if include_geometry else None,
-        height_mm=600.0 if include_geometry else None,
+        height_mm=height_mm if include_geometry else None,
         cover_side_mm=40.0 if include_geometry else None,
         cover_top_mm=40.0 if include_geometry else None,
         cover_bottom_mm=40.0 if include_geometry else None,
@@ -58,6 +75,9 @@ def _evaluate(
         shear_station=1000.0,
         provided_combined_transverse_mm2_per_m=1420.0,
         closed_stirrup_bar_diameter_mm=9.5,
+        seismic_zone_length_mm=seismic_zone_length_mm,
+        first_seismic_transverse_distance_mm=first_seismic_transverse_distance_mm,
+        seismic_region_kind=seismic_region_kind,
     )
 
 
@@ -240,6 +260,279 @@ class Phase2AciEngineTests(unittest.TestCase):
         self.assertEqual(absolute.check.section, "18.4.2.4(d)")
         self.assertNotIn("150", {limit.label for limit in dmo_limits})
 
+    def test_dmo_end_zone_length_passes_when_two_h_is_provided(self) -> None:
+        check = check_seismic_transverse_zone_extent(
+            system="DMO",
+            zone="C",
+            h_mm=600.0,
+            provided_zone_length_mm=1200.0,
+        )
+        self.assertEqual(check.rule_id, "ACI318_25_18_4_2_4_END_ZONE_LENGTH")
+        self.assertEqual(check.section, "18.4.2.4")
+        self.assertEqual(check.required_value, 1200.0)
+        self.assertEqual(check.provided_value, 1200.0)
+        self.assertEqual(check.unit, "mm")
+        self.assertEqual(check.status, RuleStatus.PASS)
+        self.assertIn("supporting member", check.applicability_reason)
+
+    def test_dmo_end_zone_length_fails_when_shorter_than_two_h(self) -> None:
+        check = check_seismic_transverse_zone_extent(
+            system="DMO",
+            zone="C",
+            h_mm=600.0,
+            provided_zone_length_mm=1199.0,
+        )
+        self.assertEqual(check.status, RuleStatus.FAIL)
+        self.assertEqual(check.margin, -1.0)
+
+    def test_dmo_end_zone_length_without_actual_length_is_not_evaluated(self) -> None:
+        check = check_seismic_transverse_zone_extent(
+            system="DMO",
+            zone="C",
+            h_mm=600.0,
+            provided_zone_length_mm=None,
+        )
+        self.assertEqual(check.status, RuleStatus.NOT_EVALUATED)
+        self.assertEqual(check.required_value, 1200.0)
+        self.assertIsNone(check.provided_value)
+
+    def test_dmo_zone_uses_total_height_while_spacing_keeps_effective_depth(self) -> None:
+        evaluation = _evaluate(
+            system="DMO",
+            d_mm=400.0,
+            height_mm=600.0,
+            seismic_zone_length_mm=1000.0,
+        )
+        zone_check = next(
+            check
+            for check in evaluation.checks
+            if check.rule_id == "ACI318_25_18_4_2_4_END_ZONE_LENGTH"
+        )
+        d_over_4 = next(
+            limit
+            for limit in evaluation.spacing_limits
+            if limit.check.rule_id == "ACI318_25_18_4_2_4_D_OVER_4"
+        )
+        self.assertEqual(zone_check.required_value, 1200.0)
+        self.assertEqual(zone_check.status, RuleStatus.FAIL)
+        self.assertEqual(d_over_4.maximum_mm, 100.0)
+
+    def test_dmo_first_stirrup_at_limit_passes(self) -> None:
+        check = check_first_seismic_transverse_reinforcement_location(
+            system="DMO",
+            zone="C",
+            first_distance_mm=50.0,
+        )
+        self.assertEqual(
+            check.rule_id,
+            "ACI318_25_18_4_2_4_FIRST_TRANSVERSE_LOCATION",
+        )
+        self.assertEqual(check.section, "18.4.2.4")
+        self.assertEqual(check.required_value, 50.0)
+        self.assertEqual(check.provided_value, 50.0)
+        self.assertEqual(check.unit, "mm")
+        self.assertEqual(check.status, RuleStatus.PASS)
+
+    def test_dmo_first_stirrup_beyond_limit_fails(self) -> None:
+        check = check_first_seismic_transverse_reinforcement_location(
+            system="DMO",
+            zone="C",
+            first_distance_mm=50.1,
+        )
+        self.assertEqual(check.status, RuleStatus.FAIL)
+        self.assertAlmostEqual(check.margin, -0.1)
+
+    def test_dmo_first_stirrup_without_position_is_not_evaluated(self) -> None:
+        check = check_first_seismic_transverse_reinforcement_location(
+            system="DMO",
+            zone="C",
+            first_distance_mm=None,
+        )
+        self.assertEqual(check.status, RuleStatus.NOT_EVALUATED)
+        self.assertEqual(check.required_value, 50.0)
+        self.assertIsNone(check.provided_value)
+
+    def test_des_beam_end_region_is_identified_and_checked(self) -> None:
+        check = check_seismic_transverse_zone_extent(
+            system="DES",
+            zone="C",
+            h_mm=600.0,
+            provided_zone_length_mm=1200.0,
+            region_kind=SeismicTransverseRegionKind.BEAM_END,
+        )
+        self.assertEqual(check.rule_id, "ACI318_25_18_6_4_1_A_END_ZONE_LENGTH")
+        self.assertEqual(check.section, "18.6.4.1(a)")
+        self.assertEqual(check.status, RuleStatus.PASS)
+
+    def test_des_probable_yielding_region_checks_two_h_on_each_side(self) -> None:
+        check = check_seismic_transverse_zone_extent(
+            system="DES",
+            zone="C",
+            h_mm=600.0,
+            provided_zone_length_mm=None,
+            region_kind=SeismicTransverseRegionKind.POTENTIAL_FLEXURAL_YIELDING,
+            yielding_extension_before_mm=1200.0,
+            yielding_extension_after_mm=1250.0,
+        )
+        self.assertEqual(
+            check.rule_id,
+            "ACI318_25_18_6_4_1_B_YIELD_ZONE_EXTENSION",
+        )
+        self.assertEqual(check.section, "18.6.4.1(b)")
+        self.assertEqual(check.required_value, 1200.0)
+        self.assertEqual(check.provided_value, 1200.0)
+        self.assertEqual(check.status, RuleStatus.PASS)
+
+    def test_des_probable_yielding_region_without_extensions_is_not_evaluated(self) -> None:
+        check = check_seismic_transverse_zone_extent(
+            system="DES",
+            zone="C",
+            h_mm=600.0,
+            provided_zone_length_mm=None,
+            region_kind=SeismicTransverseRegionKind.POTENTIAL_FLEXURAL_YIELDING,
+        )
+        self.assertEqual(check.section, "18.6.4.1(b)")
+        self.assertEqual(check.status, RuleStatus.NOT_EVALUATED)
+
+    def test_des_without_region_basis_is_not_evaluated(self) -> None:
+        check = check_seismic_transverse_zone_extent(
+            system="DES",
+            zone="C",
+            h_mm=600.0,
+            provided_zone_length_mm=1200.0,
+        )
+        self.assertEqual(check.section, "18.6.4.1(a)-(b)")
+        self.assertEqual(check.status, RuleStatus.NOT_EVALUATED)
+        self.assertIn("region basis", check.applicability_reason)
+
+    def test_des_first_hoop_at_limit_passes(self) -> None:
+        check = check_first_seismic_transverse_reinforcement_location(
+            system="DES",
+            zone="C",
+            first_distance_mm=50.0,
+            region_kind=SeismicTransverseRegionKind.BEAM_END,
+        )
+        self.assertEqual(
+            check.rule_id,
+            "ACI318_25_18_6_4_4_FIRST_TRANSVERSE_LOCATION",
+        )
+        self.assertEqual(check.section, "18.6.4.4")
+        self.assertEqual(check.status, RuleStatus.PASS)
+
+    def test_des_first_hoop_beyond_limit_fails(self) -> None:
+        check = check_first_seismic_transverse_reinforcement_location(
+            system="DES",
+            zone="C",
+            first_distance_mm=51.0,
+            region_kind=SeismicTransverseRegionKind.BEAM_END,
+        )
+        self.assertEqual(check.status, RuleStatus.FAIL)
+        self.assertEqual(check.margin, -1.0)
+
+    def test_des_first_hoop_without_position_is_not_evaluated(self) -> None:
+        check = check_first_seismic_transverse_reinforcement_location(
+            system="DES",
+            zone="C",
+            first_distance_mm=None,
+            region_kind=SeismicTransverseRegionKind.BEAM_END,
+        )
+        self.assertEqual(check.status, RuleStatus.NOT_EVALUATED)
+        self.assertEqual(check.required_value, 50.0)
+
+    def test_zone_and_first_stirrup_checks_do_not_change_spacing_limits(self) -> None:
+        without_location_data = _evaluate(system="DMO")
+        with_failing_location_data = _evaluate(
+            system="DMO",
+            seismic_zone_length_mm=1199.0,
+            first_seismic_transverse_distance_mm=51.0,
+        )
+        limit_signature = lambda evaluation: tuple(
+            (
+                limit.check.rule_id,
+                limit.maximum_mm,
+                limit.check.status,
+            )
+            for limit in evaluation.spacing_limits
+        )
+        self.assertEqual(
+            limit_signature(without_location_data),
+            limit_signature(with_failing_location_data),
+        )
+        new_statuses = {
+            check.rule_id: check.status
+            for check in with_failing_location_data.checks
+            if check.rule_id in {
+                "ACI318_25_18_4_2_4_END_ZONE_LENGTH",
+                "ACI318_25_18_4_2_4_FIRST_TRANSVERSE_LOCATION",
+            }
+        }
+        self.assertEqual(
+            new_statuses,
+            {
+                "ACI318_25_18_4_2_4_END_ZONE_LENGTH": RuleStatus.FAIL,
+                "ACI318_25_18_4_2_4_FIRST_TRANSVERSE_LOCATION": RuleStatus.FAIL,
+            },
+        )
+
+    def test_fixed_region_failure_is_reported_without_discarding_best_candidate(self) -> None:
+        scenario = DemandScenario(
+            source="SEISMIC",
+            station_mm=0.0,
+            x_relative=0.0,
+            region_id="R1",
+            v_rebar_mm2_per_m=0.0,
+            t_transverse_mm2_per_m=0.0,
+            t_longitudinal_mm2=0.0,
+            torsion_state="INACTIVE",
+            source_row=1,
+        )
+        region = RegionDemand(
+            beam_id="B1",
+            span_id="S1",
+            region_id="R1",
+            region_type="C",
+            beam_detailing="DMO",
+            d_mm=600.0,
+            db_bar="#6",
+            min_branches=4,
+            width_mm=300.0,
+            height_mm=600.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            scenarios=(scenario,),
+            fc_mpa=28.0,
+            fy_mpa=420.0,
+            region_length_mm=1199.0,
+        )
+        variables = VariablesConfig(
+            E_bars=["#3"],
+            G_bars=["#3"],
+            G_counts=[2],
+            stirrup_spacing_mm=[100],
+            longitudinal_bars=["#4"],
+            longitudinal_bar_counts=[2],
+        )
+
+        outcome = optimize_region_exhaustive(
+            region,
+            variables,
+            check_longitudinal=False,
+        )
+        candidate = outcome.selected
+        zone_check = next(
+            check
+            for check in candidate.rule_checks
+            if check.rule_id == "ACI318_25_18_4_2_4_END_ZONE_LENGTH"
+        )
+
+        self.assertEqual(outcome.feasible_candidates, 1)
+        self.assertEqual(candidate.status, "ok")
+        self.assertEqual(zone_check.status, RuleStatus.FAIL)
+        self.assertFalse(zone_check.candidate_dependent)
+        self.assertEqual(candidate.detailing_status, RuleStatus.FAIL)
+        self.assertEqual(candidate.overall_status, RuleStatus.FAIL)
+
     def test_compression_false_does_not_activate_full_ties(self) -> None:
         self.assertEqual(
             select_tie_rule_scope(
@@ -260,9 +553,10 @@ class Phase2AciEngineTests(unittest.TestCase):
             TieRuleScope.FULL,
         )
         evaluation = _evaluate(system="DMI", zone="NC", compression_rebar_required=True)
-        full_check = next(check for check in evaluation.checks if "FULL_TIE" in check.rule_id)
-        self.assertEqual(full_check.status, RuleStatus.NOT_EVALUATED)
-        self.assertEqual(full_check.section, "9.7.6.4.1-9.7.6.4.4")
+        size_check = next(check for check in evaluation.checks if check.section == "9.7.6.4.2")
+        arrangement_check = next(check for check in evaluation.checks if check.section == "9.7.6.4.4")
+        self.assertEqual(size_check.status, RuleStatus.PASS)
+        self.assertEqual(arrangement_check.status, RuleStatus.NOT_EVALUATED)
 
     def test_des_confined_selects_lateral_support_only(self) -> None:
         self.assertEqual(
