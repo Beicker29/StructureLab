@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import os
@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from openpyxl import load_workbook
 
+from rc_shear_torsion.codes.aci318_25 import RuleStatus
 from rc_shear_torsion.domain.errors import DomainValidationError
 from rc_shear_torsion.domain.validation import validate_case_payload
 from rc_shear_torsion.design import (
@@ -566,7 +567,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(candidate.failure_mode, "region_detail_fail")
         self.assertIn("minimum branches", candidate.message)
 
-    def test_dmo_region_torsion_requires_at_least_two_user_branches(self) -> None:
+    def test_closed_exterior_stirrup_satisfies_torsion_with_user_minimum_one(self) -> None:
         region = _region_demand(
             beam_id="B1",
             span_id="S1",
@@ -599,10 +600,16 @@ class CoreTests(unittest.TestCase):
             long_bar="#4",
             long_count=2,
         )
-        self.assertEqual(candidate.status, "fail")
-        self.assertEqual(candidate.failure_mode, "region_detail_fail")
-        self.assertIn("TTrnRebar>0", candidate.message)
-        self.assertIn("min_branches >= 2", candidate.message)
+        self.assertEqual(candidate.status, "ok")
+        self.assertEqual(candidate.detailing_status, RuleStatus.NOT_EVALUATED)
+        self.assertEqual(candidate.overall_status, RuleStatus.NOT_EVALUATED)
+        self.assertIn("NOT_EVALUATED", candidate.message)
+        closed_stirrup = next(
+            check
+            for check in candidate.rule_checks
+            if check.rule_id == "ACI318_25_9_7_6_3_1_CLOSED_STIRRUP"
+        )
+        self.assertEqual(closed_stirrup.status, RuleStatus.PASS)
 
     def test_min_branches_is_enforced_in_optimization_domain(self) -> None:
         region = _region_demand(

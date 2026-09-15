@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from ...tolerances import spacing_comparison_tolerance_mm
+
 
 ACI_CODE_ID = "ACI_318_25"
 ACI_CODE_SOURCE = "ACI 318-25 Code"
@@ -73,7 +75,11 @@ def spacing_limit_check(
     station: float | None = None,
 ) -> SpacingLimit:
     margin = maximum_mm - provided_mm
-    status = RuleStatus.PASS if margin >= -1.0e-9 else RuleStatus.FAIL
+    status = (
+        RuleStatus.PASS
+        if margin >= -spacing_comparison_tolerance_mm
+        else RuleStatus.FAIL
+    )
     return SpacingLimit(
         label=label,
         check=RuleCheck(

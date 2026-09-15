@@ -4,7 +4,11 @@ from .common import AciRuleEvaluation, RuleCheck, RuleStatus, SpacingLimit, sele
 from .seismic import seismic_spacing_limits
 from .shear import check_minimum_shear_reinforcement, maximum_shear_spacing_limits
 from .ties import TieRuleScope, select_tie_rule_scope, tie_rule_checks
-from .torsion import check_closed_stirrup_for_torsion, torsion_spacing_limits
+from .torsion import (
+    check_closed_stirrup_for_torsion,
+    check_minimum_transverse_reinforcement_for_torsion,
+    torsion_spacing_limits,
+)
 
 
 def evaluate_region_rules(
@@ -29,6 +33,8 @@ def evaluate_region_rules(
     fy_mpa: float | None,
     required_av_per_s_mm2_per_m: float | None,
     shear_station: float | None,
+    provided_combined_transverse_mm2_per_m: float | None = None,
+    closed_stirrup_bar_diameter_mm: float | None = None,
 ) -> AciRuleEvaluation:
     checks: list[RuleCheck] = []
     spacing_limits: list[SpacingLimit] = []
@@ -49,6 +55,16 @@ def evaluate_region_rules(
     checks.extend(shear_checks)
 
     checks.append(
+        check_minimum_transverse_reinforcement_for_torsion(
+            torsion_states=torsion_states,
+            fc_mpa=fc_mpa,
+            bw_mm=width_mm,
+            fyt_mpa=fy_mpa,
+            provided_combined_mm2_per_m=provided_combined_transverse_mm2_per_m,
+            station=torsion_station,
+        )
+    )
+    checks.append(
         check_closed_stirrup_for_torsion(
             torsion_states=torsion_states,
             minimum_branches=minimum_branches,
@@ -64,6 +80,7 @@ def evaluate_region_rules(
         cover_side_mm=cover_side_mm,
         cover_top_mm=cover_top_mm,
         cover_bottom_mm=cover_bottom_mm,
+        closed_stirrup_bar_diameter_mm=closed_stirrup_bar_diameter_mm,
         station=torsion_station,
     )
     spacing_limits.extend(torsion_limits)

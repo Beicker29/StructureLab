@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 
+from ...tolerances import reinforcement_grade_tolerance_mpa
 from .applicability import ApplicabilityStatus, required_fields
 from .common import RuleCheck, SpacingLimit, not_applicable_check, not_evaluated_check, spacing_limit_check
 
@@ -150,7 +151,12 @@ def seismic_spacing_limits(
                     unit="mm",
                 )
             )
-        elif math.isclose(fy_mpa, 420.0, abs_tol=1.0e-9):
+        elif math.isclose(
+            fy_mpa,
+            420.0,
+            rel_tol=0.0,
+            abs_tol=reinforcement_grade_tolerance_mpa,
+        ):
             limits.append(
                 spacing_limit_check(
                     rule_id="ACI318_25_18_6_4_4_SIX_DB_GRADE_420",
@@ -161,7 +167,12 @@ def seismic_spacing_limits(
                     label="6db",
                 )
             )
-        elif math.isclose(fy_mpa, 550.0, abs_tol=1.0e-9):
+        elif math.isclose(
+            fy_mpa,
+            550.0,
+            rel_tol=0.0,
+            abs_tol=reinforcement_grade_tolerance_mpa,
+        ):
             limits.append(
                 spacing_limit_check(
                     rule_id="ACI318_25_18_6_4_4_FIVE_DB_GRADE_550",

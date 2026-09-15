@@ -1,41 +1,50 @@
 code_id: ACI_318_25
 rules:
+  - rule_id: ACI318_25_9_6_4_2_COMBINED_TRANSVERSE_MINIMUM
+    module: rc_shear_torsion.codes.aci318_25.torsion
+    function: check_minimum_transverse_reinforcement_for_torsion
+    aci_section: "9.6.4.2"
+    applicability: Torsional reinforcement is required by at least one physical demand scenario.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Greater of the two SI expressions; required and provided values are reported in mm2/m.
   - rule_id: ACI318_25_9_7_6_2_2_LOW_D_LIMIT
     module: rc_shear_torsion.codes.aci318_25.shear
     function: maximum_shear_spacing_limits
-    aci_section: "9.7.6.2.2, Table 9.7.6.2.2"
+    aci_section: "9.7.6.2.2, Table 9.7.6.2.2; 22.5.8.5.3"
     applicability: Nonprestressed beam; required Vs does not exceed 0.33*sqrt(fc')*bw*d.
     implemented: true
     tested: true
     test_file: tests/test_phase2_aci_engine.py
-    notes: Maximum spacing component d/2; SI units.
+    notes: Maximum spacing component d/2; required Vs is reconstructed from ETABS Av/s using 22.5.8.5.3; SI units.
   - rule_id: ACI318_25_9_7_6_2_2_LOW_ABSOLUTE_LIMIT
     module: rc_shear_torsion.codes.aci318_25.shear
     function: maximum_shear_spacing_limits
-    aci_section: "9.7.6.2.2, Table 9.7.6.2.2"
+    aci_section: "9.7.6.2.2, Table 9.7.6.2.2; 22.5.8.5.3"
     applicability: Nonprestressed beam; required Vs does not exceed 0.33*sqrt(fc')*bw*d.
     implemented: true
     tested: true
     test_file: tests/test_phase2_aci_engine.py
-    notes: Maximum spacing component 600 mm; SI units.
+    notes: Maximum spacing component 600 mm; required Vs is reconstructed from ETABS Av/s using 22.5.8.5.3; SI units.
   - rule_id: ACI318_25_9_7_6_2_2_HIGH_D_LIMIT
     module: rc_shear_torsion.codes.aci318_25.shear
     function: maximum_shear_spacing_limits
-    aci_section: "9.7.6.2.2, Table 9.7.6.2.2"
+    aci_section: "9.7.6.2.2, Table 9.7.6.2.2; 22.5.8.5.3"
     applicability: Nonprestressed beam; required Vs exceeds 0.33*sqrt(fc')*bw*d.
     implemented: true
     tested: true
     test_file: tests/test_phase2_aci_engine.py
-    notes: Maximum spacing component d/4; SI units.
+    notes: Maximum spacing component d/4; required Vs is reconstructed from ETABS Av/s using 22.5.8.5.3; SI units.
   - rule_id: ACI318_25_9_7_6_2_2_HIGH_ABSOLUTE_LIMIT
     module: rc_shear_torsion.codes.aci318_25.shear
     function: maximum_shear_spacing_limits
-    aci_section: "9.7.6.2.2, Table 9.7.6.2.2"
+    aci_section: "9.7.6.2.2, Table 9.7.6.2.2; 22.5.8.5.3"
     applicability: Nonprestressed beam; required Vs exceeds 0.33*sqrt(fc')*bw*d.
     implemented: true
     tested: true
     test_file: tests/test_phase2_aci_engine.py
-    notes: Maximum spacing component 300 mm; SI units.
+    notes: Maximum spacing component 300 mm; required Vs is reconstructed from ETABS Av/s using 22.5.8.5.3; SI units.
   - rule_id: ACI318_25_9_7_6_3_1_CLOSED_STIRRUP
     module: rc_shear_torsion.codes.aci318_25.torsion
     function: check_closed_stirrup_for_torsion
@@ -53,7 +62,7 @@ rules:
     implemented: true
     tested: true
     test_file: tests/test_phase2_aci_engine.py
-    notes: Maximum spacing component Ph/8; inactive torsion is NOT_APPLICABLE.
+    notes: Maximum spacing component ph/8 using the centerline perimeter of the exterior closed stirrup; inactive torsion is NOT_APPLICABLE.
   - rule_id: ACI318_25_9_7_6_3_3_300_MM
     module: rc_shear_torsion.codes.aci318_25.torsion
     function: torsion_spacing_limits

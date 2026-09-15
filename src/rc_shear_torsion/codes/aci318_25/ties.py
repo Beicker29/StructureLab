@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from .common import RuleCheck, SpacingLimit, not_applicable_check, not_evaluated_check, spacing_limit_check
+from .common import RuleCheck, SpacingLimit, not_applicable_check, not_evaluated_check
 
 
 class TieRuleScope(str, Enum):
@@ -31,8 +31,8 @@ def tie_rule_checks(
     if scope == TieRuleScope.NONE:
         return (), (
             not_applicable_check(
-                rule_id="ACI318_25_25_7_2_TIE_SCOPE",
-                section="25.7.2",
+                rule_id="ACI318_25_9_7_6_4_TIE_SCOPE",
+                section="9.7.6.4.1",
                 reason="Full ties are not activated because compression_rebar_required is false; DES confined lateral support is not applicable",
             ),
         )
@@ -54,8 +54,8 @@ def tie_rule_checks(
     )
     return (), (
         not_evaluated_check(
-            rule_id="ACI318_25_25_7_2_FULL_TIE_DETAILING",
-            section="25.7.2.1-25.7.2.4",
+            rule_id="ACI318_25_9_7_6_4_FULL_TIE_DETAILING",
+            section="9.7.6.4.1-9.7.6.4.4",
             reason=(
                 "FULL tie scope applies, but the Phase 2 contract does not distinguish the smallest and largest "
                 "enclosed longitudinal bars, bundled bars, and every transverse component; numerical tie checks "

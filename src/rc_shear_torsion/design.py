@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import itertools
 import math
@@ -666,6 +666,18 @@ def evaluate_candidate(
             rule_checks=rule_evaluation.checks,
         )
 
+    if rule_evaluation.detailing_status == RuleStatus.NOT_EVALUATED:
+        success_message = (
+            "Candidate satisfies physical demands and evaluated ACI detailing rules; "
+            "unresolved ACI rules remain NOT_EVALUATED"
+        )
+    elif rule_evaluation.detailing_status == RuleStatus.NOT_APPLICABLE:
+        success_message = (
+            "Candidate satisfies physical demands; ACI detailing rules are NOT_APPLICABLE"
+        )
+    else:
+        success_message = "Candidate satisfies physical demands and ACI detailing rules"
+
     return Candidate(
         e_bar=e_bar,
         g_bar=g_bar,
@@ -683,7 +695,7 @@ def evaluate_candidate(
         f_free=f_free,
         failure_mode="ok",
         status="ok",
-        message="Candidate satisfies torsion, shear, and detailing checks",
+        message=success_message,
         objective=objective,
         score=objective,
         transverse_weight_kg_per_m=transverse_weight_kg_per_m,
@@ -784,6 +796,8 @@ def evaluate_region_rule_checks(
     longitudinal_diameter = BAR_DIAMETERS_MM.get(region.db_bar or "")
     e_diameter = BAR_DIAMETERS_MM.get(e_bar)
     g_diameter = BAR_DIAMETERS_MM.get(g_bar) if g_count > 0 else None
+    e_area = BAR_AREAS_MM2.get(e_bar)
+    g_area = BAR_AREAS_MM2.get(g_bar) if g_count > 0 else 0.0
     transverse_diameter = min(
         diameter for diameter in (e_diameter, g_diameter) if diameter is not None
     ) if e_diameter is not None else None
@@ -816,6 +830,12 @@ def evaluate_region_rule_checks(
             shear_controller.v_rebar_mm2_per_m if shear_controller is not None else None
         ),
         shear_station=(shear_controller.station_mm if shear_controller is not None else None),
+        provided_combined_transverse_mm2_per_m=(
+            ((2.0 * e_area) + (g_count * g_area)) * 1000.0 / spacing_mm
+            if e_area is not None and g_area is not None and spacing_mm > 0
+            else None
+        ),
+        closed_stirrup_bar_diameter_mm=e_diameter,
     )
 
 
@@ -857,34 +877,6 @@ def format_rule_evaluation_message(
     )
     return failure.applicability_reason if failure is not None else "ACI detailing rules satisfied"
 
-
-def check_region_rule(
-    region: RegionDemand,
-    *,
-    spacing_mm: int,
-    g_count: int,
-    long_count: int,
-    e_bar: str,
-    g_bar: str,
-) -> tuple[bool, str, str]:
-    """Temporary compatibility adapter over the single modular ACI engine."""
-    _ = long_count
-    evaluation = evaluate_region_rule_checks(
-        region,
-        spacing_mm=spacing_mm,
-        g_count=g_count,
-        e_bar=e_bar,
-        g_bar=g_bar,
-    )
-    controlling = evaluation.controlling_limit
-    controlling_label = controlling.label if controlling is not None else "N/A"
-    if not evaluation.passes_enforced_rules:
-        return False, format_rule_evaluation_message(region, spacing_mm, evaluation), controlling_label
-    if evaluation.detailing_status == RuleStatus.NOT_EVALUATED:
-        return True, "Evaluated ACI rules satisfied; unresolved rules remain NOT_EVALUATED", controlling_label
-    if evaluation.detailing_status == RuleStatus.NOT_APPLICABLE:
-        return True, "ACI detailing rules are not applicable", "N/A"
-    return True, "ACI detailing rules satisfied", controlling_label
 
 def deficit_ratio(required: float, provided: float) -> float:
     if required <= 0.0:

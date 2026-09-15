@@ -18,6 +18,10 @@ from rc_shear_torsion.codes.aci318_25.common import (
 )
 from rc_shear_torsion.codes.aci318_25.shear import maximum_shear_spacing_limits
 from rc_shear_torsion.codes.aci318_25.ties import TieRuleScope, select_tie_rule_scope
+from rc_shear_torsion.codes.aci318_25.torsion import (
+    check_minimum_transverse_reinforcement_for_torsion,
+    torsion_spacing_limits,
+)
 from rc_shear_torsion import optimization
 from rc_shear_torsion.design import Candidate, RegionDesignResult
 
@@ -52,6 +56,8 @@ def _evaluate(
         fy_mpa=420.0,
         required_av_per_s_mm2_per_m=10.0,
         shear_station=1000.0,
+        provided_combined_transverse_mm2_per_m=1420.0,
+        closed_stirrup_bar_diameter_mm=9.5,
     )
 
 
@@ -161,6 +167,67 @@ class Phase2AciEngineTests(unittest.TestCase):
         ph_limit = next(limit for limit in active.spacing_limits if limit.label == "Ph/8")
         self.assertEqual(ph_limit.check.section, "9.7.6.3.3")
 
+    def test_ph_uses_centerline_perimeter_of_exterior_closed_stirrup(self) -> None:
+        limits, _ = torsion_spacing_limits(
+            torsion_states=("ACTIVE",),
+            spacing_mm=100.0,
+            width_mm=300.0,
+            height_mm=600.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+            closed_stirrup_bar_diameter_mm=9.5,
+        )
+        ph_limit = next(limit for limit in limits if limit.label == "Ph/8")
+        expected_ph_mm = 2.0 * (210.5 + 510.5)
+        self.assertEqual(ph_limit.maximum_mm, expected_ph_mm / 8.0)
+
+    def test_active_torsion_missing_stirrup_diameter_is_not_evaluated(self) -> None:
+        limits, checks = torsion_spacing_limits(
+            torsion_states=("ACTIVE",),
+            spacing_mm=100.0,
+            width_mm=300.0,
+            height_mm=600.0,
+            cover_side_mm=40.0,
+            cover_top_mm=40.0,
+            cover_bottom_mm=40.0,
+        )
+        self.assertEqual(limits, ())
+        self.assertEqual(checks[0].status, RuleStatus.NOT_EVALUATED)
+        self.assertIn("closed_stirrup_bar_diameter_mm", checks[0].applicability_reason)
+
+    def test_active_torsion_checks_combined_transverse_minimum(self) -> None:
+        failed = check_minimum_transverse_reinforcement_for_torsion(
+            torsion_states=("ACTIVE",),
+            fc_mpa=25.0,
+            bw_mm=300.0,
+            fyt_mpa=420.0,
+            provided_combined_mm2_per_m=200.0,
+        )
+        self.assertEqual(failed.section, "9.6.4.2")
+        self.assertEqual(failed.required_value, 250.0)
+        self.assertEqual(failed.status, RuleStatus.FAIL)
+        self.assertEqual(failed.margin, -50.0)
+
+        passed = check_minimum_transverse_reinforcement_for_torsion(
+            torsion_states=("ACTIVE",),
+            fc_mpa=25.0,
+            bw_mm=300.0,
+            fyt_mpa=420.0,
+            provided_combined_mm2_per_m=250.0,
+        )
+        self.assertEqual(passed.status, RuleStatus.PASS)
+
+    def test_inactive_torsion_makes_combined_minimum_not_applicable(self) -> None:
+        check = check_minimum_transverse_reinforcement_for_torsion(
+            torsion_states=("INACTIVE",),
+            fc_mpa=None,
+            bw_mm=None,
+            fyt_mpa=None,
+            provided_combined_mm2_per_m=None,
+        )
+        self.assertEqual(check.status, RuleStatus.NOT_APPLICABLE)
+
     def test_dmo_confined_uses_confirmed_300_mm_limit(self) -> None:
         evaluation = _evaluate(system="DMO", torsion_active=False)
         dmo_limits = [
@@ -195,6 +262,7 @@ class Phase2AciEngineTests(unittest.TestCase):
         evaluation = _evaluate(system="DMI", zone="NC", compression_rebar_required=True)
         full_check = next(check for check in evaluation.checks if "FULL_TIE" in check.rule_id)
         self.assertEqual(full_check.status, RuleStatus.NOT_EVALUATED)
+        self.assertEqual(full_check.section, "9.7.6.4.1-9.7.6.4.4")
 
     def test_des_confined_selects_lateral_support_only(self) -> None:
         self.assertEqual(
@@ -267,6 +335,24 @@ class Phase2AciEngineTests(unittest.TestCase):
         )
         self.assertEqual({limit.label for limit in limits}, {"d/4", "300"})
         self.assertTrue(all(check.station == 123.0 for check in checks))
+        self.assertTrue(all("22.5.8.5.3" in check.section for check in checks))
+
+    def test_general_shear_spacing_low_case_has_both_table_limits(self) -> None:
+        limits, _ = maximum_shear_spacing_limits(
+            spacing_mm=200.0,
+            d_mm=600.0,
+            fc_mpa=25.0,
+            bw_mm=300.0,
+            fy_mpa=420.0,
+            required_av_per_s_mm2_per_m=10.0,
+        )
+        self.assertEqual(
+            {limit.check.rule_id: limit.maximum_mm for limit in limits},
+            {
+                "ACI318_25_9_7_6_2_2_LOW_D_LIMIT": 300.0,
+                "ACI318_25_9_7_6_2_2_LOW_ABSOLUTE_LIMIT": 600.0,
+            },
+        )
 
     def test_not_evaluated_never_aggregates_to_pass(self) -> None:
         evaluation = _evaluate(system="DMI")

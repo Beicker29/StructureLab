@@ -6,6 +6,11 @@ from .applicability import ApplicabilityStatus, required_fields, shear_minimum_a
 from .common import RuleCheck, SpacingLimit, not_evaluated_check, spacing_limit_check
 
 
+SHEAR_SPACING_SECTION = (
+    "9.7.6.2.2, Table 9.7.6.2.2; Vs from 22.5.8.5.3"
+)
+
+
 def check_minimum_shear_reinforcement(
     *,
     vu_n: float | None,
@@ -40,7 +45,7 @@ def maximum_shear_spacing_limits(
     if decision.status == ApplicabilityStatus.MISSING_DATA:
         check = not_evaluated_check(
             rule_id="ACI318_25_9_7_6_2_2_SHEAR_SPACING",
-            section="9.7.6.2.2, Table 9.7.6.2.2",
+            section=SHEAR_SPACING_SECTION,
             reason=decision.reason,
             provided_value=spacing_mm,
             unit="mm",
@@ -68,7 +73,7 @@ def maximum_shear_spacing_limits(
     limits = (
         spacing_limit_check(
             rule_id=f"ACI318_25_9_7_6_2_2_{'HIGH' if high_shear else 'LOW'}_D_LIMIT",
-            section="9.7.6.2.2, Table 9.7.6.2.2",
+            section=SHEAR_SPACING_SECTION,
             reason=case_reason,
             maximum_mm=d_mm / factor,
             provided_mm=spacing_mm,
@@ -77,7 +82,7 @@ def maximum_shear_spacing_limits(
         ),
         spacing_limit_check(
             rule_id=f"ACI318_25_9_7_6_2_2_{'HIGH' if high_shear else 'LOW'}_ABSOLUTE_LIMIT",
-            section="9.7.6.2.2, Table 9.7.6.2.2",
+            section=SHEAR_SPACING_SECTION,
             reason=case_reason,
             maximum_mm=absolute_limit,
             provided_mm=spacing_mm,
