@@ -235,24 +235,10 @@ def build_validated_case_payload(
             field_name=f"d_ratio vano {span_id}",
         )
         span_d_mm = span_height_mm * span_d_ratio
-        span_longitudinal_bar_diameter_mm = (
-            span_meta.get("longitudinal_bar_diameter_mm")
-            if span_meta and span_meta.get("longitudinal_bar_diameter_mm") is not None
-            else default_longitudinal_bar_diameter_mm
-        )
-        span_compression_rebar_required = (
-            span_meta.get("compression_rebar_required")
-            if span_meta and span_meta.get("compression_rebar_required") is not None
-            else compression_rebar_required
-        )
-
         span_payload: dict[str, Any] = {
             "id": span_id,
             "seismic": pair["seismic"],
             "gravity": pair["gravity"],
-            "longitudinal_bar_diameter_mm": span_longitudinal_bar_diameter_mm,
-            "compression_rebar_required": bool(span_compression_rebar_required),
-            "longitudinal_bars_bundled": False,
             "regions": _build_regions_for_span(
                 span_meta=span_meta,
                 span_width_mm=span_width_mm,
@@ -266,6 +252,17 @@ def build_validated_case_payload(
             ),
         }
         if span_meta:
+            # Accept the initial Phase 3 form contract only as a compatibility
+            # boundary. CaseConfig consolidates agreeing values globally and
+            # rejects conflicts instead of treating these as span overrides.
+            if span_meta.get("longitudinal_bar_diameter_mm") is not None:
+                span_payload["longitudinal_bar_diameter_mm"] = span_meta[
+                    "longitudinal_bar_diameter_mm"
+                ]
+            if span_meta.get("compression_rebar_required") is not None:
+                span_payload["compression_rebar_required"] = span_meta[
+                    "compression_rebar_required"
+                ]
             if span_meta.get("support_left_mm") is not None:
                 span_payload["support_left_mm"] = span_meta["support_left_mm"]
             if span_meta.get("support_right_mm") is not None:
@@ -279,6 +276,9 @@ def build_validated_case_payload(
 
     case_payload = {
         "case_name": normalized_case_name,
+        "longitudinal_bar_diameter_mm": default_longitudinal_bar_diameter_mm,
+        "compression_rebar_required": bool(compression_rebar_required),
+        "longitudinal_bars_bundled": False,
         "inputs": {
             "seismic_excel": "seismic.xlsx",
             "gravity_excel": "gravity.xlsx",

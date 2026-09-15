@@ -37,6 +37,7 @@ def _form_payload(
     db_bar: str = "#6",
     compression_rebar_required: bool = False,
     span_layout: list[dict[str, object]] | None = None,
+    span_pairs: list[dict[str, str]] | None = None,
 ) -> dict[str, object]:
     return build_validated_case_payload(
         case_name="phase3",
@@ -57,7 +58,7 @@ def _form_payload(
         min_branches_c=4,
         min_branches_nc=2,
         region_c_ratio=0.2,
-        span_pairs=[{"id": "S1", "seismic": "1", "gravity": "1"}],
+        span_pairs=span_pairs or [{"id": "S1", "seismic": "1", "gravity": "1"}],
         span_layout=span_layout,
         optimization_payload=merge_optimization_defaults(None),
         compression_rebar_required=compression_rebar_required,
@@ -113,76 +114,187 @@ class Phase3LongitudinalDetailingTests(unittest.TestCase):
             span = payload["beams"][0]["spans"][0]  # type: ignore[index]
             self.assertTrue(all(region["d_mm"] == 675.0 for region in span["regions"]))
             self.assertTrue(all(region["d_ratio"] == 0.9 for region in span["regions"]))
-        changed_span = changed["beams"][0]["spans"][0]  # type: ignore[index]
-        self.assertEqual(changed_span["longitudinal_bar_diameter_mm"], 25.4)
-        self.assertTrue(changed_span["compression_rebar_required"])
+        self.assertEqual(changed["longitudinal_bar_diameter_mm"], 25.4)
+        self.assertTrue(changed["compression_rebar_required"])
 
-    def test_span_checkbox_and_bar_flow_from_ui_shape_to_domain(self) -> None:
+    def test_global_bar_and_true_checkbox_flow_to_every_span_and_region(self) -> None:
+        span_pairs = [
+            {"id": "S1", "seismic": "1", "gravity": "1"},
+            {"id": "S2", "seismic": "2", "gravity": "2"},
+        ]
+        payload = _form_payload(
+            db_bar="#6",
+            compression_rebar_required=True,
+            span_pairs=span_pairs,
+        )
+        config = CaseConfig.model_validate(payload)
+        self.assertEqual(config.longitudinal_bar_diameter_mm, 19.1)
+        self.assertTrue(config.compression_rebar_required)
+        self.assertFalse(config.longitudinal_bars_bundled)
+        self.assertTrue(
+            all(
+                "longitudinal_bar_diameter_mm" not in span.model_fields_set
+                and "compression_rebar_required" not in span.model_fields_set
+                for span in config.beams[0].spans
+            )
+        )
+
+        for span in config.beams[0].spans:
+            demands, errors = build_region_demands(
+                beam_id="B1",
+                beam_detailing="DMI",
+                beam_cover_side_mm=40.0,
+                beam_cover_top_mm=40.0,
+                beam_cover_bottom_mm=40.0,
+                beam_fc_mpa=28.0,
+                beam_fy_mpa=420.0,
+                span=span,
+                seismic_frame=_frame(span.seismic),
+                gravity_frame=_frame(span.gravity),
+                compression_rebar_required=config.compression_rebar_required,
+                longitudinal_bar_diameter_mm=config.longitudinal_bar_diameter_mm,
+            )
+            self.assertEqual(errors, [])
+            self.assertTrue(all(item.compression_rebar_required for item in demands))
+            self.assertTrue(all(item.longitudinal_bar_diameter_mm == 19.1 for item in demands))
+            self.assertTrue(all(not item.longitudinal_bars_bundled for item in demands))
+
+    def test_global_false_checkbox_flows_to_every_span(self) -> None:
+        payload = _form_payload(
+            compression_rebar_required=False,
+            span_pairs=[
+                {"id": "S1", "seismic": "1", "gravity": "1"},
+                {"id": "S2", "seismic": "2", "gravity": "2"},
+            ],
+        )
+        config = CaseConfig.model_validate(payload)
+
+        self.assertFalse(config.compression_rebar_required)
+        self.assertFalse(any(hasattr(span, "compression_rebar_required") for span in config.beams[0].spans))
+        for span in config.beams[0].spans:
+            demands, errors = build_region_demands(
+                beam_id="B1",
+                beam_detailing="DMI",
+                beam_cover_side_mm=40.0,
+                beam_cover_top_mm=40.0,
+                beam_cover_bottom_mm=40.0,
+                beam_fc_mpa=28.0,
+                beam_fy_mpa=420.0,
+                span=span,
+                seismic_frame=_frame(span.seismic),
+                gravity_frame=_frame(span.gravity),
+                compression_rebar_required=config.compression_rebar_required,
+                longitudinal_bar_diameter_mm=config.longitudinal_bar_diameter_mm,
+            )
+            self.assertEqual(errors, [])
+            self.assertTrue(all(not item.compression_rebar_required for item in demands))
+
+    def test_d_ratio_remains_independent_by_span(self) -> None:
         raw = json.dumps(
             [
                 {
-                    "id": "S1",
-                    "seismic": "1",
-                    "gravity": "1",
-                    "d_ratio": 0.9,
-                    "longitudinal_bar": "#5",
-                    "compression_rebar_required": True,
+                    "id": span_id,
+                    "seismic": source,
+                    "gravity": source,
+                    "d_ratio": ratio,
                     "support_left_mm": 0,
                     "support_right_mm": 0,
                     "regions": [
-                        {"id": "R1", "from": 0.0, "to": 0.2, "type": "C"},
-                        {"id": "R2", "from": 0.2, "to": 0.8, "type": "NC"},
-                        {"id": "R3", "from": 0.8, "to": 1.0, "type": "C"},
+                        {"id": "R1", "from": 0.0, "to": 1.0, "type": "NC"},
                     ],
                 }
+                for span_id, source, ratio in (("S1", "1", 0.9), ("S2", "2", 0.8))
             ]
         )
         span_layout = parse_span_layout_json(raw)
-        payload = _form_payload(span_layout=span_layout)
-        config = CaseConfig.model_validate(payload)
-        span = config.beams[0].spans[0]
-
-        self.assertEqual(span.longitudinal_bar_diameter_mm, 15.9)
-        self.assertTrue(span.compression_rebar_required)
-        self.assertFalse(span.longitudinal_bars_bundled)
-        demands, errors = build_region_demands(
-            beam_id="B1",
-            beam_detailing="DMI",
-            beam_cover_side_mm=40.0,
-            beam_cover_top_mm=40.0,
-            beam_cover_bottom_mm=40.0,
-            beam_fc_mpa=28.0,
-            beam_fy_mpa=420.0,
-            span=span,
-            seismic_frame=_frame("1"),
-            gravity_frame=_frame("1"),
+        payload = _form_payload(
+            span_layout=span_layout,
+            span_pairs=[
+                {"id": "S1", "seismic": "1", "gravity": "1"},
+                {"id": "S2", "seismic": "2", "gravity": "2"},
+            ],
         )
-        self.assertEqual(errors, [])
-        self.assertTrue(all(item.compression_rebar_required for item in demands))
-        self.assertTrue(all(item.longitudinal_bar_diameter_mm == 15.9 for item in demands))
-        self.assertTrue(all(not item.longitudinal_bars_bundled for item in demands))
+        spans = payload["beams"][0]["spans"]  # type: ignore[index]
 
-    def test_legacy_json_defaults_compression_to_false_and_preserves_db_bar(self) -> None:
+        self.assertEqual([span["regions"][0]["d_mm"] for span in spans], [675.0, 600.0])
+        self.assertEqual([span["regions"][0]["d_ratio"] for span in spans], [0.9, 0.8])
+
+    def test_legacy_span_values_are_normalized_when_they_agree(self) -> None:
+        payload = _form_payload(
+            db_bar="#6",
+            compression_rebar_required=True,
+            span_pairs=[
+                {"id": "S1", "seismic": "1", "gravity": "1"},
+                {"id": "S2", "seismic": "2", "gravity": "2"},
+            ],
+        )
+        legacy = dict(payload)
+        legacy.pop("longitudinal_bar_diameter_mm")
+        legacy.pop("compression_rebar_required")
+        for span in legacy["beams"][0]["spans"]:  # type: ignore[index]
+            span["longitudinal_bar_diameter_mm"] = 19.1
+            span["compression_rebar_required"] = True
+            span["longitudinal_bars_bundled"] = False
+
+        config = CaseConfig.model_validate(legacy)
+
+        self.assertEqual(config.longitudinal_bar_diameter_mm, 19.1)
+        self.assertTrue(config.compression_rebar_required)
+        dumped_spans = config.model_dump()["beams"][0]["spans"]
+        self.assertTrue(all("longitudinal_bar_diameter_mm" not in span for span in dumped_spans))
+        self.assertTrue(all("compression_rebar_required" not in span for span in dumped_spans))
+
+    def test_conflicting_legacy_span_values_are_rejected_traceably(self) -> None:
+        payload = _form_payload(
+            span_pairs=[
+                {"id": "S1", "seismic": "1", "gravity": "1"},
+                {"id": "S2", "seismic": "2", "gravity": "2"},
+            ],
+        )
+        payload.pop("longitudinal_bar_diameter_mm")
+        payload.pop("compression_rebar_required")
+        spans = payload["beams"][0]["spans"]  # type: ignore[index]
+        spans[0]["longitudinal_bar_diameter_mm"] = 15.9
+        spans[1]["longitudinal_bar_diameter_mm"] = 19.1
+        spans[0]["compression_rebar_required"] = False
+        spans[1]["compression_rebar_required"] = True
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            "Conflicting legacy longitudinal_bar_diameter_mm values",
+        ):
+            CaseConfig.model_validate(payload)
+
+    def test_conflicting_legacy_span_compression_flags_are_rejected_traceably(self) -> None:
+        payload = _form_payload(
+            span_pairs=[
+                {"id": "S1", "seismic": "1", "gravity": "1"},
+                {"id": "S2", "seismic": "2", "gravity": "2"},
+            ],
+        )
+        payload.pop("compression_rebar_required")
+        spans = payload["beams"][0]["spans"]  # type: ignore[index]
+        spans[0]["compression_rebar_required"] = False
+        spans[1]["compression_rebar_required"] = True
+
+        with self.assertRaisesRegex(
+            ValidationError,
+            "Conflicting legacy compression_rebar_required values",
+        ):
+            CaseConfig.model_validate(payload)
+
+    def test_legacy_beam_values_migrate_to_global_case(self) -> None:
         payload = _form_payload()
-        span_payload = payload["beams"][0]["spans"][0]  # type: ignore[index]
-        span_payload.pop("compression_rebar_required")
-        span_payload.pop("longitudinal_bar_diameter_mm")
-        span_payload["regions"][0]["db_bar"] = "#5"
-
-        config = CaseConfig.model_validate(payload)
-
-        self.assertFalse(config.beams[0].spans[0].compression_rebar_required)
-        self.assertEqual(config.beams[0].spans[0].regions[0].db_bar, "#5")
-
-    def test_legacy_beam_compression_flag_migrates_to_span(self) -> None:
-        payload = _form_payload()
+        payload.pop("longitudinal_bar_diameter_mm")
+        payload.pop("compression_rebar_required")
         beam = payload["beams"][0]  # type: ignore[index]
+        beam["longitudinal_bar_diameter_mm"] = 15.9
         beam["compression_rebar_required"] = True
-        beam["spans"][0].pop("compression_rebar_required")
 
         config = CaseConfig.model_validate(payload)
 
-        self.assertTrue(config.beams[0].spans[0].compression_rebar_required)
+        self.assertEqual(config.longitudinal_bar_diameter_mm, 15.9)
+        self.assertTrue(config.compression_rebar_required)
 
     def test_aci_9_7_6_4_2_is_not_applicable_without_required_compression_steel(self) -> None:
         check = check_transverse_reinforcement_size(
@@ -223,9 +335,8 @@ class Phase3LongitudinalDetailingTests(unittest.TestCase):
 
     def test_bundled_bars_are_fixed_false_and_have_no_ui_control(self) -> None:
         payload = _form_payload()
-        span = payload["beams"][0]["spans"][0]  # type: ignore[index]
-        self.assertFalse(span["longitudinal_bars_bundled"])
-        span["longitudinal_bars_bundled"] = True
+        self.assertFalse(payload["longitudinal_bars_bundled"])
+        payload["longitudinal_bars_bundled"] = True
         with self.assertRaises(ValidationError):
             CaseConfig.model_validate(payload)
 
@@ -233,15 +344,24 @@ class Phase3LongitudinalDetailingTests(unittest.TestCase):
         javascript = (ROOT / "app/ui/static/ui.js").read_text(encoding="utf-8")
         self.assertNotIn('name="longitudinal_bars_bundled"', html)
         self.assertNotIn("span-longitudinal-bars-bundled", javascript)
-        self.assertIn("span-compression-rebar-required", javascript)
-        self.assertIn("span-longitudinal-bar", javascript)
+        self.assertNotIn("span-compression-rebar-required", javascript)
+        self.assertNotIn("span-longitudinal-bar", javascript)
 
-    def test_ui_bar_catalog_reaches_no_36_transition(self) -> None:
+    def test_global_fields_appear_once_and_not_in_span_editor(self) -> None:
         html = (ROOT / "app/ui/templates/ui.html").read_text(encoding="utf-8")
         javascript = (ROOT / "app/ui/static/ui.js").read_text(encoding="utf-8")
 
+        self.assertEqual(html.count('id="db_bar"'), 1)
+        self.assertEqual(html.count('id="compression_rebar_required"'), 1)
+        self.assertIn("Materiales y geometria", html)
+        self.assertNotIn("span-longitudinal-bar", javascript)
+        self.assertNotIn("span-compression-rebar-required", javascript)
+        self.assertIn("span-d-ratio", javascript)
+
+    def test_ui_bar_catalog_reaches_no_36_transition(self) -> None:
+        html = (ROOT / "app/ui/templates/ui.html").read_text(encoding="utf-8")
+
         self.assertIn("<option>#10</option><option>#11</option>", html)
-        self.assertIn("<option>#10</option><option>#11</option>", javascript)
 
     def test_rule_registry_records_completed_and_deferred_tie_rules(self) -> None:
         registry = (

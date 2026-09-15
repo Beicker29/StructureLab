@@ -322,11 +322,11 @@ class Phase1ScenarioTests(unittest.TestCase):
     def test_old_contract_defaults_and_dmi_are_accepted(self) -> None:
         old_config = CaseConfig.model_validate(_case_payload())
         self.assertEqual(old_config.beams[0].detailing, "DES")
-        self.assertFalse(old_config.beams[0].compression_rebar_required)
+        self.assertFalse(old_config.compression_rebar_required)
 
         dmi_config = CaseConfig.model_validate(_case_payload(detailing="DMI"))
         self.assertEqual(dmi_config.beams[0].detailing, "DMI")
-        self.assertFalse(dmi_config.beams[0].compression_rebar_required)
+        self.assertFalse(dmi_config.compression_rebar_required)
 
 
 if __name__ == "__main__":

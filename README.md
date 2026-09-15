@@ -160,8 +160,9 @@ o diametro/disposicion de barras longitudinales.
 
 ## Datos longitudinales para detallado de ties
 
-Cada vano admite `longitudinal_bar_diameter_mm` y
-`compression_rebar_required` (por defecto `false`). El diametro representa una
+Cada caso define globalmente `longitudinal_bar_diameter_mm` y
+`compression_rebar_required` (por defecto `false`). Ambos valores se aplican a
+todos los vanos y no admiten overrides por vano. El diametro representa una
 barra longitudinal individual, igual para el refuerzo superior e inferior, y
 solo aporta contexto a las reglas de detallado y a los limites sismicos que
 dependen de `db`. No es refuerzo longitudinal disenado por StructureLab y se
@@ -172,8 +173,12 @@ longitudinal se contabiliza como refuerzo a compresion requerido por diseno.
 Activa las verificaciones de ACI 318M-25 9.7.6.4.2 y 9.7.6.4.3. No significa
 solo que existan barras superiores o barras en la cara comprimida.
 
+Los contratos heredados que almacenaban estos datos por viga o por vano se
+normalizan al nivel global solo cuando todos los valores coinciden. Una
+discrepancia se reporta como error de validacion trazable.
+
 Las barras longitudinales agrupadas quedan fuera del alcance y el contrato
-fija `longitudinal_bars_bundled=false`. ACI 9.7.6.4.4 y la comprobacion
+global fija `longitudinal_bars_bundled=false`. ACI 9.7.6.4.4 y la comprobacion
 geometrica remitida por 18.6.4.2 a 25.7.2.3 permanecen `NOT_EVALUATED` cuando
 aplican, porque el modulo no conoce la cantidad ni la posicion transversal de
 las barras, crossties o distancias libres.
