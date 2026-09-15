@@ -3,10 +3,16 @@
 from dataclasses import dataclass
 from typing import Literal
 
+from .codes.aci318_25.longitudinal_torsion import (
+    MAX_LONGITUDINAL_TORSION_BAR_SPACING_MM,
+    longitudinal_torsion_bar_spacing_mm,
+    minimum_longitudinal_torsion_bar_count,
+    minimum_longitudinal_torsion_bar_diameter_mm,
+    vertical_distribution_range_mm,
+)
+
 from .design import (
     BAR_AREAS_MM2,
-    DEAP_FITNESS_CLASS,
-    DEAP_INDIVIDUAL_CLASS,
     RegionDemand,
     RegionDesignResult,
     bar_mass_kg_per_m,
@@ -14,13 +20,7 @@ from .design import (
     scenario_reference,
     stirrup_count_in_region,
 )
-from .models import OptimizationConfig
-from .optimization import SearchHooks, run_exhaustive_search, run_genetic_search
-
-DEAP_SPAN_FITNESS_CLASS = f"{DEAP_FITNESS_CLASS}SpanCoupled"
-DEAP_SPAN_INDIVIDUAL_CLASS = f"{DEAP_INDIVIDUAL_CLASS}SpanCoupled"
-LARGE_EXHAUSTIVE_SPACE = 250_000
-
+from .models import BAR_DIAMETERS_MM, OptimizationConfig
 
 @dataclass(frozen=True)
 class SpanRegionState:
@@ -88,6 +88,42 @@ def _arrangement_label(base_bar: str, base_count: int, extra_bar: str, extra_cou
     return f"{base_count} x {base_bar} + {extra_count} x {extra_bar}"
 
 
+def longitudinal_vertical_range_mm(demand: RegionDemand) -> float | None:
+    """Vertical distance delimited by the existing top and bottom flexural steel."""
+    if demand.d_mm is None or demand.height_mm is None:
+        return None
+    return vertical_distribution_range_mm(
+        height_mm=demand.height_mm,
+        d_mm=demand.d_mm,
+    )
+
+
+def longitudinal_layer_spacing_mm(demand: RegionDemand, total_count: int) -> float | None:
+    """Spacing of intermediate torsional side-face bars per ACI 318-25 9.7.5.1."""
+    if demand.d_mm is None or demand.height_mm is None:
+        return None
+    return longitudinal_torsion_bar_spacing_mm(
+        height_mm=demand.height_mm,
+        d_mm=demand.d_mm,
+        total_torsion_bar_count=total_count,
+    )
+
+
+def minimum_longitudinal_count_for_distribution(demand: RegionDemand) -> int | None:
+    """Smallest even total count satisfying the adopted 300 mm distribution limit."""
+    if demand.d_mm is None or demand.height_mm is None:
+        return None
+    return minimum_longitudinal_torsion_bar_count(
+        height_mm=demand.height_mm,
+        d_mm=demand.d_mm,
+    )
+
+
+def minimum_torsion_longitudinal_bar_diameter_mm(transverse_spacing_mm: float) -> float:
+    """ACI 318-25 9.7.5.2 minimum diameter for longitudinal torsional bars."""
+    return minimum_longitudinal_torsion_bar_diameter_mm(transverse_spacing_mm)
+
+
 def _evaluate_longitudinal_region(
     demand: RegionDemand,
     *,
@@ -95,6 +131,7 @@ def _evaluate_longitudinal_region(
     base_long_count: int,
     extra_long_bar: str,
     extra_long_count: int,
+    transverse_spacing_mm: float | None = None,
 ) -> tuple[bool, str, float, int, float | None]:
     if base_long_count < 0 or extra_long_count < 0:
         return False, "Longitudinal bar counts must be >= 0", 0.0, 0, None
@@ -136,27 +173,48 @@ def _evaluate_longitudinal_region(
         if demand.d_mm is None or demand.height_mm is None:
             return False, "Longitudinal layering checks require d_mm and height_mm", provided, 0, None
         layers = total_count // 2
-        available_range = 2.0 * demand.d_mm - demand.height_mm
-        base_layers = 0.5 * float(max(0, base_long_count))
-        s2_denominator = base_layers + 1.0
+        available_range = longitudinal_vertical_range_mm(demand)
+        if available_range is None:
+            return False, "Longitudinal layering checks require d_mm and height_mm", provided, layers, None
+        if available_range <= 0.0:
+            return False, "2*d - h must be > 0 to place longitudinal side-face bars", provided, layers, None
 
-        if layers > 1:
-            if available_range <= 0.0:
-                return False, "2*d - h must be > 0 to place multiple longitudinal layers", provided, layers, None
-            s2_mm = available_range / s2_denominator
-            if s2_mm > 300.0:
-                return False, f"Longitudinal layer spacing s2={s2_mm:.1f} mm exceeds 300 mm", provided, layers, s2_mm
+        s2_mm = longitudinal_layer_spacing_mm(demand, total_count)
+        if s2_mm is None:
+            return False, "Longitudinal bar count must be even", provided, layers, None
+        if s2_mm > MAX_LONGITUDINAL_TORSION_BAR_SPACING_MM:
+            return (
+                False,
+                f"ACI 318-25 9.7.5.1 longitudinal spacing sL={s2_mm:.1f} mm exceeds 300 mm",
+                provided,
+                layers,
+                s2_mm,
+            )
+
+        if transverse_spacing_mm is not None:
+            minimum_diameter_mm = minimum_torsion_longitudinal_bar_diameter_mm(
+                transverse_spacing_mm
+            )
+            for role, bar, count in (
+                ("base", base_long_bar, base_long_count),
+                ("additional", extra_long_bar, extra_long_count),
+            ):
+                if count <= 0:
+                    continue
+                diameter_mm = BAR_DIAMETERS_MM.get(bar)
+                if diameter_mm is None or diameter_mm < minimum_diameter_mm:
+                    return (
+                        False,
+                        (
+                            f"ACI 318-25 9.7.5.2 {role} bar {bar} diameter "
+                            f"{diameter_mm or 0.0:.1f} mm is less than {minimum_diameter_mm:.1f} mm"
+                        ),
+                        provided,
+                        layers,
+                        s2_mm,
+                    )
 
     return True, "ok", provided, layers, s2_mm
-
-
-def _estimate_search_space(domain_sizes: list[int], *, cap: int = 10**12) -> int:
-    total = 1
-    for size in domain_sizes:
-        total *= max(1, int(size))
-        if total >= cap:
-            return cap
-    return total
 
 
 def _region_result_from_state(
@@ -514,137 +572,131 @@ def optimize_span_coupled(
             failure_counts={"input_fail": 1},
         )
 
-    region_extra_count_domains: list[list[int]] = []
-    for demand in demands:
-        if requires_longitudinal_design(demand):
-            region_extra_count_domains.append(default_extra_counts)
-        else:
-            region_extra_count_domains.append([0])
+    method = f"{method_prefix}_conditional_exhaustive"
+    selected = _failed_candidate(
+        base_long_bar="",
+        base_long_count=0,
+        failure_mode="longitudinal_fail",
+        message="No feasible conditional longitudinal candidate",
+    )
 
-    domain_sizes: list[int] = [len(base_long_bars), len(base_long_counts)]
-    for extra_counts in region_extra_count_domains:
-        domain_sizes.extend([len(extra_long_bars), len(extra_counts)])
+    # The regional longitudinal choice is separable once a span base is fixed.
+    # Evaluate that conditional minimum exactly so UI alternatives never depend
+    # on whether the stochastic search happened to visit the zero-extra option.
+    deterministic_evaluations = 0
+    deterministic_candidates: list[SpanCandidate] = []
+    if any(requires_longitudinal_design(demand) for demand in demands):
+        base_arrangements = [
+            (bar, count)
+            for count in base_long_counts
+            if count > 0
+            for bar in base_long_bars
+        ]
+    else:
+        base_arrangements = [("", 0)]
+    extra_arrangements = [
+        (bar, count)
+        for count in default_extra_counts
+        for bar in ([""] if count == 0 else extra_long_bars)
+    ]
 
-    evaluation_cache: dict[tuple[int, ...], SpanCandidate] = {}
-
-    def decode(individual: list[int]) -> tuple[str, int, list[tuple[str, int]]]:
-        offset = 0
-        base_long_bar = str(base_long_bars[individual[offset]])
-        offset += 1
-        base_long_count = int(base_long_counts[individual[offset]])
-        offset += 1
-
-        decoded_regions: list[tuple[str, int]] = []
-        for extra_counts in region_extra_count_domains:
-            extra_long_bar = str(extra_long_bars[individual[offset]])
-            offset += 1
-            extra_long_count = int(extra_counts[individual[offset]])
-            offset += 1
-            decoded_regions.append((extra_long_bar, extra_long_count))
-
-        return base_long_bar, base_long_count, decoded_regions
-
-    def evaluate_individual(individual: list[int]) -> SpanCandidate:
-        key = tuple(int(gene) for gene in individual)
-        cached = evaluation_cache.get(key)
-        if cached is not None:
-            return cached
-
-        base_long_bar, base_long_count, decoded_regions = decode(individual)
-        objective = 0.0
-
+    for base_long_bar, base_long_count in base_arrangements:
         states: list[SpanRegionState] = []
-        for demand, decoded in zip(demands, decoded_regions):
-            extra_long_bar, extra_long_count = decoded
-            long_ok, long_message, long_provided, layers, s2_mm = _evaluate_longitudinal_region(
-                demand,
-                base_long_bar=base_long_bar,
-                base_long_count=base_long_count,
-                extra_long_bar=extra_long_bar,
-                extra_long_count=extra_long_count,
+        objective = 0.0
+        feasible_base = True
+
+        for demand in demands:
+            transverse_template = templates.get((demand.span_id, demand.region_id))
+            transverse_spacing_mm = (
+                float(transverse_template.spacing_mm)
+                if transverse_template is not None and transverse_template.spacing_mm > 0
+                else None
             )
-            if not long_ok:
-                failed = _failed_candidate(
+            region_options: list[tuple[float, float, int, str, SpanRegionState]] = []
+            candidates = extra_arrangements if requires_longitudinal_design(demand) else [("", 0)]
+            for extra_long_bar, extra_long_count in candidates:
+                deterministic_evaluations += 1
+                long_ok, _, long_provided, layers, s2_mm = _evaluate_longitudinal_region(
+                    demand,
                     base_long_bar=base_long_bar,
                     base_long_count=base_long_count,
-                    failure_mode="longitudinal_fail",
-                    message=f"{demand.span_id}/{demand.region_id}: {long_message}",
-                    objective=objective + 2.0e4,
+                    extra_long_bar=extra_long_bar,
+                    extra_long_count=extra_long_count,
+                    transverse_spacing_mm=transverse_spacing_mm,
                 )
-                evaluation_cache[key] = failed
-                return failed
+                if not long_ok:
+                    continue
 
-            region_length_m = max(0.0, demand.region_length_mm / 1000.0)
-            if requires_longitudinal_design(demand):
-                objective += (
+                region_length_m = max(0.0, demand.region_length_mm / 1000.0)
+                region_objective = (
                     bar_mass_kg_per_m(base_long_bar, base_long_count)
                     + bar_mass_kg_per_m(extra_long_bar, extra_long_count)
-                ) * region_length_m
-
-            states.append(
-                SpanRegionState(
+                ) * region_length_m if requires_longitudinal_design(demand) else 0.0
+                state = SpanRegionState(
                     demand=demand,
                     extra_long_bar=extra_long_bar,
                     extra_long_count=extra_long_count,
                     long_provided_mm2=long_provided,
                     layers=layers,
                     s2_mm=s2_mm,
-                    arrangement_label=_arrangement_label(
-                        base_long_bar,
-                        base_long_count,
-                        extra_long_bar,
-                        extra_long_count,
+                    arrangement_label=(
+                        _arrangement_label(
+                            base_long_bar,
+                            base_long_count,
+                            extra_long_bar,
+                            extra_long_count,
+                        )
+                        if requires_longitudinal_design(demand)
+                        else "no se requiere"
                     ),
+                )
+                region_options.append(
+                    (
+                        region_objective,
+                        long_provided,
+                        base_long_count + extra_long_count,
+                        extra_long_bar,
+                        state,
+                    )
+                )
+
+            if not region_options:
+                feasible_base = False
+                break
+
+            best_region = min(region_options, key=lambda item: item[:4])
+            objective += best_region[0]
+            states.append(best_region[4])
+
+        if feasible_base:
+            deterministic_candidates.append(
+                SpanCandidate(
+                    base_long_bar=base_long_bar,
+                    base_long_count=base_long_count,
+                    states=tuple(states),
+                    status="ok",
+                    failure_mode="ok",
+                    message="Exact conditional longitudinal minimum",
+                    objective=objective,
+                    score=objective,
                 )
             )
 
-        resolved = SpanCandidate(
-            base_long_bar=base_long_bar,
-            base_long_count=base_long_count,
-            states=tuple(states),
-            status="ok",
-            failure_mode="ok",
-            message="Longitudinal candidate satisfies checks",
-            objective=objective,
-            score=objective,
+    if deterministic_candidates:
+        deterministic_selected = min(
+            deterministic_candidates,
+            key=lambda item: (
+                round(item.objective, 12),
+                sum(state.extra_long_count for state in item.states),
+                -item.base_long_count,
+                item.base_long_bar,
+            ),
         )
-        evaluation_cache[key] = resolved
-        return resolved
-
-    hooks = SearchHooks[SpanCandidate](
-        evaluate=evaluate_individual,
-        score=lambda candidate: candidate.score,
-        objective=lambda candidate: candidate.objective,
-        is_feasible=lambda candidate: candidate.status == "ok",
-        failure_mode=lambda candidate: candidate.failure_mode,
-    )
-
-    search_space = _estimate_search_space(domain_sizes)
-    use_genetic = True
-
-    if use_genetic:
-        ga = optimization.genetic_algorithm
-        raw_outcome = run_genetic_search(
-            domain_sizes=domain_sizes,
-            population_size=ga.population_size,
-            generations=ga.generations,
-            crossover_rate=ga.crossover_rate,
-            mutation_rate=ga.mutation_rate,
-            elite_count=ga.elite_count,
-            hooks=hooks,
-            seed=42,
-            fitness_class_name=DEAP_SPAN_FITNESS_CLASS,
-            individual_class_name=DEAP_SPAN_INDIVIDUAL_CLASS,
-        )
-        method = f"{method_prefix}_genetic"
-    else:
-        raw_outcome = run_exhaustive_search(domain_sizes=domain_sizes, hooks=hooks)
-        method = f"{method_prefix}_exhaustive"
-
-    selected = raw_outcome.selected
+        if selected.status != "ok" or deterministic_selected.objective < selected.objective:
+            selected = deterministic_selected
 
     feasible_unique: dict[tuple[object, ...], SpanCandidate] = {}
-    for candidate in evaluation_cache.values():
+    for candidate in deterministic_candidates:
         if candidate.status != "ok":
             continue
         fingerprint = (
@@ -667,6 +719,9 @@ def optimize_span_coupled(
     feasible_sorted = sorted(feasible_unique.values(), key=lambda item: item.objective)
     if selected.status != "ok" and feasible_sorted:
         selected = feasible_sorted[0]
+
+    evaluated_candidates = deterministic_evaluations
+    feasible_candidates = len(deterministic_candidates)
 
     max_candidates = max(1, int(top_n))
     top_candidates: list[SpanCandidate] = []
@@ -724,8 +779,8 @@ def optimize_span_coupled(
                 span_candidate=selected,
                 transverse_template=templates.get((state.demand.span_id, state.demand.region_id)),
                 method=method,
-                evaluated_candidates=raw_outcome.evaluated_candidates,
-                feasible_candidates=raw_outcome.feasible_candidates,
+                evaluated_candidates=evaluated_candidates,
+                feasible_candidates=feasible_candidates,
             )
             for state in selected.states
         ]
@@ -750,8 +805,8 @@ def optimize_span_coupled(
                     span_candidate=candidate,
                     transverse_template=templates.get((demand.span_id, demand.region_id)),
                     method=f"{method_prefix}_top",
-                    evaluated_candidates=raw_outcome.evaluated_candidates,
-                    feasible_candidates=raw_outcome.feasible_candidates,
+                    evaluated_candidates=evaluated_candidates,
+                    feasible_candidates=feasible_candidates,
                 )
                 for candidate in top_candidates
             ]
@@ -763,8 +818,8 @@ def optimize_span_coupled(
         results=selected_results,
         alternatives_by_region=alternatives_by_region,
         method=method,
-        evaluated_candidates=raw_outcome.evaluated_candidates,
-        feasible_candidates=raw_outcome.feasible_candidates,
-        failure_counts=raw_outcome.failure_counts,
+        evaluated_candidates=evaluated_candidates,
+        feasible_candidates=feasible_candidates,
+        failure_counts={} if selected.status == "ok" else {selected.failure_mode: 1},
     )
 

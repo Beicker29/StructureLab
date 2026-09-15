@@ -9,6 +9,24 @@ rules:
     tested: true
     test_file: tests/test_phase2_aci_engine.py
     notes: Greater of the two SI expressions; required and provided values are reported in mm2/m.
+  - rule_id: ACI318_25_9_7_5_1_LONGITUDINAL_TORSION_DISTRIBUTION
+    module: rc_shear_torsion.codes.aci318_25.longitudinal_torsion
+    function: longitudinal_torsion_bar_spacing_mm
+    aci_section: "9.7.5.1"
+    applicability: Longitudinal torsional reinforcement is required; StructureLab designs intermediate bars symmetrically on the two side faces.
+    implemented: true
+    tested: true
+    test_file: tests/test_pre_phase4_longitudinal_audit.py
+    notes: Existing top and bottom flexural bars delimit Lv but are not counted in torsional area or N; sL=Lv/(N/2+1), maximum 300 mm.
+  - rule_id: ACI318_25_9_7_5_2_LONGITUDINAL_TORSION_BAR_DIAMETER
+    module: rc_shear_torsion.codes.aci318_25.longitudinal_torsion
+    function: minimum_longitudinal_torsion_bar_diameter_mm
+    aci_section: "9.7.5.2"
+    applicability: Longitudinal torsional reinforcement is required.
+    implemented: true
+    tested: true
+    test_file: tests/test_pre_phase4_longitudinal_audit.py
+    notes: Minimum diameter is max(0.042 times selected transverse spacing, 10 mm); checked for base and additional torsional bars.
   - rule_id: ACI318_25_9_7_6_2_2_LOW_D_LIMIT
     module: rc_shear_torsion.codes.aci318_25.shear
     function: maximum_shear_spacing_limits

@@ -10,6 +10,10 @@ from openpyxl import load_workbook
 
 from app.services.job_service import get_job, get_job_case_payload
 from rc_shear_torsion.design import bar_mass_kg_per_m
+from rc_shear_torsion.models import BAR_DIAMETERS_MM
+from rc_shear_torsion.codes.aci318_25.longitudinal_torsion import (
+    minimum_longitudinal_torsion_bar_diameter_mm,
+)
 
 _PREVIEW_CACHE_LOCK = RLock()
 _PREVIEW_CACHE: dict[str, tuple[tuple[Any, ...], dict[str, Any]]] = {}
@@ -359,6 +363,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
     region_col = _find_col(columns, "region_id")
     status_col = _find_col(columns, "estado", "status")
     label_col = _find_col(columns, "arreglo_transversal", "transverse_arrangement")
+    spacing_col = _find_col(columns, "espaciamiento_mm", "spacing_mm")
     stirrup_count_col = _find_col(columns, "cantidad_estribos_region", "stirrup_count_region", "stirrup_count")
     stirrup_unit_weight_col = _find_col(columns, "peso_unitario_estribo_kg", "stirrup_unit_weight_kg")
     weight_col = _find_col(columns, "peso_transversal_region_kg", "transverse_weight_region_kg")
@@ -382,6 +387,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
             continue
 
         stirrup_count = _as_non_negative_int(row[stirrup_count_col]) if stirrup_count_col is not None else None
+        spacing_mm = _as_non_negative_float(row[spacing_col]) if spacing_col is not None else None
         stirrup_unit_weight_kg = (
             _as_non_negative_float(row[stirrup_unit_weight_col]) if stirrup_unit_weight_col is not None else None
         )
@@ -395,6 +401,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
         output[(span_id, region_id)].append(
             {
                 "label": label,
+                "spacing_mm": spacing_mm,
                 "weight_kg": float(weight) if weight is not None else None,
                 "stirrup_count": stirrup_count,
                 "stirrup_unit_weight_kg": (
@@ -418,6 +425,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
             if current is None or sort_weight < current["_sort_weight"]:
                 best_by_label[label] = {
                     "label": label,
+                    "spacing_mm": item.get("spacing_mm"),
                     "weight_kg": item.get("weight_kg"),
                     "stirrup_count": item.get("stirrup_count"),
                     "stirrup_unit_weight_kg": item.get("stirrup_unit_weight_kg"),
@@ -431,6 +439,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
         output[key] = [
             {
                 "label": item["label"],
+                "spacing_mm": item.get("spacing_mm"),
                 "weight_kg": item.get("weight_kg"),
                 "stirrup_count": item.get("stirrup_count"),
                 "stirrup_unit_weight_kg": item.get("stirrup_unit_weight_kg"),
@@ -510,6 +519,10 @@ def _build_transverse_component_options(
             continue
 
         stirrup_count = _as_non_negative_int(row.get("stirrup_count"))
+        spacing_mm = _as_non_negative_float(row.get("spacing_mm"))
+        if spacing_mm is None:
+            match = re.search(r"@\s*([0-9]+(?:\.[0-9]+)?)\s*mm", label, flags=re.IGNORECASE)
+            spacing_mm = float(match.group(1)) if match is not None else None
         stirrup_unit_weight_kg = _as_non_negative_float(row.get("stirrup_unit_weight_kg"))
         explicit_weight = _as_non_negative_float(row.get("weight_transverse_kg"))
         weight = _resolve_transverse_weight_kg(
@@ -522,6 +535,7 @@ def _build_transverse_component_options(
         if current is None or sort_weight < current["_sort_weight"]:
             best_by_label[label] = {
                 "label": label,
+                "spacing_mm": spacing_mm,
                 "weight_kg": float(weight) if weight is not None else None,
                 "stirrup_count": stirrup_count,
                 "stirrup_unit_weight_kg": (
@@ -534,6 +548,7 @@ def _build_transverse_component_options(
     return [
         {
             "label": item["label"],
+            "spacing_mm": item.get("spacing_mm"),
             "weight_kg": item["weight_kg"],
             "stirrup_count": item.get("stirrup_count"),
             "stirrup_unit_weight_kg": item.get("stirrup_unit_weight_kg"),
@@ -638,12 +653,36 @@ def _expand_span_coupled_options(
             label = _as_text(trans.get("label"))
             if not label:
                 continue
+            transverse_spacing_mm = _as_non_negative_float(trans.get("spacing_mm"))
+            if transverse_spacing_mm is None:
+                match = re.search(
+                    r"@\s*([0-9]+(?:\.[0-9]+)?)\s*mm",
+                    label,
+                    flags=re.IGNORECASE,
+                )
+                transverse_spacing_mm = float(match.group(1)) if match is not None else None
+            if transverse_spacing_mm is not None:
+                minimum_diameter_mm = minimum_longitudinal_torsion_bar_diameter_mm(
+                    transverse_spacing_mm
+                )
+                longitudinal_bars = (
+                    (_as_text(long_row.get("base_long_bar")), _as_int(long_row.get("base_long_count"))),
+                    (_as_text(long_row.get("extra_long_bar")), _as_int(long_row.get("extra_long_count"))),
+                )
+                if any(
+                    count is not None
+                    and count > 0
+                    and (BAR_DIAMETERS_MM.get(bar) or 0.0) < minimum_diameter_mm
+                    for bar, count in longitudinal_bars
+                ):
+                    continue
             trans_weight = float(_as_non_negative_float(trans.get("weight_kg")) or 0.0)
             item = dict(long_row)
             item["option"] = long_option
             item["longitudinal_option"] = long_option
             item["transverse_option_rank"] = trans_rank
             item["transverse_label"] = label
+            item["spacing_mm"] = transverse_spacing_mm
             item["stirrup_count"] = _as_non_negative_int(trans.get("stirrup_count"))
             item["stirrup_unit_weight_kg"] = _as_non_negative_float(trans.get("stirrup_unit_weight_kg"))
             item["weight_transverse_kg"] = trans_weight
@@ -652,7 +691,7 @@ def _expand_span_coupled_options(
             expanded.append(item)
 
     if not expanded:
-        return long_sorted
+        return []
     expanded.sort(
         key=lambda item: (
             item.get("weight_total_kg") if item.get("weight_total_kg") is not None else float("inf"),

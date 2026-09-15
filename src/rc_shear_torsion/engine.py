@@ -197,29 +197,44 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                 span_region_index[(span.id, result.region_id)] = idx
 
         if config.optimization.longitudinal_mode == "span_coupled" and beam_demands:
-            beam_length_mm = sum(max(0.0, demand.region_length_mm) for demand in beam_demands)
-            long_outcome = optimize_span_coupled(
-                beam_demands,
-                config.optimization,
-                span_length_mm=beam_length_mm,
-                top_n=200,
-                transverse_templates=transverse_templates,
-            )
+            demands_by_span: dict[str, list[RegionDemand]] = {}
+            for demand in beam_demands:
+                demands_by_span.setdefault(demand.span_id, []).append(demand)
 
-            for updated in long_outcome.results:
-                key = (updated.span_id, updated.region_id)
-                index = span_region_index.get(key)
-                if index is None:
-                    continue
-                span_results_by_span[updated.span_id][index] = updated
+            for span_id, span_demands in demands_by_span.items():
+                span_length_mm = sum(
+                    max(0.0, demand.region_length_mm) for demand in span_demands
+                )
+                span_templates = {
+                    (demand.span_id, demand.region_id): transverse_templates[
+                        (demand.span_id, demand.region_id)
+                    ]
+                    for demand in span_demands
+                    if (demand.span_id, demand.region_id) in transverse_templates
+                }
+                long_outcome = optimize_span_coupled(
+                    span_demands,
+                    config.optimization,
+                    span_length_mm=span_length_mm,
+                    top_n=200,
+                    transverse_templates=span_templates,
+                )
 
-            for (span_id, region_id), options in long_outcome.alternatives_by_region.items():
-                region_alternatives[(beam.beam_id, span_id, region_id)] = options
+                for updated in long_outcome.results:
+                    key = (updated.span_id, updated.region_id)
+                    index = span_region_index.get(key)
+                    if index is None:
+                        continue
+                    span_results_by_span[updated.span_id][index] = updated
 
-            log_lines.append(
-                f"beam_longitudinal={beam.beam_id} method={long_outcome.method} "
-                f"evaluated={long_outcome.evaluated_candidates} feasible={long_outcome.feasible_candidates}"
-            )
+                for (result_span_id, region_id), options in long_outcome.alternatives_by_region.items():
+                    region_alternatives[(beam.beam_id, result_span_id, region_id)] = options
+
+                log_lines.append(
+                    f"span_longitudinal={beam.beam_id}/{span_id} method={long_outcome.method} "
+                    f"evaluated={long_outcome.evaluated_candidates} "
+                    f"feasible={long_outcome.feasible_candidates}"
+                )
 
         for span in beam.spans:
             span_results = span_results_by_span.get(span.id, [])
