@@ -171,7 +171,6 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
     extra_long_bar_col = _find_col(columns, "extra_long_bar")
     extra_long_count_col = _find_col(columns, "extra_long_count")
     longitudinal_mode_col = _find_col(columns, "longitudinal_mode")
-    is_deep_beam_col = _find_col(columns, "is_deep_beam")
     status_col = _find_col(columns, "status")
     if span_col is None or region_col is None:
         return {}
@@ -198,7 +197,6 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
         extra_long_bar = _as_text(row[extra_long_bar_col]) if extra_long_bar_col is not None else ""
         extra_long_count = _as_int(row[extra_long_count_col]) if extra_long_count_col is not None else None
         longitudinal_mode = _as_text(row[longitudinal_mode_col]) if longitudinal_mode_col is not None else ""
-        is_deep_beam = _as_text(row[is_deep_beam_col]) if is_deep_beam_col is not None else ""
 
         if e_bar and g_bar and g_count is not None and spacing is not None:
             transverse = f"1E {e_bar} + {g_count}G {g_bar} @ {spacing} mm"
@@ -227,7 +225,6 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
             "extra_long_bar": extra_long_bar,
             "extra_long_count": extra_long_count,
             "longitudinal_mode": longitudinal_mode,
-            "is_deep_beam": is_deep_beam,
         }
     return output
 
@@ -1091,7 +1088,6 @@ def _build_span_preview(
     support_right_mm = _as_non_negative_float(span.get("support_right_mm"))
     clear_length_mm = _as_float(span.get("clear_length_mm"))
     span_default_length_mm = clear_length_mm if clear_length_mm is not None else default_span_length_mm
-    is_deep_beam = bool(span.get("is_deep_beam"))
     regions = span.get("regions") if isinstance(span.get("regions"), list) else []
     region_rows: list[dict[str, Any]] = []
     region_lengths: list[float] = []
@@ -1228,7 +1224,6 @@ def _build_span_preview(
                 "extra_long_count": _as_int((schedule_row or {}).get("extra_long_count"))
                 or _as_int((optimized or {}).get("extra_long_count")),
                 "longitudinal_mode": longitudinal_mode,
-                "is_deep_beam": is_deep_beam,
                 "selected_option": _as_int(schedule_row.get("option")) if schedule_row is not None else None,
                 "best_option": _as_int(schedule_options[0].get("option")) if schedule_options else None,
                 "best_weight_kg": (
@@ -1348,7 +1343,6 @@ def _build_span_preview(
         "width_mm": int(round(span_width_mm)) if span_width_mm is not None else None,
         "height_mm": int(round(span_height_mm)) if span_height_mm is not None else None,
         "d_mm": int(round(span_d_mm)) if span_d_mm is not None else None,
-        "is_deep_beam": is_deep_beam,
         "longitudinal_base_options": longitudinal_base_options,
         "default_longitudinal_base_value": default_longitudinal_base_value,
         "span_longitudinal_option_sets": span_longitudinal_option_sets,

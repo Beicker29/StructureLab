@@ -223,7 +223,6 @@ def build_validated_case_payload(
             "id": span_id,
             "seismic": pair["seismic"],
             "gravity": pair["gravity"],
-            "is_deep_beam": bool(span_meta.get("is_deep_beam")) if span_meta else False,
             "regions": _build_regions_for_span(
                 span_meta=span_meta,
                 span_width_mm=span_width_mm,
@@ -259,6 +258,7 @@ def build_validated_case_payload(
             {
                 "beam_id": normalized_beam_id,
                 "detailing": detailing,
+                "compression_rebar_required": False,
                 "cover_side_mm": cover_side_mm,
                 "cover_top_mm": cover_top_mm,
                 "cover_bottom_mm": cover_bottom_mm,

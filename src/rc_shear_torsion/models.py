@@ -43,7 +43,6 @@ class SpanConfig(BaseModel):
     id: str
     seismic: str
     gravity: str
-    is_deep_beam: bool = False
     support_left_mm: float | None = None
     support_right_mm: float | None = None
     clear_length_mm: float | None = Field(
@@ -87,7 +86,8 @@ class SpanConfig(BaseModel):
 
 class BeamConfig(BaseModel):
     beam_id: str
-    detailing: Literal["DES", "DMO"] = "DES"
+    detailing: Literal["DES", "DMO", "DMI"] = "DES"
+    compression_rebar_required: bool = False
     cover_side_mm: float | None = None
     cover_top_mm: float | None = None
     cover_bottom_mm: float | None = None

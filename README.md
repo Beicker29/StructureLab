@@ -120,17 +120,9 @@ El sistema soporta dos modos en `optimization.longitudinal_mode`:
 - `legacy_region_independent` (Dise?o independiente por regi?n (legacy), default): flujo historico por region.
 - `span_coupled` (Dise?o acoplado por tramo): optimizacion acoplada por vano con:
   - refuerzo longitudinal base continuo por vano,
-  - refuerzo longitudinal adicional por region,
-  - chequeos deep-beam cuando `is_deep_beam=true`.
+  - refuerzo longitudinal adicional por region.
 
 Si no se envia el campo, se mantiene compatibilidad con `legacy_region_independent`.
-
-### Configuracion avanzada por vano
-
-En `span_layout_json` cada vano acepta:
-
-- `is_deep_beam` (opcional, default `false`).
-- alias aceptado: `viga_alta`.
 
 ### Seleccion de resultados (API)
 
@@ -140,5 +132,3 @@ Endpoint: `POST /v1/jobs/{job_id}/selection`
 - `span_selections` (opcional): seleccion longitudinal por vano para `span_coupled`.
 
 Compatibilidad: ambos pueden coexistir; el backend mantiene el contrato previo.
-
-

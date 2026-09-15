@@ -264,21 +264,6 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
                 f"span_layout_json[{span_index}].clear_length_mm debe ser > 0"
             )
 
-        deep_beam_raw = (
-            item.get("is_deep_beam")
-            if item.get("is_deep_beam") is not None
-            else item.get("viga_alta")
-        )
-        if deep_beam_raw is None:
-            is_deep_beam = False
-        else:
-            parsed_deep_beam = _parse_confined_flag(deep_beam_raw)
-            if parsed_deep_beam is None:
-                raise InvalidUploadError(
-                    f"span_layout_json[{span_index}].is_deep_beam debe ser booleano"
-                )
-            is_deep_beam = bool(parsed_deep_beam)
-
         raw_regions = item.get("regions")
         if raw_regions is None:
             raw_regions = item.get("regiones")
@@ -428,7 +413,6 @@ def parse_span_layout_json(raw: str | None) -> list[dict[str, Any]]:
                 "support_left_mm": support_left_mm,
                 "support_right_mm": support_right_mm,
                 "clear_length_mm": clear_length_mm,
-                "is_deep_beam": is_deep_beam,
                 "regions": regions,
             }
         )

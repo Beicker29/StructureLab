@@ -197,3 +197,7 @@ storage/
 results/
 uvicorn.log
 uvicorn.pid
+
+# Private normative reference documents
+references/codes/aci/ACI_318_25/private/**
+!references/codes/aci/ACI_318_25/private/.gitkeep

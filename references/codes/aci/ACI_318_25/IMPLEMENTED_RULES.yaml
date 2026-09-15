@@ -1,0 +1,155 @@
+code_id: ACI_318_25
+rules:
+  - rule_id: ACI318_25_9_7_6_2_2_LOW_D_LIMIT
+    module: rc_shear_torsion.codes.aci318_25.shear
+    function: maximum_shear_spacing_limits
+    aci_section: "9.7.6.2.2, Table 9.7.6.2.2"
+    applicability: Nonprestressed beam; required Vs does not exceed 0.33*sqrt(fc')*bw*d.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component d/2; SI units.
+  - rule_id: ACI318_25_9_7_6_2_2_LOW_ABSOLUTE_LIMIT
+    module: rc_shear_torsion.codes.aci318_25.shear
+    function: maximum_shear_spacing_limits
+    aci_section: "9.7.6.2.2, Table 9.7.6.2.2"
+    applicability: Nonprestressed beam; required Vs does not exceed 0.33*sqrt(fc')*bw*d.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component 600 mm; SI units.
+  - rule_id: ACI318_25_9_7_6_2_2_HIGH_D_LIMIT
+    module: rc_shear_torsion.codes.aci318_25.shear
+    function: maximum_shear_spacing_limits
+    aci_section: "9.7.6.2.2, Table 9.7.6.2.2"
+    applicability: Nonprestressed beam; required Vs exceeds 0.33*sqrt(fc')*bw*d.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component d/4; SI units.
+  - rule_id: ACI318_25_9_7_6_2_2_HIGH_ABSOLUTE_LIMIT
+    module: rc_shear_torsion.codes.aci318_25.shear
+    function: maximum_shear_spacing_limits
+    aci_section: "9.7.6.2.2, Table 9.7.6.2.2"
+    applicability: Nonprestressed beam; required Vs exceeds 0.33*sqrt(fc')*bw*d.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component 300 mm; SI units.
+  - rule_id: ACI318_25_9_7_6_3_1_CLOSED_STIRRUP
+    module: rc_shear_torsion.codes.aci318_25.torsion
+    function: check_closed_stirrup_for_torsion
+    aci_section: "9.7.6.3.1"
+    applicability: At least one physical demand scenario has active torsion.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: The current exterior transverse component represents a closed stirrup.
+  - rule_id: ACI318_25_9_7_6_3_3_PH_OVER_8
+    module: rc_shear_torsion.codes.aci318_25.torsion
+    function: torsion_spacing_limits
+    aci_section: "9.7.6.3.3"
+    applicability: Active torsion and available closed-stirrup geometry.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component Ph/8; inactive torsion is NOT_APPLICABLE.
+  - rule_id: ACI318_25_9_7_6_3_3_300_MM
+    module: rc_shear_torsion.codes.aci318_25.torsion
+    function: torsion_spacing_limits
+    aci_section: "9.7.6.3.3"
+    applicability: Active torsion.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component 300 mm; inactive torsion is NOT_APPLICABLE.
+  - rule_id: ACI318_25_18_4_2_4_D_OVER_4
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.4.2.4(a)"
+    applicability: DMO confined end region.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component d/4.
+  - rule_id: ACI318_25_18_4_2_4_EIGHT_DB
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.4.2.4(b)"
+    applicability: DMO confined end region with smallest enclosed longitudinal bar identified.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component 8db.
+  - rule_id: ACI318_25_18_4_2_4_TWENTY_FOUR_DBT
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.4.2.4(c)"
+    applicability: DMO confined end region with transverse bar diameter identified.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component 24 times the transverse reinforcing-bar diameter.
+  - rule_id: ACI318_25_18_4_2_4_ABSOLUTE_300
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.4.2.4(d)"
+    applicability: DMO confined end region.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Corrected maximum spacing component is 300 mm, not 150 mm.
+  - rule_id: ACI318_25_18_4_2_5_D_OVER_2
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.4.2.5"
+    applicability: DMO beam outside the confined end-region overlay.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum transverse reinforcement spacing d/2.
+  - rule_id: ACI318_25_18_6_4_4_D_OVER_4
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.6.4.4(a)"
+    applicability: DES confined region where hoops are required by 18.6.4.1.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component d/4.
+  - rule_id: ACI318_25_18_6_4_4_ABSOLUTE_150
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.6.4.4(b)"
+    applicability: DES confined region where hoops are required by 18.6.4.1.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component 150 mm.
+  - rule_id: ACI318_25_18_6_4_4_SIX_DB_GRADE_420
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.6.4.4(c)"
+    applicability: DES confined region with Grade 420 primary flexural reinforcement.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component 6db of the smallest primary flexural bar, excluding skin reinforcement.
+  - rule_id: ACI318_25_18_6_4_4_FIVE_DB_GRADE_550
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.6.4.4(d)"
+    applicability: DES confined region with Grade 550 primary flexural reinforcement.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum spacing component 5db of the smallest primary flexural bar, excluding skin reinforcement.
+  - rule_id: ACI318_25_18_6_4_5_D_OVER_2
+    module: rc_shear_torsion.codes.aci318_25.seismic
+    function: seismic_spacing_limits
+    aci_section: "18.6.4.5"
+    applicability: DES beam region where hoops are not required.
+    implemented: true
+    tested: true
+    test_file: tests/test_phase2_aci_engine.py
+    notes: Maximum stirrup spacing d/2.

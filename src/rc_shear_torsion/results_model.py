@@ -43,7 +43,6 @@ class CanonicalRegionResult:
     base_long_count: int | None
     extra_long_bar: str | None
     extra_long_count: int | None
-    is_deep_beam: bool | None
     longitudinal_mode: str | None
     longitudinal_arrangement_label: str | None
     checks: RegionChecks
@@ -58,6 +57,13 @@ class CanonicalRegionResult:
     longitudinal_weight_kg_per_m: float
     total_weight_kg_per_m: float
     stirrup_unit_weight_kg: float
+    torsion_governing_source: str | None = None
+    torsion_governing_station: float | None = None
+    combined_governing_source: str | None = None
+    combined_governing_station: float | None = None
+    longitudinal_governing_source: str | None = None
+    longitudinal_governing_station: float | None = None
+    scenario_count: int = 0
 
 
 def _longitudinal_provided_mm2(result: RegionDesignResult) -> float:
@@ -68,9 +74,21 @@ def _longitudinal_provided_mm2(result: RegionDesignResult) -> float:
 
 def _checks(result: RegionDesignResult, long_provided_mm2: float) -> RegionChecks:
     return RegionChecks(
-        torsion=result.at_over_s >= result.t_req,
-        shear=result.av_over_s >= result.v_req,
-        longitudinal=long_provided_mm2 >= result.l_req,
+        torsion=(
+            result.torsion_check_override
+            if result.torsion_check_override is not None
+            else result.at_over_s >= result.t_req
+        ),
+        shear=(
+            result.combined_check_override
+            if result.combined_check_override is not None
+            else result.av_over_s >= result.v_req
+        ),
+        longitudinal=(
+            result.longitudinal_check_override
+            if result.longitudinal_check_override is not None
+            else long_provided_mm2 >= result.l_req
+        ),
         detailing=result.failure_mode != "region_detail_fail",
     )
 
@@ -107,7 +125,6 @@ def to_canonical_region_result(result: RegionDesignResult) -> CanonicalRegionRes
         base_long_count=result.base_long_count,
         extra_long_bar=result.extra_long_bar,
         extra_long_count=result.extra_long_count,
-        is_deep_beam=result.is_deep_beam,
         longitudinal_mode=result.longitudinal_mode,
         longitudinal_arrangement_label=result.longitudinal_arrangement_label,
         checks=checks,
@@ -122,6 +139,13 @@ def to_canonical_region_result(result: RegionDesignResult) -> CanonicalRegionRes
         longitudinal_weight_kg_per_m=result.longitudinal_weight_kg_per_m,
         total_weight_kg_per_m=total_weight,
         stirrup_unit_weight_kg=result.stirrup_unit_weight_kg,
+        torsion_governing_source=result.torsion_governing_source,
+        torsion_governing_station=result.torsion_governing_station,
+        combined_governing_source=result.combined_governing_source,
+        combined_governing_station=result.combined_governing_station,
+        longitudinal_governing_source=result.longitudinal_governing_source,
+        longitudinal_governing_station=result.longitudinal_governing_station,
+        scenario_count=result.scenario_count,
     )
 
 

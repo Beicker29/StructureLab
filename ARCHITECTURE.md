@@ -71,7 +71,6 @@ This repository follows a layered engineering-service architecture focused on tr
   - `span_coupled`.
 
 2. Domain inputs:
-- `span_layout_json[].is_deep_beam` optional (default `false`).
 - `optimization.variables.longitudinal_bar_counts` must be even in `span_coupled`.
 
 3. Engine behavior:

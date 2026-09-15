@@ -5,9 +5,11 @@ import math
 from dataclasses import dataclass
 from typing import Literal
 
+from .codes.aci318_25 import AciRuleEvaluation, RuleCheck, RuleStatus, evaluate_region_rules
 from .io import EtabsFrameData, EtabsStationRow
 from .models import OptimizationConfig, RegionConfig, SpanConfig, VariablesConfig
 from .optimization import SearchHooks, run_exhaustive_search, run_genetic_search
+from .tolerances import torsion_zero_tolerance
 
 FailureMode = Literal[
     "torsion_fail",
@@ -73,19 +75,21 @@ HOOK_LENGTH_MM_BY_BAR: dict[str, float] = {
 HOOK_LENGTH_FACTOR_FALLBACK = 10.0
 
 
+DemandSource = Literal["SEISMIC", "GRAVITY"]
+TorsionState = Literal["ACTIVE", "INACTIVE", "INCONSISTENT"]
+
+
 @dataclass(frozen=True)
-class StationDemand:
-    station: float
-    x_rel: float
+class DemandScenario:
+    source: DemandSource
+    station_mm: float
+    x_relative: float
     region_id: str
-    v_req: float
-    t_req: float
-    l_req: float
-    source_v: Literal["seismic", "gravity", "mixed"]
-    source_t: Literal["seismic", "gravity", "mixed"]
-    source_l: Literal["seismic", "gravity", "mixed"]
-    seismic_row: EtabsStationRow
-    gravity_row: EtabsStationRow
+    v_rebar_mm2_per_m: float
+    t_transverse_mm2_per_m: float
+    t_longitudinal_mm2: float
+    torsion_state: TorsionState
+    source_row: int | None = None
 
 
 @dataclass(frozen=True)
@@ -94,7 +98,7 @@ class RegionDemand:
     span_id: str
     region_id: str
     region_type: Literal["C", "NC"]
-    beam_detailing: Literal["DES", "DMO"]
+    beam_detailing: Literal["DES", "DMO", "DMI"]
     d_mm: float | None
     db_bar: str | None
     min_branches: int | None
@@ -103,16 +107,67 @@ class RegionDemand:
     cover_side_mm: float | None
     cover_top_mm: float | None
     cover_bottom_mm: float | None
-    source_control: Literal["seismic", "gravity", "mixed"]
-    governing_station: float | None
-    v_req: float
-    t_req: float
-    l_req: float
-    station_count: int
-    is_deep_beam: bool = False
+    scenarios: tuple[DemandScenario, ...]
     fc_mpa: float | None = None
     fy_mpa: float | None = None
     region_length_mm: float = 0.0
+    compression_rebar_required: bool = False
+
+    @property
+    def governing_t_transverse_scenario(self) -> DemandScenario | None:
+        return max(self.scenarios, key=lambda item: item.t_transverse_mm2_per_m, default=None)
+
+    @property
+    def governing_combined_scenario(self) -> DemandScenario | None:
+        return max(
+            self.scenarios,
+            key=lambda item: item.v_rebar_mm2_per_m + 2.0 * item.t_transverse_mm2_per_m,
+            default=None,
+        )
+
+    @property
+    def governing_longitudinal_scenario(self) -> DemandScenario | None:
+        return max(self.scenarios, key=lambda item: item.t_longitudinal_mm2, default=None)
+
+    @property
+    def v_req(self) -> float:
+        return max((item.v_rebar_mm2_per_m for item in self.scenarios), default=0.0)
+
+    @property
+    def t_req(self) -> float:
+        controller = self.governing_t_transverse_scenario
+        return controller.t_transverse_mm2_per_m if controller is not None else 0.0
+
+    @property
+    def l_req(self) -> float:
+        controller = self.governing_longitudinal_scenario
+        return controller.t_longitudinal_mm2 if controller is not None else 0.0
+
+    @property
+    def station_count(self) -> int:
+        return len(self.scenarios)
+
+    @property
+    def governing_station(self) -> float | None:
+        controller = self.governing_combined_scenario
+        return controller.station_mm if controller is not None else None
+
+    @property
+    def source_control(self) -> Literal["seismic", "gravity", "mixed"]:
+        sources = {
+            item.source
+            for item in (
+                self.governing_t_transverse_scenario,
+                self.governing_combined_scenario,
+                self.governing_longitudinal_scenario,
+            )
+            if item is not None
+        }
+        if sources == {"SEISMIC"}:
+            return "seismic"
+        if sources == {"GRAVITY"}:
+            return "gravity"
+        return "mixed"
 
 
 @dataclass(frozen=True)
@@ -140,6 +195,10 @@ class Candidate:
     longitudinal_weight_kg_per_m: float = 0.0
     stirrup_unit_weight_kg: float = 0.0
     controlling_limit: str = ""
+    demand_status: RuleStatus = RuleStatus.NOT_EVALUATED
+    detailing_status: RuleStatus = RuleStatus.NOT_EVALUATED
+    overall_status: RuleStatus = RuleStatus.NOT_EVALUATED
+    rule_checks: tuple[RuleCheck, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -181,9 +240,22 @@ class RegionDesignResult:
     base_long_count: int | None = None
     extra_long_bar: str | None = None
     extra_long_count: int | None = None
-    is_deep_beam: bool | None = None
     longitudinal_mode: str | None = None
     longitudinal_arrangement_label: str | None = None
+    torsion_governing_source: str | None = None
+    torsion_governing_station: float | None = None
+    combined_governing_source: str | None = None
+    combined_governing_station: float | None = None
+    longitudinal_governing_source: str | None = None
+    longitudinal_governing_station: float | None = None
+    scenario_count: int = 0
+    torsion_check_override: bool | None = None
+    combined_check_override: bool | None = None
+    longitudinal_check_override: bool | None = None
+    demand_status: RuleStatus = RuleStatus.NOT_EVALUATED
+    detailing_status: RuleStatus = RuleStatus.NOT_EVALUATED
+    overall_status: RuleStatus = RuleStatus.NOT_EVALUATED
+    rule_checks: tuple[RuleCheck, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -218,7 +290,7 @@ class OptimizationOutcome:
 def build_region_demands(
     *,
     beam_id: str,
-    beam_detailing: Literal["DES", "DMO"],
+    beam_detailing: Literal["DES", "DMO", "DMI"],
     beam_cover_side_mm: float | None,
     beam_cover_top_mm: float | None,
     beam_cover_bottom_mm: float | None,
@@ -227,71 +299,67 @@ def build_region_demands(
     span: SpanConfig,
     seismic_frame: EtabsFrameData,
     gravity_frame: EtabsFrameData,
+    compression_rebar_required: bool = False,
+    torsion_tolerance: float = torsion_zero_tolerance,
 ) -> tuple[list[RegionDemand], list[str]]:
-    if len(seismic_frame.stations) != len(gravity_frame.stations):
-        return [], [
-            f"Span {span.id}: station count mismatch seismic={len(seismic_frame.stations)} "
-            f"gravity={len(gravity_frame.stations)}"
-        ]
+    if torsion_tolerance < 0.0:
+        return [], [f"Span {span.id}: torsion tolerance must be >= 0"]
 
-    seismic_stations = [row.station for row in seismic_frame.stations]
-    gravity_stations = [row.station for row in gravity_frame.stations]
-    if seismic_stations != gravity_stations:
-        return [], [f"Span {span.id}: station sequence mismatch between seismic and gravity"]
+    all_rows = tuple(seismic_frame.stations) + tuple(gravity_frame.stations)
+    if not all_rows:
+        return [], [f"Span {span.id}: no seismic or gravity stations were provided"]
 
-    station_min = min(seismic_stations) if seismic_stations else 0.0
-    station_max = max(seismic_stations) if seismic_stations else 0.0
+    station_min = min(row.station for row in all_rows)
+    station_max = max(row.station for row in all_rows)
     span_length_mm = station_max - station_min
     if span_length_mm <= 0.0:
         return [], [f"Span {span.id}: invalid station length={span_length_mm}; cannot compute relative position"]
 
-    region_stations: dict[str, list[StationDemand]] = {region.id: [] for region in span.regions}
+    region_scenarios: dict[str, list[DemandScenario]] = {region.id: [] for region in span.regions}
     errors: list[str] = []
 
-    for seismic_row, gravity_row in zip(seismic_frame.stations, gravity_frame.stations):
-        x_rel = (seismic_row.station - station_min) / span_length_mm
-        region = locate_region(span.regions, x_rel)
-        if region is None:
-            errors.append(
-                f"Span {span.id}: station {seismic_row.station} with x_rel={x_rel:.6f} is outside region map"
-            )
-            continue
+    for source, rows in (
+        ("SEISMIC", seismic_frame.stations),
+        ("GRAVITY", gravity_frame.stations),
+    ):
+        for ordinal, row in enumerate(rows, start=1):
+            x_rel = (row.station - station_min) / span_length_mm
+            region = locate_region(span.regions, x_rel)
+            if region is None:
+                errors.append(
+                    f"Span {span.id}: {source} station {row.station} with "
+                    f"x_rel={x_rel:.6f} is outside region map"
+                )
+                continue
 
-        source_v, v_req = envelope_source(seismic_row.v_rebar_req, gravity_row.v_rebar_req)
-        source_t, t_req = envelope_source(seismic_row.t_trn_req, gravity_row.t_trn_req)
-        source_l, l_req = envelope_source(seismic_row.t_lng_req, gravity_row.t_lng_req)
-
-        region_stations[region.id].append(
-            StationDemand(
-                station=seismic_row.station,
-                x_rel=x_rel,
-                region_id=region.id,
-                v_req=v_req,
-                t_req=t_req,
-                l_req=l_req,
-                source_v=source_v,
-                source_t=source_t,
-                source_l=source_l,
-                seismic_row=seismic_row,
-                gravity_row=gravity_row,
+            region_scenarios[region.id].append(
+                DemandScenario(
+                    source=source,
+                    station_mm=row.station,
+                    x_relative=x_rel,
+                    region_id=region.id,
+                    v_rebar_mm2_per_m=row.v_rebar_req,
+                    t_transverse_mm2_per_m=row.t_trn_req,
+                    t_longitudinal_mm2=row.t_lng_req,
+                    torsion_state=classify_torsion_state(
+                        row.t_trn_req,
+                        row.t_lng_req,
+                        tolerance=torsion_tolerance,
+                    ),
+                    source_row=row.source_row if row.source_row is not None else ordinal,
+                )
             )
-        )
 
     if errors:
         return [], errors
 
     demands: list[RegionDemand] = []
     for region in span.regions:
-        stations = region_stations.get(region.id, [])
-        if not stations:
+        scenarios = region_scenarios.get(region.id, [])
+        if not scenarios:
             errors.append(f"Span {span.id} region {region.id}: no stations were assigned")
             continue
 
-        v_req = max(station.v_req for station in stations)
-        t_req = max(station.t_req for station in stations)
-        l_req = max(station.l_req for station in stations)
-        governing = max(stations, key=lambda station: station.v_req + 2.0 * station.t_req)
-        source_control = region_source_control(stations)
         demands.append(
             RegionDemand(
                 beam_id=beam_id,
@@ -307,16 +375,11 @@ def build_region_demands(
                 cover_side_mm=beam_cover_side_mm,
                 cover_top_mm=beam_cover_top_mm,
                 cover_bottom_mm=beam_cover_bottom_mm,
-                source_control=source_control,
-                governing_station=governing.station,
-                v_req=v_req,
-                t_req=t_req,
-                l_req=l_req,
-                station_count=len(stations),
-                is_deep_beam=span.is_deep_beam,
+                scenarios=tuple(scenarios),
                 fc_mpa=beam_fc_mpa,
                 fy_mpa=beam_fy_mpa,
                 region_length_mm=(region.to - region.from_) * span_length_mm,
+                compression_rebar_required=compression_rebar_required,
             )
         )
 
@@ -333,33 +396,39 @@ def locate_region(regions: list[RegionConfig], x_rel: float) -> RegionConfig | N
     return None
 
 
-def envelope_source(seismic_value: float, gravity_value: float) -> tuple[Literal["seismic", "gravity", "mixed"], float]:
-    if seismic_value > gravity_value:
-        return "seismic", seismic_value
-    if gravity_value > seismic_value:
-        return "gravity", gravity_value
-    return "mixed", seismic_value
+def classify_torsion_state(
+    t_transverse_mm2_per_m: float,
+    t_longitudinal_mm2: float,
+    *,
+    tolerance: float = torsion_zero_tolerance,
+) -> TorsionState:
+    if tolerance < 0.0:
+        raise ValueError("torsion tolerance must be >= 0")
+    transverse_active = t_transverse_mm2_per_m > tolerance
+    longitudinal_active = t_longitudinal_mm2 > tolerance
+    if transverse_active and longitudinal_active:
+        return "ACTIVE"
+    if not transverse_active and not longitudinal_active:
+        return "INACTIVE"
+    return "INCONSISTENT"
 
 
-def region_source_control(stations: list[StationDemand]) -> Literal["seismic", "gravity", "mixed"]:
-    v_src, _ = envelope_source(
-        max(station.seismic_row.v_rebar_req for station in stations),
-        max(station.gravity_row.v_rebar_req for station in stations),
-    )
-    t_src, _ = envelope_source(
-        max(station.seismic_row.t_trn_req for station in stations),
-        max(station.gravity_row.t_trn_req for station in stations),
-    )
-    l_src, _ = envelope_source(
-        max(station.seismic_row.t_lng_req for station in stations),
-        max(station.gravity_row.t_lng_req for station in stations),
-    )
-    if v_src == t_src == l_src and v_src in {"seismic", "gravity"}:
-        return v_src
-    return "mixed"
+def scenario_reference(scenario: DemandScenario) -> str:
+    row = f", source_row={scenario.source_row}" if scenario.source_row is not None else ""
+    return f"source={scenario.source}, station_mm={scenario.station_mm}{row}"
 
 
-def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count: int, spacing_mm: int, long_bar: str, long_count: int) -> Candidate:
+def evaluate_candidate(
+    region: RegionDemand,
+    *,
+    e_bar: str,
+    g_bar: str,
+    g_count: int,
+    spacing_mm: int,
+    long_bar: str,
+    long_count: int,
+    check_longitudinal: bool = False,
+) -> Candidate:
     if e_bar not in BAR_AREAS_MM2 or g_bar not in BAR_AREAS_MM2 or long_bar not in BAR_AREAS_MM2:
         return failed_candidate(
             e_bar=e_bar,
@@ -392,6 +461,7 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
     av2 = g_count * ag
     av_total = av1 + av2
     av_over_s = av_total * 1000.0 / spacing_mm
+    combined_capacity = ((2.0 * at) + (g_count * ag)) * 1000.0 / spacing_mm
 
     stirrup_unit_weight_kg = stirrup_set_unit_weight_kg(
         region=region,
@@ -406,7 +476,7 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
     # Objective of optimization: total transverse weight in the region (kg).
     objective = transverse_weight_region_kg
 
-    if at_over_s < region.t_req:
+    if not region.scenarios:
         return failed_candidate(
             e_bar=e_bar,
             g_bar=g_bar,
@@ -414,8 +484,29 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             spacing_mm=spacing_mm,
             long_bar=long_bar,
             long_count=long_count,
-            failure_mode="torsion_fail",
-            message="(At/s)_real < TTrnRebar_req",
+            failure_mode="input_fail",
+            message="Region contains no physical demand scenarios",
+            objective=objective,
+            deficit=1.0,
+        )
+
+    inconsistent = next(
+        (scenario for scenario in region.scenarios if scenario.torsion_state == "INCONSISTENT"),
+        None,
+    )
+    if inconsistent is not None:
+        return failed_candidate(
+            e_bar=e_bar,
+            g_bar=g_bar,
+            g_count=g_count,
+            spacing_mm=spacing_mm,
+            long_bar=long_bar,
+            long_count=long_count,
+            failure_mode="input_fail",
+            message=(
+                "Inconsistent torsion demand at "
+                f"{scenario_reference(inconsistent)}: TTrn and TLng must both be active or inactive"
+            ),
             at=at,
             at_over_s=at_over_s,
             av1=av1,
@@ -428,9 +519,18 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             transverse_weight_kg_per_m=transverse_weight_kg_per_m,
             stirrup_unit_weight_kg=stirrup_unit_weight_kg,
             controlling_limit="N/A" if region.beam_detailing not in {"DMO", "DES"} else "",
-            deficit=deficit_ratio(region.t_req, at_over_s),
+            deficit=1.0,
         )
-    if f_free < 0.0:
+
+    torsion_failure = next(
+        (
+            scenario
+            for scenario in region.scenarios
+            if scenario.t_transverse_mm2_per_m > at_over_s
+        ),
+        None,
+    )
+    if torsion_failure is not None:
         return failed_candidate(
             e_bar=e_bar,
             g_bar=g_bar,
@@ -439,7 +539,7 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             long_bar=long_bar,
             long_count=long_count,
             failure_mode="torsion_fail",
-            message="f_free < 0.0",
+            message=f"C_T < TTrnRebar at {scenario_reference(torsion_failure)}",
             at=at,
             at_over_s=at_over_s,
             av1=av1,
@@ -452,9 +552,19 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             transverse_weight_kg_per_m=transverse_weight_kg_per_m,
             stirrup_unit_weight_kg=stirrup_unit_weight_kg,
             controlling_limit="N/A" if region.beam_detailing not in {"DMO", "DES"} else "",
-            deficit=abs(f_free),
+            deficit=deficit_ratio(torsion_failure.t_transverse_mm2_per_m, at_over_s),
         )
-    if av_over_s < region.v_req:
+
+    combined_failure = next(
+        (
+            scenario
+            for scenario in region.scenarios
+            if scenario.v_rebar_mm2_per_m + 2.0 * scenario.t_transverse_mm2_per_m
+            > combined_capacity
+        ),
+        None,
+    )
+    if combined_failure is not None:
         return failed_candidate(
             e_bar=e_bar,
             g_bar=g_bar,
@@ -463,7 +573,7 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             long_bar=long_bar,
             long_count=long_count,
             failure_mode="shear_fail",
-            message="(Av_total/s)_real < VRebar_req",
+            message=f"C_VT < VRebar + 2*TTrnRebar at {scenario_reference(combined_failure)}",
             at=at,
             at_over_s=at_over_s,
             av1=av1,
@@ -476,17 +586,59 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             transverse_weight_kg_per_m=transverse_weight_kg_per_m,
             stirrup_unit_weight_kg=stirrup_unit_weight_kg,
             controlling_limit="N/A" if region.beam_detailing not in {"DMO", "DES"} else "",
-            deficit=deficit_ratio(region.v_req, av_over_s),
+            deficit=deficit_ratio(
+                combined_failure.v_rebar_mm2_per_m
+                + 2.0 * combined_failure.t_transverse_mm2_per_m,
+                combined_capacity,
+            ),
         )
-    region_rule_ok, region_rule_message, controlling_limit = check_region_rule(
+
+    if check_longitudinal:
+        longitudinal_failure = next(
+            (
+                scenario
+                for scenario in region.scenarios
+                if scenario.t_longitudinal_mm2 > along
+            ),
+            None,
+        )
+        if longitudinal_failure is not None:
+            return failed_candidate(
+                e_bar=e_bar,
+                g_bar=g_bar,
+                g_count=g_count,
+                spacing_mm=spacing_mm,
+                long_bar=long_bar,
+                long_count=long_count,
+                failure_mode="longitudinal_fail",
+                message=f"Along < TLngRebar at {scenario_reference(longitudinal_failure)}",
+                at=at,
+                at_over_s=at_over_s,
+                av1=av1,
+                av2=av2,
+                av_total=av_total,
+                av_over_s=av_over_s,
+                long_provided=along,
+                f_free=f_free,
+                objective=objective,
+                transverse_weight_kg_per_m=transverse_weight_kg_per_m,
+                stirrup_unit_weight_kg=stirrup_unit_weight_kg,
+                controlling_limit="N/A" if region.beam_detailing not in {"DMO", "DES"} else "",
+                deficit=deficit_ratio(longitudinal_failure.t_longitudinal_mm2, along),
+            )
+    rule_evaluation = evaluate_region_rule_checks(
         region,
         spacing_mm=spacing_mm,
         g_count=g_count,
-        long_count=long_count,
         e_bar=e_bar,
         g_bar=g_bar,
     )
-    if not region_rule_ok:
+    controlling_limit = (
+        rule_evaluation.controlling_limit.label
+        if rule_evaluation.controlling_limit is not None
+        else "N/A"
+    )
+    if not rule_evaluation.passes_enforced_rules:
         return failed_candidate(
             e_bar=e_bar,
             g_bar=g_bar,
@@ -495,7 +647,7 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             long_bar=long_bar,
             long_count=long_count,
             failure_mode="region_detail_fail",
-            message=region_rule_message,
+            message=format_rule_evaluation_message(region, spacing_mm, rule_evaluation),
             at=at,
             at_over_s=at_over_s,
             av1=av1,
@@ -509,85 +661,11 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
             stirrup_unit_weight_kg=stirrup_unit_weight_kg,
             controlling_limit=controlling_limit,
             deficit=1.0,
+            demand_status=RuleStatus.PASS,
+            detailing_status=RuleStatus.FAIL,
+            rule_checks=rule_evaluation.checks,
         )
 
-    if region.is_deep_beam:
-        if region.d_mm is None or region.width_mm is None:
-            return failed_candidate(
-                e_bar=e_bar,
-                g_bar=g_bar,
-                g_count=g_count,
-                spacing_mm=spacing_mm,
-                long_bar=long_bar,
-                long_count=long_count,
-                failure_mode="region_detail_fail",
-                message="Deep beam checks require d_mm and width_mm",
-                at=at,
-                at_over_s=at_over_s,
-                av1=av1,
-                av2=av2,
-                av_total=av_total,
-                av_over_s=av_over_s,
-                long_provided=along,
-                f_free=f_free,
-                objective=objective,
-                transverse_weight_kg_per_m=transverse_weight_kg_per_m,
-                stirrup_unit_weight_kg=stirrup_unit_weight_kg,
-                controlling_limit="s1",
-                deficit=1.0,
-            )
-
-        s1_limit = min(region.d_mm / 5.0, 300.0)
-        if float(spacing_mm) > s1_limit:
-            return failed_candidate(
-                e_bar=e_bar,
-                g_bar=g_bar,
-                g_count=g_count,
-                spacing_mm=spacing_mm,
-                long_bar=long_bar,
-                long_count=long_count,
-                failure_mode="region_detail_fail",
-                message=f"Deep beam requires s1 <= min(d/5,300)={s1_limit:.1f} mm (got {spacing_mm})",
-                at=at,
-                at_over_s=at_over_s,
-                av1=av1,
-                av2=av2,
-                av_total=av_total,
-                av_over_s=av_over_s,
-                long_provided=along,
-                f_free=f_free,
-                objective=objective,
-                transverse_weight_kg_per_m=transverse_weight_kg_per_m,
-                stirrup_unit_weight_kg=stirrup_unit_weight_kg,
-                controlling_limit="s1",
-                deficit=1.0,
-            )
-
-        min_av_total = 0.0025 * region.width_mm * float(spacing_mm)
-        if av_total < min_av_total:
-            return failed_candidate(
-                e_bar=e_bar,
-                g_bar=g_bar,
-                g_count=g_count,
-                spacing_mm=spacing_mm,
-                long_bar=long_bar,
-                long_count=long_count,
-                failure_mode="region_detail_fail",
-                message=f"Deep beam requires Av_total >= 0.0025*b*s1 ({min_av_total:.2f} mm2)",
-                at=at,
-                at_over_s=at_over_s,
-                av1=av1,
-                av2=av2,
-                av_total=av_total,
-                av_over_s=av_over_s,
-                long_provided=along,
-                f_free=f_free,
-                objective=objective,
-                transverse_weight_kg_per_m=transverse_weight_kg_per_m,
-                stirrup_unit_weight_kg=stirrup_unit_weight_kg,
-                controlling_limit="Av_total",
-                deficit=deficit_ratio(min_av_total, av_total),
-            )
     return Candidate(
         e_bar=e_bar,
         g_bar=g_bar,
@@ -612,6 +690,14 @@ def evaluate_candidate(region: RegionDemand, *, e_bar: str, g_bar: str, g_count:
         longitudinal_weight_kg_per_m=bar_mass_kg_per_m(long_bar, long_count),
         stirrup_unit_weight_kg=stirrup_unit_weight_kg,
         controlling_limit=controlling_limit,
+        demand_status=RuleStatus.PASS,
+        detailing_status=rule_evaluation.detailing_status,
+        overall_status=(
+            RuleStatus.PASS
+            if rule_evaluation.detailing_status in {RuleStatus.PASS, RuleStatus.NOT_APPLICABLE}
+            else rule_evaluation.detailing_status
+        ),
+        rule_checks=rule_evaluation.checks,
     )
 
 
@@ -639,8 +725,23 @@ def failed_candidate(
     controlling_limit: str = "",
     deficit: float = 1.0,
     longitudinal_weight_kg_per_m: float = 0.0,
+    demand_status: RuleStatus | None = None,
+    detailing_status: RuleStatus | None = None,
+    rule_checks: tuple[RuleCheck, ...] = (),
 ) -> Candidate:
     penalty = 1.0e6 * (1.0 + max(deficit, 0.0))
+    resolved_demand_status = demand_status
+    if resolved_demand_status is None:
+        resolved_demand_status = (
+            RuleStatus.FAIL
+            if failure_mode in {"torsion_fail", "shear_fail", "longitudinal_fail"}
+            else RuleStatus.NOT_EVALUATED
+        )
+    resolved_detailing_status = detailing_status
+    if resolved_detailing_status is None:
+        resolved_detailing_status = (
+            RuleStatus.FAIL if failure_mode == "region_detail_fail" else RuleStatus.NOT_EVALUATED
+        )
     return Candidate(
         e_bar=e_bar,
         g_bar=g_bar,
@@ -665,7 +766,96 @@ def failed_candidate(
         longitudinal_weight_kg_per_m=longitudinal_weight_kg_per_m,
         stirrup_unit_weight_kg=stirrup_unit_weight_kg,
         controlling_limit=controlling_limit,
+        demand_status=resolved_demand_status,
+        detailing_status=resolved_detailing_status,
+        overall_status=RuleStatus.FAIL,
+        rule_checks=rule_checks,
     )
+
+
+def evaluate_region_rule_checks(
+    region: RegionDemand,
+    *,
+    spacing_mm: int,
+    g_count: int,
+    e_bar: str,
+    g_bar: str,
+) -> AciRuleEvaluation:
+    longitudinal_diameter = BAR_DIAMETERS_MM.get(region.db_bar or "")
+    e_diameter = BAR_DIAMETERS_MM.get(e_bar)
+    g_diameter = BAR_DIAMETERS_MM.get(g_bar) if g_count > 0 else None
+    transverse_diameter = min(
+        diameter for diameter in (e_diameter, g_diameter) if diameter is not None
+    ) if e_diameter is not None else None
+    shear_controller = max(
+        region.scenarios,
+        key=lambda scenario: scenario.v_rebar_mm2_per_m,
+        default=None,
+    )
+    torsion_controller = region.governing_t_transverse_scenario
+    return evaluate_region_rules(
+        system=region.beam_detailing,
+        zone=region.region_type,
+        spacing_mm=float(spacing_mm),
+        d_mm=region.d_mm,
+        longitudinal_bar_diameter_mm=longitudinal_diameter,
+        transverse_bar_diameter_mm=transverse_diameter,
+        minimum_branches=region.min_branches,
+        provided_branches=2 + g_count,
+        compression_rebar_required=region.compression_rebar_required,
+        torsion_states=tuple(scenario.torsion_state for scenario in region.scenarios),
+        torsion_station=(torsion_controller.station_mm if torsion_controller is not None else None),
+        width_mm=region.width_mm,
+        height_mm=region.height_mm,
+        cover_side_mm=region.cover_side_mm,
+        cover_top_mm=region.cover_top_mm,
+        cover_bottom_mm=region.cover_bottom_mm,
+        fc_mpa=region.fc_mpa,
+        fy_mpa=region.fy_mpa,
+        required_av_per_s_mm2_per_m=(
+            shear_controller.v_rebar_mm2_per_m if shear_controller is not None else None
+        ),
+        shear_station=(shear_controller.station_mm if shear_controller is not None else None),
+    )
+
+
+def format_rule_evaluation_message(
+    region: RegionDemand,
+    spacing_mm: int,
+    evaluation: AciRuleEvaluation,
+) -> str:
+    closed_stirrup_failure = next(
+        (
+            check
+            for check in evaluation.checks
+            if check.rule_id == "ACI318_25_9_7_6_3_1_CLOSED_STIRRUP"
+            and check.status == RuleStatus.FAIL
+        ),
+        None,
+    )
+    if closed_stirrup_failure is not None:
+        return (
+            f"{region.beam_detailing} region {region.region_type} with TTrnRebar>0 requires "
+            "minimum branches: min_branches >= 2 (closed stirrup equivalent)"
+        )
+
+    controlling = evaluation.controlling_limit
+    if controlling is not None and controlling.check.status == RuleStatus.FAIL:
+        formatted_limits = ", ".join(
+            f"{limit.label}={limit.maximum_mm:.1f}"
+            for limit in evaluation.spacing_limits
+            if limit.maximum_mm is not None
+        )
+        return (
+            f"{region.beam_detailing} region {region.region_type} spacing limit failed: "
+            f"s={spacing_mm} > min({formatted_limits}) = {controlling.maximum_mm:.1f} mm"
+        )
+
+    failure = next(
+        (check for check in evaluation.checks if check.status == RuleStatus.FAIL),
+        None,
+    )
+    return failure.applicability_reason if failure is not None else "ACI detailing rules satisfied"
 
 
 def check_region_rule(
@@ -677,182 +867,24 @@ def check_region_rule(
     e_bar: str,
     g_bar: str,
 ) -> tuple[bool, str, str]:
-    if region.beam_detailing not in {"DMO", "DES"}:
-        return True, "Detailing rule check: not applicable", "N/A"
-
-    if region.beam_detailing == "DES":
-        if region.region_type != "C":
-            return True, "DES detailing rule check: not applicable", "N/A"
-        if region.db_bar not in BAR_DIAMETERS_MM:
-            return False, f"Unsupported db_bar for detailing checks: {region.db_bar}", ""
-        if e_bar not in BAR_DIAMETERS_MM:
-            return False, f"Unsupported stirrup bar for detailing checks: {e_bar}", ""
-        if g_bar not in BAR_DIAMETERS_MM:
-            return False, f"Unsupported branch bar for detailing checks: {g_bar}", ""
-        if region.d_mm is None:
-            return False, "DES region C requires d_mm and db_bar in case.json", ""
-
-        db_mm = BAR_DIAMETERS_MM[region.db_bar]
-        branch_diameter = BAR_DIAMETERS_MM[g_bar] if g_count > 0 else math.inf
-        dest = min(BAR_DIAMETERS_MM[e_bar], branch_diameter)
-        limits: list[tuple[str, float]] = [
-            ("d/4", region.d_mm / 4.0),
-            ("6db", 6.0 * db_mm),
-            ("150", 150.0),
-            ("16db", 16.0 * db_mm),
-            ("48dest", 48.0 * dest),
-        ]
-        if (
-            region.width_mm is None
-            or region.height_mm is None
-            or region.cover_side_mm is None
-            or region.cover_top_mm is None
-            or region.cover_bottom_mm is None
-        ):
-            return False, "DES region C requires width_mm, height_mm, and beam covers for Ph/8 limit", ""
-        stirrup_width_mm = region.width_mm - 2.0 * region.cover_side_mm
-        stirrup_height_mm = region.height_mm - (region.cover_top_mm + region.cover_bottom_mm)
-        if stirrup_width_mm <= 0.0 or stirrup_height_mm <= 0.0:
-            return False, "DES region C Ph/8 limit invalid: non-positive closed stirrup dimensions", ""
-        ph_mm = 2.0 * (stirrup_width_mm + stirrup_height_mm)
-        limits.append(("Ph/8", ph_mm / 8.0))
-
-        controlling_name, max_spacing = min(limits, key=lambda item: item[1])
-        if float(spacing_mm) > max_spacing:
-            formatted_limits = ", ".join(f"{name}={value:.1f}" for name, value in limits)
-            return (
-                False,
-                "DES region C spacing limit failed: "
-                f"s={spacing_mm} > min({formatted_limits}) = {max_spacing:.1f} mm",
-                controlling_name,
-            )
-        controlling_label = controlling_name if float(spacing_mm) >= (max_spacing - 1.0e-9) else "Resistencia"
-        return True, "DES region C detailing checks satisfied", controlling_label
-
-    if region.db_bar not in BAR_DIAMETERS_MM:
-        return False, f"Unsupported db_bar for detailing checks: {region.db_bar}", ""
-    if e_bar not in BAR_DIAMETERS_MM:
-        return False, f"Unsupported stirrup bar for detailing checks: {e_bar}", ""
-    if g_bar not in BAR_DIAMETERS_MM:
-        return False, f"Unsupported branch bar for detailing checks: {g_bar}", ""
-
-    if region.region_type == "C":
-        if region.d_mm is None or region.min_branches is None:
-            return False, "DMO region C requires d_mm, db_bar, and min_branches in case.json", ""
-        if region.t_req > 0.0 and region.min_branches < 2:
-            return (
-                False,
-                "DMO region C with TTrnRebar>0 requires min_branches >= 2 "
-                "(closed stirrup equivalent)",
-                "",
-            )
-
-        db_mm = BAR_DIAMETERS_MM[region.db_bar]
-        d_limit = region.d_mm / 4.0
-        db8_limit = 8.0 * db_mm
-        mm150_limit = 150.0
-        db16_limit = 16.0 * db_mm
-        branch_diameter = BAR_DIAMETERS_MM[g_bar] if g_count > 0 else math.inf
-        dest = min(BAR_DIAMETERS_MM[e_bar], branch_diameter)
-        dest48_limit = 48.0 * dest
-        dest24_limit = 24.0 * dest
-
-        limits: list[tuple[str, float]] = [
-            ("d/4", d_limit),
-            ("8db", db8_limit),
-            ("150", mm150_limit),
-            ("16db", db16_limit),
-            ("48dest", dest48_limit),
-            ("24dest", dest24_limit),
-        ]
-        controlling_name, max_spacing = min(limits, key=lambda item: item[1])
-        if float(spacing_mm) > max_spacing:
-            return (
-                False,
-                "DMO region C spacing limit failed: "
-                f"s={spacing_mm} > min(d/4={d_limit:.1f}, 8db={db8_limit:.1f}, 150={mm150_limit:.1f}, "
-                f"16db={db16_limit:.1f}, 48dest={dest48_limit:.1f}, 24dest={dest24_limit:.1f}) = {max_spacing:.1f} mm",
-                controlling_name,
-            )
-        controlling_label = controlling_name if float(spacing_mm) >= (max_spacing - 1.0e-9) else "Resistencia"
-
-        _ = long_count
-        provided_branches = 2 + g_count
-        if provided_branches < region.min_branches:
-            return (
-                False,
-                "DMO region C minimum branches failed: "
-                f"provided={provided_branches} < required={region.min_branches}",
-                controlling_name,
-            )
-
-        return True, "DMO region C detailing checks satisfied", controlling_label
-
-    if region.region_type != "NC":
-        return True, "Detailing rule check: unsupported region type skipped", "N/A"
-
-    if region.d_mm is None:
-        return False, "DMO region NC requires d_mm in case.json", ""
-    if region.t_req > 0.0 and region.min_branches is not None and region.min_branches < 2:
-        return (
-            False,
-            "DMO region NC with TTrnRebar>0 requires min_branches >= 2 "
-            "(closed stirrup equivalent)",
-            "",
-        )
-    if region.fc_mpa is None or region.fy_mpa is None:
-        return False, "DMO region NC requires beam fc_mpa and fy_mpa", ""
-    if region.width_mm is None:
-        return False, "DMO region NC requires width_mm to evaluate spacing limits", ""
-
-    db_mm = BAR_DIAMETERS_MM[region.db_bar]
-    branch_diameter = BAR_DIAMETERS_MM[g_bar] if g_count > 0 else math.inf
-    dest = min(BAR_DIAMETERS_MM[e_bar], branch_diameter)
-
-    vs_req_n = (region.v_req / 1000.0) * region.fy_mpa * region.d_mm
-    v33_n = 0.33 * region.fc_mpa * region.width_mm * region.d_mm
-
-    limits: list[tuple[str, float]] = [
-        ("16db", 16.0 * db_mm),
-        ("48dest", 48.0 * dest),
-    ]
-    if vs_req_n < v33_n:
-        limits.append(("d/2", region.d_mm / 2.0))
-    else:
-        limits.append(("d/4", region.d_mm / 4.0))
-
-    if region.t_req > 0.0:
-        if (
-            region.height_mm is None
-            or region.cover_side_mm is None
-            or region.cover_top_mm is None
-            or region.cover_bottom_mm is None
-        ):
-            return (
-                False,
-                "DMO region NC with TTrnRebar>0 requires height_mm and beam covers for Ph/8 limit",
-                "",
-            )
-        stirrup_width_mm = region.width_mm - 2.0 * region.cover_side_mm
-        stirrup_height_mm = region.height_mm - (region.cover_top_mm + region.cover_bottom_mm)
-        if stirrup_width_mm <= 0.0 or stirrup_height_mm <= 0.0:
-            return False, "DMO region NC Ph/8 limit invalid: non-positive closed stirrup dimensions", ""
-        ph_mm = 2.0 * (stirrup_width_mm + stirrup_height_mm)
-        limits.append(("Ph/8", ph_mm / 8.0))
-
-    controlling_name, max_spacing = min(limits, key=lambda item: item[1])
-    if float(spacing_mm) > max_spacing:
-        formatted_limits = ", ".join(f"{name}={value:.1f}" for name, value in limits)
-        return (
-            False,
-            "DMO region NC spacing limit failed: "
-            f"s={spacing_mm} > min({formatted_limits}) = {max_spacing:.1f} mm "
-            f"[Vrebar*fy*d={vs_req_n:.1f} N, 0.33f'c*bw*d={v33_n:.1f} N]",
-            controlling_name,
-        )
-
-    controlling_label = controlling_name if float(spacing_mm) >= (max_spacing - 1.0e-9) else "Resistencia"
-    return True, "DMO region NC detailing checks satisfied", controlling_label
+    """Temporary compatibility adapter over the single modular ACI engine."""
+    _ = long_count
+    evaluation = evaluate_region_rule_checks(
+        region,
+        spacing_mm=spacing_mm,
+        g_count=g_count,
+        e_bar=e_bar,
+        g_bar=g_bar,
+    )
+    controlling = evaluation.controlling_limit
+    controlling_label = controlling.label if controlling is not None else "N/A"
+    if not evaluation.passes_enforced_rules:
+        return False, format_rule_evaluation_message(region, spacing_mm, evaluation), controlling_label
+    if evaluation.detailing_status == RuleStatus.NOT_EVALUATED:
+        return True, "Evaluated ACI rules satisfied; unresolved rules remain NOT_EVALUATED", controlling_label
+    if evaluation.detailing_status == RuleStatus.NOT_APPLICABLE:
+        return True, "ACI detailing rules are not applicable", "N/A"
+    return True, "ACI detailing rules satisfied", controlling_label
 
 def deficit_ratio(required: float, provided: float) -> float:
     if required <= 0.0:
@@ -933,7 +965,7 @@ def longitudinal_mass_kg_per_m(long_provided_mm2: float) -> float:
     return long_provided_mm2 * 1000.0 * STEEL_DENSITY_KG_PER_MM3
 
 def requires_longitudinal_design(region: RegionDemand) -> bool:
-    return bool(region.is_deep_beam or region.l_req > 0.0)
+    return any(scenario.t_longitudinal_mm2 > 0.0 for scenario in region.scenarios)
 
 
 def select_longitudinal_independent(
@@ -951,7 +983,7 @@ def select_longitudinal_independent(
     options.sort(key=lambda item: item[0])
 
     for provided, long_bar, long_count in options:
-        if provided >= region.l_req:
+        if all(scenario.t_longitudinal_mm2 <= provided for scenario in region.scenarios):
             return long_bar, long_count, provided, True
 
     provided, long_bar, long_count = options[-1]
@@ -959,12 +991,22 @@ def select_longitudinal_independent(
 
 
 def optimize_region(region: RegionDemand, optimization: OptimizationConfig) -> OptimizationOutcome:
+    check_longitudinal = optimization.longitudinal_mode == "legacy_region_independent"
     if optimization.enabled:
-        return optimize_region_ga(region, optimization)
-    return optimize_region_exhaustive(region, optimization.variables)
+        return optimize_region_ga(region, optimization, check_longitudinal=check_longitudinal)
+    return optimize_region_exhaustive(
+        region,
+        optimization.variables,
+        check_longitudinal=check_longitudinal,
+    )
 
 
-def optimize_region_exhaustive(region: RegionDemand, variables: VariablesConfig) -> OptimizationOutcome:
+def optimize_region_exhaustive(
+    region: RegionDemand,
+    variables: VariablesConfig,
+    *,
+    check_longitudinal: bool = True,
+) -> OptimizationOutcome:
     allowed_g_counts, min_required_g = g_count_domain_for_region(region, variables.G_counts)
     if not allowed_g_counts:
         selected = failed_candidate(
@@ -996,8 +1038,11 @@ def optimize_region_exhaustive(region: RegionDemand, variables: VariablesConfig)
         allowed_g_counts,
         variables.stirrup_spacing_mm,
     ]
-    default_long_bar = variables.longitudinal_bars[0]
-    default_long_count = 0
+    if check_longitudinal:
+        default_long_bar, default_long_count, _, _ = select_longitudinal_independent(region, variables)
+    else:
+        default_long_bar = variables.longitudinal_bars[0]
+        default_long_count = 0
 
     def decode(individual: list[int]) -> tuple[str, str, int, int]:
         return (
@@ -1017,6 +1062,7 @@ def optimize_region_exhaustive(region: RegionDemand, variables: VariablesConfig)
             spacing_mm=spacing_mm,
             long_bar=default_long_bar,
             long_count=default_long_count,
+            check_longitudinal=check_longitudinal,
         )
         return candidate
 
@@ -1040,9 +1086,16 @@ def optimize_region_exhaustive(region: RegionDemand, variables: VariablesConfig)
     )
 
 
-def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -> OptimizationOutcome:
+def optimize_region_ga(
+    region: RegionDemand,
+    optimization: OptimizationConfig,
+    *,
+    check_longitudinal: bool | None = None,
+) -> OptimizationOutcome:
     variables = optimization.variables
     ga = optimization.genetic_algorithm
+    if check_longitudinal is None:
+        check_longitudinal = optimization.longitudinal_mode == "legacy_region_independent"
     allowed_g_counts, min_required_g = g_count_domain_for_region(region, variables.G_counts)
     if not allowed_g_counts:
         selected = failed_candidate(
@@ -1075,8 +1128,11 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
         variables.stirrup_spacing_mm,
     ]
     domain_sizes = [len(values) for values in domain]
-    default_long_bar = variables.longitudinal_bars[0]
-    default_long_count = 0
+    if check_longitudinal:
+        default_long_bar, default_long_count, _, _ = select_longitudinal_independent(region, variables)
+    else:
+        default_long_bar = variables.longitudinal_bars[0]
+        default_long_count = 0
 
     def decode(individual: list[int]) -> tuple[str, str, int, int]:
         return (
@@ -1103,6 +1159,7 @@ def optimize_region_ga(region: RegionDemand, optimization: OptimizationConfig) -
             spacing_mm=spacing_mm,
             long_bar=default_long_bar,
             long_count=default_long_count,
+            check_longitudinal=check_longitudinal,
         )
         evaluation_cache[key] = candidate
         return candidate
@@ -1143,6 +1200,15 @@ def candidate_to_region_result(
     evaluated_candidates: int,
     feasible_candidates: int,
 ) -> RegionDesignResult:
+    torsion_controller = demand.governing_t_transverse_scenario
+    combined_controller = demand.governing_combined_scenario
+    longitudinal_controller = demand.governing_longitudinal_scenario
+    combined_capacity = (
+        ((2.0 * candidate.at) + candidate.av2) * 1000.0 / candidate.spacing_mm
+        if candidate.spacing_mm > 0
+        else 0.0
+    )
+    consistent = all(item.torsion_state != "INCONSISTENT" for item in demand.scenarios)
     return RegionDesignResult(
         beam_id=demand.beam_id,
         span_id=demand.span_id,
@@ -1176,6 +1242,27 @@ def candidate_to_region_result(
         transverse_weight_kg_per_m=candidate.transverse_weight_kg_per_m,
         longitudinal_weight_kg_per_m=candidate.longitudinal_weight_kg_per_m,
         stirrup_unit_weight_kg=candidate.stirrup_unit_weight_kg,
+        torsion_governing_source=(torsion_controller.source if torsion_controller else None),
+        torsion_governing_station=(torsion_controller.station_mm if torsion_controller else None),
+        combined_governing_source=(combined_controller.source if combined_controller else None),
+        combined_governing_station=(combined_controller.station_mm if combined_controller else None),
+        longitudinal_governing_source=(longitudinal_controller.source if longitudinal_controller else None),
+        longitudinal_governing_station=(longitudinal_controller.station_mm if longitudinal_controller else None),
+        scenario_count=len(demand.scenarios),
+        torsion_check_override=consistent and all(
+            item.t_transverse_mm2_per_m <= candidate.at_over_s for item in demand.scenarios
+        ),
+        combined_check_override=consistent and all(
+            item.v_rebar_mm2_per_m + 2.0 * item.t_transverse_mm2_per_m <= combined_capacity
+            for item in demand.scenarios
+        ),
+        longitudinal_check_override=consistent and all(
+            item.t_longitudinal_mm2 <= candidate.long_provided for item in demand.scenarios
+        ),
+        demand_status=candidate.demand_status,
+        detailing_status=candidate.detailing_status,
+        overall_status=candidate.overall_status,
+        rule_checks=candidate.rule_checks,
     )
 
 
@@ -1184,6 +1271,7 @@ def top_region_alternatives(
     variables: VariablesConfig,
     *,
     top_n: int | None = 10,
+    check_longitudinal: bool = True,
 ) -> list[RegionDesignResult]:
     allowed_g_counts, _ = g_count_domain_for_region(region, variables.G_counts)
     if not allowed_g_counts:
@@ -1195,8 +1283,11 @@ def top_region_alternatives(
     else:
         top_n_int = int(top_n)
         limit = None if top_n_int <= 0 else max(1, top_n_int)
-    default_long_bar = variables.longitudinal_bars[0]
-    default_long_count = 0
+    if check_longitudinal:
+        default_long_bar, default_long_count, _, _ = select_longitudinal_independent(region, variables)
+    else:
+        default_long_bar = variables.longitudinal_bars[0]
+        default_long_count = 0
 
     evaluated: list[Candidate] = []
     for e_bar, g_bar, g_count, spacing in itertools.product(
@@ -1213,6 +1304,7 @@ def top_region_alternatives(
             spacing_mm=spacing,
             long_bar=default_long_bar,
             long_count=default_long_count,
+            check_longitudinal=check_longitudinal,
         )
         evaluated.append(candidate)
 

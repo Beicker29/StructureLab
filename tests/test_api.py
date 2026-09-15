@@ -815,7 +815,6 @@ class ApiTests(unittest.TestCase):
                 "support_left_mm": 180,
                 "support_right_mm": 250,
                 "clear_length_mm": 5370,
-                "is_deep_beam": True,
                 "regions": [
                     {"id": "R1", "from": 0.0, "to": 0.2, "type": "C"},
                     {"id": "R2", "from": 0.2, "to": 0.8, "type": "NC"},
@@ -829,7 +828,6 @@ class ApiTests(unittest.TestCase):
                 "c_ratio_extremos": 0.25,
                 "support_left_mm": 200,
                 "support_right_mm": 150,
-                "is_deep_beam": False,
                 "regions": [
                     {"id": "R1", "from": 0.0, "to": 0.25, "confinado": True},
                     {"id": "R2", "from": 0.25, "to": 0.75, "confinado": False},
@@ -882,8 +880,6 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(spans[0]["support_left_mm"], 180)
         self.assertEqual(spans[0]["support_right_mm"], 250)
         self.assertEqual(spans[0]["clear_length_mm"], 5370)
-        self.assertTrue(spans[0]["is_deep_beam"])
-        self.assertFalse(spans[1]["is_deep_beam"])
         self.assertEqual(spans[1]["support_left_mm"], 250)
         self.assertEqual(spans[1]["support_right_mm"], 150)
 

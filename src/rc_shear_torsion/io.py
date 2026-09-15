@@ -34,6 +34,7 @@ class EtabsStationRow:
     v_rebar_req: float
     t_lng_req: float
     t_trn_req: float
+    source_row: int | None = None
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,9 @@ def read_etabs_excel(
             f"Missing required columns in {excel_path.name}: {', '.join(missing)}"
         )
 
-    raw_by_unique: dict[str, dict[float, EtabsStationRow]] = {}
+    raw_by_unique: dict[str, list[EtabsStationRow]] = {}
+    seen_stations: dict[str, set[float]] = {}
+    duplicate_counts: dict[str, int] = {}
     row_count = 0
     skipped_rows = 0
     warnings: list[str] = []
@@ -123,46 +126,45 @@ def read_etabs_excel(
             v_rebar_req=as_float(row[header_map["VRebar"]]) * rebar_per_length_factor,
             t_lng_req=as_float(row[header_map["TLngRebar"]]),
             t_trn_req=as_float(row[header_map["TTrnRebar"]]) * rebar_per_length_factor,
+            source_row=row_index,
         )
 
-        by_station = raw_by_unique.setdefault(unique_name, {})
-        if station in by_station:
-            prev = by_station[station]
-            by_station[station] = EtabsStationRow(
-                story=record.story or prev.story,
-                label=record.label or prev.label,
-                unique_name=unique_name,
-                design_sect=record.design_sect or prev.design_sect,
-                station=station,
-                as_top=max(prev.as_top, record.as_top),
-                as_bot=max(prev.as_bot, record.as_bot),
-                v_rebar_req=max(prev.v_rebar_req, record.v_rebar_req),
-                t_lng_req=max(prev.t_lng_req, record.t_lng_req),
-                t_trn_req=max(prev.t_trn_req, record.t_trn_req),
-            )
-        else:
-            by_station[station] = record
+        known = seen_stations.setdefault(unique_name, set())
+        if station in known:
+            duplicate_counts[unique_name] = duplicate_counts.get(unique_name, 0) + 1
+        known.add(station)
+        raw_by_unique.setdefault(unique_name, []).append(record)
 
     by_unique_name = {
         unique_name: EtabsFrameData(
             unique_name=unique_name,
-            stations=tuple(by_station[key] for key in sorted(by_station.keys())),
+            stations=tuple(sorted(rows, key=lambda item: (item.station, item.source_row or 0))),
         )
-        for unique_name, by_station in raw_by_unique.items()
+        for unique_name, rows in raw_by_unique.items()
     }
 
     if skipped_rows > 0:
         warnings.append(
             f"{source_name}: skipped {skipped_rows} rows with missing/invalid UniqueName or Station"
         )
+    if duplicate_counts:
+        duplicate_summary = ", ".join(
+            f"{unique_name}={count}" for unique_name, count in sorted(duplicate_counts.items())
+        )
+        warnings.append(
+            f"{source_name}: duplicate station rows preserved as independent physical scenarios "
+            f"because their ETABS semantics are ambiguous ({duplicate_summary}); source_row retains provenance"
+        )
 
-    return EtabsSourceData(
+    result = EtabsSourceData(
         source_name=source_name,
         by_unique_name=by_unique_name,
         row_count=row_count,
         skipped_rows=skipped_rows,
         warnings=tuple(warnings),
     )
+    wb.close()
+    return result
 
 
 def find_header(rows: Iterable[tuple[object, ...]]) -> tuple[int, dict[str, int]]:

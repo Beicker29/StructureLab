@@ -92,7 +92,6 @@ DESIGN_COLUMNS = [
     "base_long_count",
     "extra_long_bar",
     "extra_long_count",
-    "is_deep_beam",
     "longitudinal_mode",
     "longitudinal_arrangement",
 ]
@@ -149,7 +148,6 @@ def write_design_results(path: Path, region_results: Iterable[RegionDesignResult
                 canonical.base_long_count,
                 canonical.extra_long_bar,
                 canonical.extra_long_count,
-                canonical.is_deep_beam,
                 canonical.longitudinal_mode,
                 canonical.longitudinal_arrangement_label,
             ]
@@ -229,7 +227,6 @@ def write_optimized_results(path: Path, region_results: Iterable[RegionDesignRes
             "base_long_count",
             "extra_long_bar",
             "extra_long_count",
-            "is_deep_beam",
             "longitudinal_mode",
             "longitudinal_arrangement",
         ]
@@ -274,7 +271,6 @@ def write_optimized_results(path: Path, region_results: Iterable[RegionDesignRes
                 canonical.base_long_count,
                 canonical.extra_long_bar,
                 canonical.extra_long_count,
-                canonical.is_deep_beam,
                 canonical.longitudinal_mode,
                 canonical.longitudinal_arrangement_label,
             ]

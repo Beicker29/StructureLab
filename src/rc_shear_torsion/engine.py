@@ -88,15 +88,10 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                 cover_side_mm=beam.cover_side_mm,
                 cover_top_mm=beam.cover_top_mm,
                 cover_bottom_mm=beam.cover_bottom_mm,
-                source_control="mixed",
-                governing_station=None,
-                v_req=0.0,
-                t_req=0.0,
-                l_req=0.0,
-                station_count=0,
-                is_deep_beam=span.is_deep_beam,
+                scenarios=tuple(),
                 fc_mpa=beam.fc_mpa,
                 fy_mpa=beam.fy_mpa,
+                compression_rebar_required=beam.compression_rebar_required,
             )
             failed_result = make_failed_region_result(
                 demand,
@@ -121,8 +116,8 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
             seismic_frame = sources["seismic"].by_unique_name.get(span.seismic)
             gravity_frame = sources["gravity"].by_unique_name.get(span.gravity)
             stations = [row.station for row in seismic_frame.stations] if seismic_frame is not None else []
-            if not stations and gravity_frame is not None:
-                stations = [row.station for row in gravity_frame.stations]
+            if gravity_frame is not None:
+                stations.extend(row.station for row in gravity_frame.stations)
             model_span_length_mm = (max(stations) - min(stations)) if stations else 0.0
             support_left_mm, support_right_mm = support_by_span.get(span.id, (0.0, 0.0))
             clear_length_raw = getattr(span, "clear_length_mm", None)
@@ -161,6 +156,7 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                     span=span,
                     seismic_frame=seismic_frame,
                     gravity_frame=gravity_frame,
+                    compression_rebar_required=beam.compression_rebar_required,
                 )
                 if errors:
                     message = "; ".join(errors)
@@ -178,6 +174,9 @@ def run_case(case_json: str | Path, out_root: str | Path) -> Path:
                             demand,
                             config.optimization.variables,
                             top_n=10,
+                            check_longitudinal=(
+                                config.optimization.longitudinal_mode == "legacy_region_independent"
+                            ),
                         )
                         key_region = (beam.beam_id, span.id, demand.region_id)
                         transverse_alternatives[key_region] = transverse_options or [result]

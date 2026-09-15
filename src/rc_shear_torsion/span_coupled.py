@@ -11,6 +11,7 @@ from .design import (
     RegionDesignResult,
     bar_mass_kg_per_m,
     requires_longitudinal_design,
+    scenario_reference,
     stirrup_count_in_region,
 )
 from .models import OptimizationConfig
@@ -111,14 +112,24 @@ def _evaluate_longitudinal_region(
     if not needs_longitudinal:
         return True, "no se requiere", provided, 0, None
 
-    if provided < demand.l_req:
-        return False, "Along_real < Along_req", provided, 0, None
+    failing_scenario = next(
+        (scenario for scenario in demand.scenarios if scenario.t_longitudinal_mm2 > provided),
+        None,
+    )
+    if failing_scenario is not None:
+        return (
+            False,
+            f"Along_real < TLngRebar at {scenario_reference(failing_scenario)}",
+            provided,
+            0,
+            None,
+        )
 
     total_count = base_long_count + extra_long_count
     layers = 0
     s2_mm: float | None = None
 
-    if demand.l_req > 0.0:
+    if any(scenario.t_longitudinal_mm2 > 0.0 for scenario in demand.scenarios):
         if total_count < 2 or total_count % 2 != 0:
             return False, "Longitudinal bars must be arranged as 2 bars per layer", provided, 0, None
 
@@ -247,9 +258,53 @@ def _region_result_from_state(
         base_long_count=base_count,
         extra_long_bar=extra_bar,
         extra_long_count=extra_count,
-        is_deep_beam=demand.is_deep_beam,
         longitudinal_mode="span_coupled",
         longitudinal_arrangement_label=state.arrangement_label,
+        torsion_governing_source=(
+            demand.governing_t_transverse_scenario.source
+            if demand.governing_t_transverse_scenario is not None
+            else None
+        ),
+        torsion_governing_station=(
+            demand.governing_t_transverse_scenario.station_mm
+            if demand.governing_t_transverse_scenario is not None
+            else None
+        ),
+        combined_governing_source=(
+            demand.governing_combined_scenario.source
+            if demand.governing_combined_scenario is not None
+            else None
+        ),
+        combined_governing_station=(
+            demand.governing_combined_scenario.station_mm
+            if demand.governing_combined_scenario is not None
+            else None
+        ),
+        longitudinal_governing_source=(
+            demand.governing_longitudinal_scenario.source
+            if demand.governing_longitudinal_scenario is not None
+            else None
+        ),
+        longitudinal_governing_station=(
+            demand.governing_longitudinal_scenario.station_mm
+            if demand.governing_longitudinal_scenario is not None
+            else None
+        ),
+        scenario_count=len(demand.scenarios),
+        torsion_check_override=(
+            transverse_template.torsion_check_override if transverse_template is not None else False
+        ),
+        combined_check_override=(
+            transverse_template.combined_check_override if transverse_template is not None else False
+        ),
+        longitudinal_check_override=all(
+            scenario.t_longitudinal_mm2 <= state.long_provided_mm2
+            for scenario in demand.scenarios
+        ),
+        demand_status=(transverse_template.demand_status if transverse_template is not None else "NOT_EVALUATED"),
+        detailing_status=(transverse_template.detailing_status if transverse_template is not None else "NOT_EVALUATED"),
+        overall_status=(transverse_template.overall_status if transverse_template is not None else "NOT_EVALUATED"),
+        rule_checks=(transverse_template.rule_checks if transverse_template is not None else ()),
     )
 
 
@@ -328,9 +383,46 @@ def _failed_region_result(
         base_long_count=None,
         extra_long_bar=None,
         extra_long_count=None,
-        is_deep_beam=demand.is_deep_beam,
         longitudinal_mode="span_coupled",
         longitudinal_arrangement_label="no se requiere",
+        torsion_governing_source=(
+            demand.governing_t_transverse_scenario.source
+            if demand.governing_t_transverse_scenario is not None
+            else None
+        ),
+        torsion_governing_station=(
+            demand.governing_t_transverse_scenario.station_mm
+            if demand.governing_t_transverse_scenario is not None
+            else None
+        ),
+        combined_governing_source=(
+            demand.governing_combined_scenario.source
+            if demand.governing_combined_scenario is not None
+            else None
+        ),
+        combined_governing_station=(
+            demand.governing_combined_scenario.station_mm
+            if demand.governing_combined_scenario is not None
+            else None
+        ),
+        longitudinal_governing_source=(
+            demand.governing_longitudinal_scenario.source
+            if demand.governing_longitudinal_scenario is not None
+            else None
+        ),
+        longitudinal_governing_station=(
+            demand.governing_longitudinal_scenario.station_mm
+            if demand.governing_longitudinal_scenario is not None
+            else None
+        ),
+        scenario_count=len(demand.scenarios),
+        torsion_check_override=(template.torsion_check_override if template is not None else False),
+        combined_check_override=(template.combined_check_override if template is not None else False),
+        longitudinal_check_override=False,
+        demand_status=(template.demand_status if template is not None else "NOT_EVALUATED"),
+        detailing_status=(template.detailing_status if template is not None else "NOT_EVALUATED"),
+        overall_status="FAIL",
+        rule_checks=(template.rule_checks if template is not None else ()),
     )
 
 

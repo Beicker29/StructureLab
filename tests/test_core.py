@@ -14,9 +14,11 @@ from openpyxl import load_workbook
 from rc_shear_torsion.domain.errors import DomainValidationError
 from rc_shear_torsion.domain.validation import validate_case_payload
 from rc_shear_torsion.design import (
+    DemandScenario,
     RegionDemand,
     RegionDesignResult,
     build_region_demands,
+    classify_torsion_state,
     evaluate_candidate,
     optimize_region_exhaustive,
     select_longitudinal_independent,
@@ -36,6 +38,33 @@ def _new_runtime_dir(prefix: str) -> Path:
     path = TMP_TEST_ROOT / f"{prefix}_{uuid4().hex}"
     path.mkdir(parents=True, exist_ok=False)
     return path
+
+
+def _region_demand(**values: object) -> RegionDemand:
+    """Build one valid physical scenario for pre-Phase-1 unit fixtures."""
+    source_control = str(values.pop("source_control", "seismic"))
+    station = float(values.pop("governing_station", 0.0) or 0.0)
+    values.pop("station_count", None)
+    v_req = float(values.pop("v_req", 0.0))
+    t_req = float(values.pop("t_req", 0.0))
+    l_req = float(values.pop("l_req", 0.0))
+    if t_req > 0.0 and l_req <= 0.0:
+        l_req = 1.0
+    elif l_req > 0.0 and t_req <= 0.0:
+        t_req = 1.0
+    region_id = str(values["region_id"])
+    scenario = DemandScenario(
+        source="GRAVITY" if source_control == "gravity" else "SEISMIC",
+        station_mm=station,
+        x_relative=0.0,
+        region_id=region_id,
+        v_rebar_mm2_per_m=v_req,
+        t_transverse_mm2_per_m=t_req,
+        t_longitudinal_mm2=l_req,
+        torsion_state=classify_torsion_state(t_req, l_req),
+        source_row=1,
+    )
+    return RegionDemand(scenarios=(scenario,), **values)
 
 
 class CoreTests(unittest.TestCase):
@@ -132,7 +161,7 @@ class CoreTests(unittest.TestCase):
         self.assertAlmostEqual(canonical.total_weight_kg_per_m, 16.8)
 
     def test_candidate_formula(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -168,7 +197,7 @@ class CoreTests(unittest.TestCase):
         self.assertGreaterEqual(candidate.long_provided, region.l_req)
 
     def test_top_region_alternatives_returns_top_feasible_sorted(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -210,7 +239,7 @@ class CoreTests(unittest.TestCase):
         objectives = [item.objective for item in alternatives]
         self.assertEqual(objectives, sorted(objectives))
 
-    def test_build_region_demands_reports_station_sequence_mismatch(self) -> None:
+    def test_build_region_demands_accepts_different_source_station_sequences(self) -> None:
         span = SpanConfig.model_validate(
             {
                 "id": "S1",
@@ -267,9 +296,20 @@ class CoreTests(unittest.TestCase):
             gravity_frame=gravity_frame,
         )
 
-        self.assertEqual(demands, [])
-        self.assertTrue(errors)
-        self.assertIn("station sequence mismatch", errors[0])
+        self.assertEqual(errors, [])
+        self.assertEqual(len(demands), 1)
+        self.assertEqual(len(demands[0].scenarios), 6)
+        self.assertEqual(
+            {(item.source, item.station_mm) for item in demands[0].scenarios},
+            {
+                ("SEISMIC", 0.0),
+                ("SEISMIC", 1500.0),
+                ("SEISMIC", 3000.0),
+                ("GRAVITY", 0.0),
+                ("GRAVITY", 1400.0),
+                ("GRAVITY", 3000.0),
+            },
+        )
 
     def test_dmo_requires_detail_inputs_in_confined_region(self) -> None:
         payload = {
@@ -492,7 +532,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(cfg.beams[0].spans[0].regions[0].db_bar, "#11")
 
     def test_dmo_confined_region_detailing_rule(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -527,7 +567,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("minimum branches", candidate.message)
 
     def test_dmo_region_torsion_requires_at_least_two_user_branches(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -565,7 +605,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("min_branches >= 2", candidate.message)
 
     def test_min_branches_is_enforced_in_optimization_domain(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -598,7 +638,7 @@ class CoreTests(unittest.TestCase):
         self.assertGreaterEqual(outcome.selected.g_count, 3)
 
     def test_min_branches_without_valid_g_count_returns_input_fail(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -633,7 +673,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("No G_counts satisfy min_branches", outcome.selected.message)
 
     def test_dmo_spacing_limit_reports_24dest_term(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -670,7 +710,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("24dest", candidate.message)
 
     def test_transverse_feasibility_is_independent_from_longitudinal(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -706,7 +746,7 @@ class CoreTests(unittest.TestCase):
         self.assertGreaterEqual(candidate.av_over_s, region.v_req)
 
     def test_des_confined_spacing_rule_reports_6db_as_controlling_limit(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -726,6 +766,7 @@ class CoreTests(unittest.TestCase):
             t_req=1.0,
             l_req=10.0,
             station_count=3,
+            fy_mpa=420.0,
         )
         candidate = evaluate_candidate(
             region,
@@ -742,7 +783,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("DES region C spacing limit failed", candidate.message)
 
     def test_dmo_non_confined_spacing_rule_uses_ph_over_8_when_torsion_exists(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R2",
@@ -779,7 +820,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("Ph/8", candidate.message)
 
     def test_dmo_non_confined_spacing_rule_uses_d_over_4_for_high_shear(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R2",
@@ -1093,7 +1134,7 @@ class CoreTests(unittest.TestCase):
         self.assertIn("optimization.genetic_algorithm.population_size", fields)
 
     def test_select_longitudinal_independent_skips_when_not_required(self) -> None:
-        region = RegionDemand(
+        region = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -1110,13 +1151,12 @@ class CoreTests(unittest.TestCase):
             source_control="mixed",
             governing_station=0.0,
             v_req=5.0,
-            t_req=1.0,
+            t_req=0.0,
             l_req=0.0,
             station_count=2,
             fc_mpa=28.0,
             fy_mpa=420.0,
             region_length_mm=1000.0,
-            is_deep_beam=False,
         )
         variables = VariablesConfig.model_validate(
             {
@@ -1137,7 +1177,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(long_ok)
 
     def test_span_coupled_reports_no_longitudinal_when_not_required(self) -> None:
-        demand = RegionDemand(
+        demand = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -1154,13 +1194,12 @@ class CoreTests(unittest.TestCase):
             source_control="mixed",
             governing_station=0.0,
             v_req=8.0,
-            t_req=2.0,
+            t_req=0.0,
             l_req=0.0,
             station_count=3,
             fc_mpa=28.0,
             fy_mpa=420.0,
             region_length_mm=2000.0,
-            is_deep_beam=False,
         )
         optimization = OptimizationConfig.model_validate(
             {
@@ -1259,7 +1298,7 @@ class CoreTests(unittest.TestCase):
 
     def test_span_coupled_optimizer_provides_longitudinal_area_per_region(self) -> None:
         demands = [
-            RegionDemand(
+            _region_demand(
                 beam_id="B1",
                 span_id="S1",
                 region_id="R1",
@@ -1282,9 +1321,8 @@ class CoreTests(unittest.TestCase):
                 fc_mpa=28.0,
                 fy_mpa=420.0,
                 region_length_mm=1500.0,
-                is_deep_beam=False,
             ),
-            RegionDemand(
+            _region_demand(
                 beam_id="B1",
                 span_id="S1",
                 region_id="R2",
@@ -1307,9 +1345,8 @@ class CoreTests(unittest.TestCase):
                 fc_mpa=28.0,
                 fy_mpa=420.0,
                 region_length_mm=3000.0,
-                is_deep_beam=False,
             ),
-            RegionDemand(
+            _region_demand(
                 beam_id="B1",
                 span_id="S1",
                 region_id="R3",
@@ -1332,7 +1369,6 @@ class CoreTests(unittest.TestCase):
                 fc_mpa=28.0,
                 fy_mpa=420.0,
                 region_length_mm=1500.0,
-                is_deep_beam=False,
             ),
         ]
         optimization = OptimizationConfig.model_validate(
@@ -1371,90 +1407,8 @@ class CoreTests(unittest.TestCase):
             self.assertIsNotNone(result.base_long_bar)
             self.assertIsNotNone(result.base_long_count)
 
-    def test_span_coupled_deep_beam_rejects_s1_over_limit(self) -> None:
-        demand = RegionDemand(
-            beam_id="B1",
-            span_id="S1",
-            region_id="R1",
-            region_type="C",
-            beam_detailing="DES",
-            d_mm=500.0,
-            db_bar="#6",
-            min_branches=2,
-            width_mm=300.0,
-            height_mm=700.0,
-            cover_side_mm=40.0,
-            cover_top_mm=40.0,
-            cover_bottom_mm=40.0,
-            source_control="mixed",
-            governing_station=0.0,
-            v_req=5.0,
-            t_req=2.0,
-            l_req=258.0,
-            station_count=3,
-            fc_mpa=28.0,
-            fy_mpa=420.0,
-            region_length_mm=2000.0,
-            is_deep_beam=True,
-        )
-
-        candidate = evaluate_candidate(
-            demand,
-            e_bar="#8",
-            g_bar="#8",
-            g_count=4,
-            spacing_mm=110,
-            long_bar="#4",
-            long_count=2,
-        )
-
-        self.assertEqual(candidate.status, "fail")
-        self.assertEqual(candidate.failure_mode, "region_detail_fail")
-        self.assertIn("Deep beam requires s1 <=", candidate.message)
-
-    def test_span_coupled_deep_beam_rejects_av_total_minimum(self) -> None:
-        demand = RegionDemand(
-            beam_id="B1",
-            span_id="S1",
-            region_id="R1",
-            region_type="C",
-            beam_detailing="DES",
-            d_mm=500.0,
-            db_bar="#6",
-            min_branches=2,
-            width_mm=700.0,
-            height_mm=700.0,
-            cover_side_mm=40.0,
-            cover_top_mm=40.0,
-            cover_bottom_mm=40.0,
-            source_control="mixed",
-            governing_station=0.0,
-            v_req=5.0,
-            t_req=2.0,
-            l_req=258.0,
-            station_count=3,
-            fc_mpa=28.0,
-            fy_mpa=420.0,
-            region_length_mm=2000.0,
-            is_deep_beam=True,
-        )
-
-        candidate = evaluate_candidate(
-            demand,
-            e_bar="#3",
-            g_bar="#3",
-            g_count=0,
-            spacing_mm=100,
-            long_bar="#4",
-            long_count=2,
-        )
-
-        self.assertEqual(candidate.status, "fail")
-        self.assertEqual(candidate.failure_mode, "region_detail_fail")
-        self.assertIn("Deep beam requires Av_total >=", candidate.message)
-
-    def test_span_coupled_deep_beam_rejects_s2_limit(self) -> None:
-        demand = RegionDemand(
+    def test_span_coupled_torsion_accepts_longitudinal_layer_spacing(self) -> None:
+        demand = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -1477,7 +1431,6 @@ class CoreTests(unittest.TestCase):
             fc_mpa=28.0,
             fy_mpa=420.0,
             region_length_mm=2000.0,
-            is_deep_beam=True,
         )
         optimization = OptimizationConfig.model_validate(
             {
@@ -1507,8 +1460,8 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(len(outcome.results), 1)
         self.assertEqual(outcome.results[0].status, "ok")
 
-    def test_span_coupled_deep_beam_rejects_a_layer_minimum(self) -> None:
-        demand = RegionDemand(
+    def test_span_coupled_torsion_accepts_wide_section_arrangement(self) -> None:
+        demand = _region_demand(
             beam_id="B1",
             span_id="S1",
             region_id="R1",
@@ -1531,7 +1484,6 @@ class CoreTests(unittest.TestCase):
             fc_mpa=28.0,
             fy_mpa=420.0,
             region_length_mm=2000.0,
-            is_deep_beam=True,
         )
         optimization = OptimizationConfig.model_validate(
             {
@@ -1808,7 +1760,6 @@ class CoreTests(unittest.TestCase):
                     "base_long_count",
                     "extra_long_bar",
                     "extra_long_count",
-                    "is_deep_beam",
                     "longitudinal_mode",
                     "longitudinal_arrangement",
                 ],
@@ -1857,7 +1808,6 @@ class CoreTests(unittest.TestCase):
                     "base_long_count",
                     "extra_long_bar",
                     "extra_long_count",
-                    "is_deep_beam",
                     "longitudinal_mode",
                     "longitudinal_arrangement",
                 ],

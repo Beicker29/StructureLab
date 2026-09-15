@@ -1,0 +1,16 @@
+code_id: ACI_318_25
+title: Building Code Requirements for Structural Concrete
+publisher: American Concrete Institute
+edition: 2025
+status: governing_normative_reference
+
+local_document:
+  expected_path: references/codes/aci/ACI_318_25/private/ACI_318_25.pdf
+  distributed_with_repository: false
+  note: The official document must be obtained and placed here manually.
+
+implementation_policy:
+  exact_section_and_subsection_required: true
+  verify_applicability_before_implementation: true
+  equations_must_not_be_inferred_from_memory: true
+  unconfirmed_rules_must_remain_unimplemented: true
