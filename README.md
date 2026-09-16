@@ -41,6 +41,16 @@ uvicorn app.main:app --host 0.0.0.0 --port 10000
 5. Crear job.
 6. Revisar estado y descargar resultados.
 
+## Sistemas de detallado soportados
+
+- `DMI`: reglas generales de cortante y reglas de torsion cuando aplican.
+- `DMO`: reglas generales y reglas DMO aplicables.
+- `DES`: reglas generales y reglas DES aplicables.
+
+El valor seleccionado se conserva como `beams[].detailing` en el caso
+normalizado y en el preview. DMI no se convierte en DMO ni activa reglas
+especificas de DMO o DES.
+
 ## Fixture de ejemplo
 
 - `examples/case_0001/` es el caso base para pruebas, smoke y ejemplos de uso.

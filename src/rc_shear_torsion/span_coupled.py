@@ -401,6 +401,7 @@ def _region_result_from_state(
         d_mm=demand.d_mm,
         d_source=demand.d_source,
         d_ratio=demand.d_ratio,
+        detailing_system=demand.beam_detailing,
     )
 
 
@@ -522,6 +523,7 @@ def _failed_region_result(
         d_mm=demand.d_mm,
         d_source=demand.d_source,
         d_ratio=demand.d_ratio,
+        detailing_system=demand.beam_detailing,
     )
 
 

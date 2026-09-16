@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from openpyxl import Workbook
+from pydantic import ValidationError
 
 from rc_shear_torsion.design import (
     DemandScenario,
@@ -327,6 +328,17 @@ class Phase1ScenarioTests(unittest.TestCase):
         dmi_config = CaseConfig.model_validate(_case_payload(detailing="DMI"))
         self.assertEqual(dmi_config.beams[0].detailing, "DMI")
         self.assertFalse(dmi_config.compression_rebar_required)
+
+        serialized = dmi_config.model_dump(mode="python")
+        self.assertEqual(serialized["beams"][0]["detailing"], "DMI")
+        self.assertEqual(
+            CaseConfig.model_validate(serialized).beams[0].detailing,
+            "DMI",
+        )
+
+    def test_unknown_detailing_system_remains_invalid(self) -> None:
+        with self.assertRaises(ValidationError):
+            CaseConfig.model_validate(_case_payload(detailing="XYZ"))
 
 
 if __name__ == "__main__":

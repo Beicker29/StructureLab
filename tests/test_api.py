@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import re
 import time
 import unittest
 from unittest.mock import patch
@@ -12,6 +13,8 @@ from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
+
+from rc_shear_torsion.models import CaseConfig
 
 
 class ApiTests(unittest.TestCase):
@@ -185,6 +188,19 @@ class ApiTests(unittest.TestCase):
         self.assertIn("Crear y ejecutar job", response.text)
         self.assertIn("Refuerzo transversal", response.text)
 
+    def test_ui_detailing_selector_has_dmi_dmo_des_once_and_in_order(self) -> None:
+        response = self.client.get("/ui")
+        self.assertEqual(response.status_code, 200, response.text)
+        select = re.search(
+            r'<select id="detailing" name="detailing">(.*?)</select>',
+            response.text,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(select)
+        assert select is not None
+        values = re.findall(r'<option value="([^"]+)"', select.group(1))
+        self.assertEqual(values, ["DMI", "DMO", "DES"])
+
     def test_ui_static_assets_available(self) -> None:
         css_response = self.client.get("/ui/static/ui.css")
         self.assertEqual(css_response.status_code, 200, css_response.text)
@@ -319,6 +335,62 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(case_payload["inputs"]["gravity_excel"], "gravity.xlsx")
         self.assertGreater(len(case_payload["beams"][0]["spans"]), 0)
         self.assertEqual(case_payload["optimization"]["longitudinal_mode"], "legacy_region_independent")
+
+    def test_dmi_form_runs_end_to_end_and_preview_preserves_detailing(self) -> None:
+        with (
+            self.seismic_excel.open("rb") as seismic_stream,
+            self.gravity_excel.open("rb") as gravity_stream,
+        ):
+            response = self.client.post(
+                "/v1/jobs/from-form",
+                data={
+                    "case_name": "case_dmi_end_to_end",
+                    "sheet_name": "Conc Bm Sum - ACI 318-08",
+                    "detailing": "DMI",
+                    "units_rebar_per_length": "mm2/m",
+                    "beam_id": "BDMI",
+                    "cover_side_mm": "40",
+                    "cover_top_mm": "40",
+                    "cover_bottom_mm": "40",
+                    "fc_mpa": "28",
+                    "fy_mpa": "420",
+                    "width_mm": "300",
+                    "height_mm": "750",
+                    "d_mm": "675",
+                    "d_ratio_default": "0.9",
+                    "db_bar": "#5",
+                    "compression_rebar_required": "false",
+                    "min_branches_c": "4",
+                    "min_branches_nc": "2",
+                    "region_c_ratio": "0.2",
+                    "frame_names_csv": "190",
+                },
+                files={
+                    "seismic_excel": ("sismo.xlsx", seismic_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                    "gravity_excel": ("gravedad.xlsx", gravity_stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+                },
+            )
+
+        self.assertEqual(response.status_code, 202, response.text)
+        job_id = response.json()["job_id"]
+        final_status = self._wait_terminal_status(job_id)
+        self.assertEqual(final_status["status"], "completed", final_status)
+
+        case_response = self.client.get(f"/v1/jobs/{job_id}/case")
+        self.assertEqual(case_response.status_code, 200, case_response.text)
+        case_payload = case_response.json()
+        self.assertEqual(case_payload["beams"][0]["detailing"], "DMI")
+        self.assertEqual(
+            CaseConfig.model_validate(case_payload).model_dump(mode="python")["beams"][0]["detailing"],
+            "DMI",
+        )
+
+        preview_response = self.client.get(f"/v1/jobs/{job_id}/preview")
+        self.assertEqual(preview_response.status_code, 200, preview_response.text)
+        preview_payload = preview_response.json()
+        self.assertEqual(preview_payload["beam"]["detailing"], "DMI")
+        self.assertTrue(preview_payload["spans"])
+        self.assertIn("design_results.xlsx", final_status["artifacts"])
 
     def test_create_job_from_form_with_geometry_excel_maps_sections(self) -> None:
         sheet_name = "Conc Bm Sum - ACI 318-08"

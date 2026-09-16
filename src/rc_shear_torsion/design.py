@@ -16,6 +16,7 @@ from .models import (
     VariablesConfig,
 )
 from .optimization import SearchHooks, run_exhaustive_search, run_genetic_search
+from .ranking import transverse_alternative_rank_key
 from .tolerances import dimensional_comparison_tolerance_mm, torsion_zero_tolerance
 
 FailureMode = Literal[
@@ -277,6 +278,7 @@ class RegionDesignResult:
     d_mm: float | None = None
     d_source: str | None = None
     d_ratio: float | None = None
+    detailing_system: Literal["DMI", "DMO", "DES"] | None = None
 
 
 @dataclass(frozen=True)
@@ -1384,7 +1386,15 @@ def optimize_region_exhaustive(
         objective=lambda candidate: candidate.objective,
         is_feasible=lambda candidate: candidate.status == "ok",
         failure_mode=lambda candidate: candidate.failure_mode,
-        tie_break=lambda candidate: -candidate.spacing_mm,
+        tie_break=lambda candidate: transverse_alternative_rank_key(
+            weight_kg=candidate.objective,
+            spacing_mm=candidate.spacing_mm,
+            stable_tie_break=(
+                candidate.e_bar,
+                candidate.g_bar,
+                candidate.g_count,
+            ),
+        ),
     )
     outcome = run_exhaustive_search(
         domain_sizes=[len(values) for values in domain],
@@ -1509,7 +1519,15 @@ def optimize_region_ga(
         objective=lambda candidate: candidate.objective,
         is_feasible=lambda candidate: candidate.status == "ok",
         failure_mode=lambda candidate: candidate.failure_mode,
-        tie_break=lambda candidate: -candidate.spacing_mm,
+        tie_break=lambda candidate: transverse_alternative_rank_key(
+            weight_kg=candidate.objective,
+            spacing_mm=candidate.spacing_mm,
+            stable_tie_break=(
+                candidate.e_bar,
+                candidate.g_bar,
+                candidate.g_count,
+            ),
+        ),
     )
     outcome = run_genetic_search(
         domain_sizes=domain_sizes,
@@ -1613,6 +1631,7 @@ def candidate_to_region_result(
         d_mm=demand.d_mm,
         d_source=demand.d_source,
         d_ratio=demand.d_ratio,
+        detailing_system=demand.beam_detailing,
     )
 
 
@@ -1664,13 +1683,14 @@ def top_region_alternatives(
 
     feasible = sorted(
         (candidate for candidate in evaluated if candidate.status == "ok"),
-        key=lambda candidate: (
-            candidate.objective,
-            candidate.transverse_weight_kg_per_m,
-            -candidate.spacing_mm,
-            candidate.e_bar,
-            candidate.g_bar,
-            candidate.g_count,
+        key=lambda candidate: transverse_alternative_rank_key(
+            weight_kg=candidate.objective,
+            spacing_mm=candidate.spacing_mm,
+            stable_tie_break=(
+                candidate.e_bar,
+                candidate.g_bar,
+                candidate.g_count,
+            ),
         ),
     )
     feasible_count = len(feasible)

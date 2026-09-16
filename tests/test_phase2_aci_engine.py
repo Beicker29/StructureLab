@@ -95,12 +95,27 @@ class Phase2AciEngineTests(unittest.TestCase):
     def test_dmi_without_torsion(self) -> None:
         evaluation = _evaluate(system="DMI", torsion_active=False)
         self.assertFalse(any(limit.label == "Ph/8" for limit in evaluation.spacing_limits))
-        self.assertTrue(any(check.section == "18.3" for check in evaluation.checks))
+        seismic_checks = [check for check in evaluation.checks if check.section == "18.3"]
+        self.assertTrue(seismic_checks)
+        self.assertTrue(all(check.status == RuleStatus.NOT_APPLICABLE for check in seismic_checks))
+        self.assertFalse(
+            any(
+                check.rule_id.startswith(("ACI318_25_18_4", "ACI318_25_18_6"))
+                for check in evaluation.checks
+            )
+        )
 
     def test_dmi_with_torsion(self) -> None:
         evaluation = _evaluate(system="DMI", torsion_active=True)
         self.assertTrue(any(limit.label == "Ph/8" for limit in evaluation.spacing_limits))
-        self.assertTrue(any(check.section == "9.7.6.3.1" for check in evaluation.checks))
+        torsion_check = next(check for check in evaluation.checks if check.section == "9.7.6.3.1")
+        self.assertEqual(torsion_check.status, RuleStatus.PASS)
+        self.assertFalse(
+            any(
+                check.rule_id.startswith(("ACI318_25_18_4", "ACI318_25_18_6"))
+                for check in evaluation.checks
+            )
+        )
 
     def test_dmo_without_torsion(self) -> None:
         evaluation = _evaluate(system="DMO", torsion_active=False)
@@ -541,6 +556,34 @@ class Phase2AciEngineTests(unittest.TestCase):
                 zone="C",
             ),
             TieRuleScope.NONE,
+        )
+
+    def test_dmi_compression_false_selects_no_tie_rules(self) -> None:
+        self.assertEqual(
+            select_tie_rule_scope(
+                compression_rebar_required=False,
+                system="DMI",
+                zone="C",
+            ),
+            TieRuleScope.NONE,
+        )
+
+    def test_dmi_controlling_limit_is_general_not_dmo_or_des(self) -> None:
+        evaluation = _evaluate(
+            system="DMI",
+            torsion_active=False,
+            spacing_mm=100.0,
+            d_mm=600.0,
+        )
+        self.assertIsNotNone(evaluation.controlling_limit)
+        assert evaluation.controlling_limit is not None
+        self.assertTrue(
+            evaluation.controlling_limit.check.rule_id.startswith("ACI318_25_9_")
+        )
+        self.assertFalse(
+            evaluation.controlling_limit.check.rule_id.startswith(
+                ("ACI318_25_18_4", "ACI318_25_18_6")
+            )
         )
 
     def test_compression_true_selects_full_ties(self) -> None:

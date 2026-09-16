@@ -7,6 +7,7 @@ from typing import Iterable
 from openpyxl import Workbook
 
 from .design import BeamSummary, RegionDesignResult, SpanSummary
+from .ranking import transverse_alternative_rank_key
 from .results_model import to_canonical_region_result
 
 
@@ -468,23 +469,27 @@ def write_reinforcement_schedule(
             is_first_region = bool(span_edge and region_id == span_edge[0])
             is_last_region = bool(span_edge and region_id == span_edge[1])
             feasible_rows = [row for row in (transverse_by_region.get((beam_id, span_id, region_id)) or []) if row.status == "ok"]
-            rows_sorted = sorted(
-                feasible_rows,
-                key=lambda row: (
-                    float(row.stirrup_unit_weight_kg or 0.0)
-                    * _stirrup_count_for_reporting(
-                        region_length_mm,
-                        row.spacing_mm,
-                        is_first_region=is_first_region,
-                        is_last_region=is_last_region,
-                    ),
-                    row.e_bar,
-                    row.g_bar,
-                    row.g_count,
+            ranked_rows: list[tuple[tuple[object, ...], RegionDesignResult, int, float]] = []
+            for row in feasible_rows:
+                stirrup_count = _stirrup_count_for_reporting(
+                    region_length_mm,
                     row.spacing_mm,
-                ),
-            )
-            for option_idx, result in enumerate(rows_sorted, start=1):
+                    is_first_region=is_first_region,
+                    is_last_region=is_last_region,
+                )
+                transverse_weight_kg = float(row.stirrup_unit_weight_kg or 0.0) * stirrup_count
+                rank_key = transverse_alternative_rank_key(
+                    weight_kg=transverse_weight_kg,
+                    spacing_mm=row.spacing_mm,
+                    stable_tie_break=(row.e_bar, row.g_bar, row.g_count),
+                )
+                ranked_rows.append((rank_key, row, stirrup_count, transverse_weight_kg))
+            ranked_rows.sort(key=lambda item: item[0])
+
+            for option_idx, (_, result, cantidad_estribos_region, peso_transversal_region_kg) in enumerate(
+                ranked_rows,
+                start=1,
+            ):
                 transverse_arrangement = ""
                 if result.e_bar and result.spacing_mm > 0:
                     if result.g_bar and result.g_count > 0:
@@ -492,17 +497,7 @@ def write_reinforcement_schedule(
                     else:
                         transverse_arrangement = f"1E {result.e_bar} @ {result.spacing_mm} mm"
 
-                cantidad_estribos_region = 0
-                if result.spacing_mm > 0 and region_length_mm > 0.0:
-                    cantidad_estribos_region = _stirrup_count_for_reporting(
-                        region_length_mm,
-                        result.spacing_mm,
-                        is_first_region=is_first_region,
-                        is_last_region=is_last_region,
-                    )
-
                 peso_unitario_estribo_kg = float(result.stirrup_unit_weight_kg or 0.0)
-                peso_transversal_region_kg = peso_unitario_estribo_kg * cantidad_estribos_region
                 transverse_sheet.append(
                     [
                         beam_id,

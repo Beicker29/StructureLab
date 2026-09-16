@@ -11,6 +11,7 @@ from openpyxl import load_workbook
 from app.services.job_service import get_job, get_job_case_payload
 from rc_shear_torsion.design import bar_mass_kg_per_m
 from rc_shear_torsion.models import BAR_DIAMETERS_MM
+from rc_shear_torsion.ranking import transverse_alternative_rank_key
 from rc_shear_torsion.codes.aci318_25.longitudinal_torsion import (
     minimum_longitudinal_torsion_bar_diameter_mm,
 )
@@ -350,12 +351,14 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
 
     workbook = load_workbook(path, data_only=True, read_only=True)
     if "transversales" not in workbook.sheetnames:
+        workbook.close()
         return {}
 
     sheet = workbook["transversales"]
     iterator = sheet.iter_rows(values_only=True)
     header_row = next(iterator, None)
     if header_row is None:
+        workbook.close()
         return {}
 
     columns = _header_map(header_row)
@@ -369,6 +372,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
     weight_col = _find_col(columns, "peso_transversal_region_kg", "transverse_weight_region_kg")
 
     if span_col is None or region_col is None or label_col is None:
+        workbook.close()
         return {}
 
     output: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
@@ -434,7 +438,14 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
 
         ordered = sorted(
             best_by_label.values(),
-            key=lambda item: (item["_sort_weight"], item["label"]),
+            key=lambda item: transverse_alternative_rank_key(
+                weight_kg=item.get("weight_kg"),
+                spacing_mm=item.get("spacing_mm"),
+                stable_tie_break=(
+                    item.get("stirrup_count") if item.get("stirrup_count") is not None else float("inf"),
+                    item["label"],
+                ),
+            ),
         )[:10]
         output[key] = [
             {
@@ -447,6 +458,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
             for item in ordered
         ]
 
+    workbook.close()
     return output
 
 def _pick_schedule_row(
@@ -544,7 +556,17 @@ def _build_transverse_component_options(
                 "_sort_weight": sort_weight,
             }
 
-    ordered = sorted(best_by_label.values(), key=lambda item: (item["_sort_weight"], item["label"]))
+    ordered = sorted(
+        best_by_label.values(),
+        key=lambda item: transverse_alternative_rank_key(
+            weight_kg=item.get("weight_kg"),
+            spacing_mm=item.get("spacing_mm"),
+            stable_tie_break=(
+                item.get("stirrup_count") if item.get("stirrup_count") is not None else float("inf"),
+                item["label"],
+            ),
+        ),
+    )
     return [
         {
             "label": item["label"],
@@ -632,15 +654,7 @@ def _expand_span_coupled_options(
             item.get("option") if item.get("option") is not None else 999_999,
         ),
     )
-    trans_sorted = sorted(
-        transverse_options,
-        key=lambda item: (
-            _as_non_negative_float(item.get("weight_kg"))
-            if _as_non_negative_float(item.get("weight_kg")) is not None
-            else float("inf"),
-            _as_text(item.get("label")),
-        ),
-    )
+    trans_sorted = list(transverse_options)
 
     expanded: list[dict[str, Any]] = []
     for long_row in long_sorted:

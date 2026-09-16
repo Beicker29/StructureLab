@@ -74,6 +74,7 @@ class CanonicalRegionResult:
     d_mm: float | None = None
     d_source: str | None = None
     d_ratio: float | None = None
+    detailing_system: str | None = None
 
 
 def _longitudinal_provided_mm2(result: RegionDesignResult) -> float:
@@ -166,6 +167,7 @@ def to_canonical_region_result(result: RegionDesignResult) -> CanonicalRegionRes
         d_mm=result.d_mm,
         d_source=result.d_source,
         d_ratio=result.d_ratio,
+        detailing_system=result.detailing_system,
     )
 
 

@@ -151,6 +151,7 @@ class CoreTests(unittest.TestCase):
             transverse_weight_kg_per_m=12.3,
             longitudinal_weight_kg_per_m=4.5,
             stirrup_unit_weight_kg=0.98,
+            detailing_system="DMI",
         )
 
         canonical = to_canonical_region_result(result)
@@ -160,6 +161,7 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(canonical.checks.longitudinal)
         self.assertTrue(canonical.checks.detailing)
         self.assertAlmostEqual(canonical.total_weight_kg_per_m, 16.8)
+        self.assertEqual(canonical.detailing_system, "DMI")
 
     def test_candidate_formula(self) -> None:
         region = _region_demand(
