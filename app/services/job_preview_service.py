@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from collections import defaultdict
+import json
 import re
 from pathlib import Path
 from threading import RLock
@@ -8,9 +9,8 @@ from typing import Any
 
 from openpyxl import load_workbook
 
-from app.services.job_service import get_job, get_job_case_payload
-from rc_shear_torsion.design import bar_mass_kg_per_m
-from rc_shear_torsion.models import BAR_DIAMETERS_MM
+from app.services.job_service import SELECTION_JSON_NAME, get_job, get_job_case_payload
+from rc_shear_torsion.reinforcement import BAR_DIAMETERS_MM, bar_mass_kg_per_m
 from rc_shear_torsion.ranking import transverse_alternative_rank_key
 from rc_shear_torsion.codes.aci318_25.longitudinal_torsion import (
     minimum_longitudinal_torsion_bar_diameter_mm,
@@ -150,7 +150,7 @@ def _resolve_transverse_weight_kg(
     return None
 
 
-def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str, Any]]:
+def _read_optimized_regions(path: Path | None, *, beam_id: str | None = None) -> dict[tuple[str, str], dict[str, Any]]:
     if path is None or not path.exists():
         return {}
 
@@ -162,6 +162,7 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
         return {}
 
     columns = _header_map(header_row)
+    beam_col = _find_col(columns, "beam_id", "viga_id")
     span_col = _find_col(columns, "span_id", "vano_id")
     region_col = _find_col(columns, "region_id")
     e_bar_col = _find_col(columns, "e_bar")
@@ -182,6 +183,8 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
 
     output: dict[tuple[str, str], dict[str, Any]] = {}
     for row in iterator:
+        if beam_id is not None and beam_col is not None and _as_text(row[beam_col]) != beam_id:
+            continue
         span_id = _as_text(row[span_col])
         region_id = _as_text(row[region_col])
         if not span_id or not region_id:
@@ -234,7 +237,7 @@ def _read_optimized_regions(path: Path | None) -> dict[tuple[str, str], dict[str
     return output
 
 
-def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[str, Any]]]:
+def _read_schedule_rows(path: Path | None, *, beam_id: str | None = None) -> dict[tuple[str, str], list[dict[str, Any]]]:
     if path is None or not path.exists():
         return {}
 
@@ -246,6 +249,7 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
         return {}
 
     columns = _header_map(header_row)
+    beam_col = _find_col(columns, "beam_id", "viga_id")
     span_col = _find_col(columns, "span_id", "vano_id")
     region_col = _find_col(columns, "region_id")
     option_col = _find_col(columns, "option", "opcion")
@@ -269,6 +273,8 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
 
     output: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in iterator:
+        if beam_id is not None and beam_col is not None and _as_text(row[beam_col]) != beam_id:
+            continue
         span_id = _as_text(row[span_col])
         region_id = _as_text(row[region_col])
         if not span_id or not region_id:
@@ -345,7 +351,7 @@ def _read_schedule_rows(path: Path | None) -> dict[tuple[str, str], list[dict[st
     return output
 
 
-def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[dict[str, Any]]]:
+def _read_transverse_options(path: Path | None, *, beam_id: str | None = None) -> dict[tuple[str, str], list[dict[str, Any]]]:
     if path is None or not path.exists():
         return {}
 
@@ -362,6 +368,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
         return {}
 
     columns = _header_map(header_row)
+    beam_col = _find_col(columns, "beam_id", "viga_id")
     span_col = _find_col(columns, "vano_id", "span_id")
     region_col = _find_col(columns, "region_id")
     status_col = _find_col(columns, "estado", "status")
@@ -377,6 +384,8 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
 
     output: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in iterator:
+        if beam_id is not None and beam_col is not None and _as_text(row[beam_col]) != beam_id:
+            continue
         span_id = _as_text(row[span_col])
         region_id = _as_text(row[region_col])
         if not span_id or not region_id:
@@ -415,48 +424,7 @@ def _read_transverse_options(path: Path | None) -> dict[tuple[str, str], list[di
         )
 
     for key, rows in output.items():
-        best_by_label: dict[str, dict[str, Any]] = {}
-        for item in rows:
-            label = _as_text(item.get("label"))
-            if not label:
-                continue
-            sort_weight = (
-                float(item["weight_kg"])
-                if item.get("weight_kg") is not None
-                else float("inf")
-            )
-            current = best_by_label.get(label)
-            if current is None or sort_weight < current["_sort_weight"]:
-                best_by_label[label] = {
-                    "label": label,
-                    "spacing_mm": item.get("spacing_mm"),
-                    "weight_kg": item.get("weight_kg"),
-                    "stirrup_count": item.get("stirrup_count"),
-                    "stirrup_unit_weight_kg": item.get("stirrup_unit_weight_kg"),
-                    "_sort_weight": sort_weight,
-                }
-
-        ordered = sorted(
-            best_by_label.values(),
-            key=lambda item: transverse_alternative_rank_key(
-                weight_kg=item.get("weight_kg"),
-                spacing_mm=item.get("spacing_mm"),
-                stable_tie_break=(
-                    item.get("stirrup_count") if item.get("stirrup_count") is not None else float("inf"),
-                    item["label"],
-                ),
-            ),
-        )[:10]
-        output[key] = [
-            {
-                "label": item["label"],
-                "spacing_mm": item.get("spacing_mm"),
-                "weight_kg": item.get("weight_kg"),
-                "stirrup_count": item.get("stirrup_count"),
-                "stirrup_unit_weight_kg": item.get("stirrup_unit_weight_kg"),
-            }
-            for item in ordered
-        ]
+        output[key] = _rank_transverse_options(rows, max_items=10)
 
     workbook.close()
     return output
@@ -519,12 +487,39 @@ def _build_component_options(
     ]
 
 
+def _rank_transverse_options(
+    options: list[dict[str, Any]],
+    *,
+    max_items: int,
+) -> list[dict[str, Any]]:
+    """Keep the lightest row per label; exact ties retain the first row."""
+    best_by_label: dict[str, dict[str, Any]] = {}
+    for item in options:
+        weight = item["weight_kg"] if item["weight_kg"] is not None else float("inf")
+        current = best_by_label.get(item["label"])
+        current_weight = current["weight_kg"] if current and current["weight_kg"] is not None else float("inf")
+        if current is None or weight < current_weight:
+            best_by_label[item["label"]] = item
+    ordered = sorted(
+        best_by_label.values(),
+        key=lambda item: transverse_alternative_rank_key(
+            weight_kg=item["weight_kg"],
+            spacing_mm=item["spacing_mm"],
+            stable_tie_break=(
+                item["stirrup_count"] if item["stirrup_count"] is not None else float("inf"),
+                item["label"],
+            ),
+        ),
+    )
+    return ordered[:max(1, int(max_items))]
+
+
 def _build_transverse_component_options(
     rows: list[dict[str, Any]],
     *,
     max_items: int = 10,
 ) -> list[dict[str, Any]]:
-    best_by_label: dict[str, dict[str, Any]] = {}
+    options: list[dict[str, Any]] = []
     for row in rows:
         label = _as_text(row.get("transverse_label"))
         if not label:
@@ -542,41 +537,16 @@ def _build_transverse_component_options(
             stirrup_unit_weight_kg=stirrup_unit_weight_kg,
             explicit_weight_kg=explicit_weight,
         )
-        sort_weight = weight if weight is not None else float("inf")
-        current = best_by_label.get(label)
-        if current is None or sort_weight < current["_sort_weight"]:
-            best_by_label[label] = {
-                "label": label,
-                "spacing_mm": spacing_mm,
-                "weight_kg": float(weight) if weight is not None else None,
-                "stirrup_count": stirrup_count,
-                "stirrup_unit_weight_kg": (
-                    float(stirrup_unit_weight_kg) if stirrup_unit_weight_kg is not None else None
-                ),
-                "_sort_weight": sort_weight,
-            }
-
-    ordered = sorted(
-        best_by_label.values(),
-        key=lambda item: transverse_alternative_rank_key(
-            weight_kg=item.get("weight_kg"),
-            spacing_mm=item.get("spacing_mm"),
-            stable_tie_break=(
-                item.get("stirrup_count") if item.get("stirrup_count") is not None else float("inf"),
-                item["label"],
+        options.append({
+            "label": label,
+            "spacing_mm": spacing_mm,
+            "weight_kg": float(weight) if weight is not None else None,
+            "stirrup_count": stirrup_count,
+            "stirrup_unit_weight_kg": (
+                float(stirrup_unit_weight_kg) if stirrup_unit_weight_kg is not None else None
             ),
-        ),
-    )
-    return [
-        {
-            "label": item["label"],
-            "spacing_mm": item.get("spacing_mm"),
-            "weight_kg": item["weight_kg"],
-            "stirrup_count": item.get("stirrup_count"),
-            "stirrup_unit_weight_kg": item.get("stirrup_unit_weight_kg"),
-        }
-        for item in ordered[: max(1, int(max_items))]
-    ]
+        })
+    return _rank_transverse_options(options, max_items=max_items)
 
 def _build_span_option_choices(region_rows: list[dict[str, Any]], max_items: int = 10) -> list[dict[str, Any]]:
     if not region_rows:
@@ -716,6 +686,28 @@ def _expand_span_coupled_options(
     return expanded
 
 
+def _has_only_zero_longitudinal_results(region_row: dict[str, Any]) -> bool:
+    """Recognize explicit zero results, not missing engineering data or demand."""
+    options = region_row.get("options") or []
+    return bool(options) and all(
+        _norm_match(_as_text(option.get("base_longitudinal_label"))) == "no se requiere"
+        and _norm_match(_as_text(option.get("additional_longitudinal_label"))) == "no se requiere"
+        and _as_non_negative_float(option.get("weight_longitudinal_kg")) == 0.0
+        and not option.get("base_long_count")
+        and not option.get("extra_long_count")
+        for option in options
+    )
+
+
+def _region_options_for_span_base(region_row: dict[str, Any], base_label: str) -> list[dict[str, Any]]:
+    options = region_row.get("options") or []
+    if _has_only_zero_longitudinal_results(region_row):
+        # This region contributes its original zero result to every span choice.
+        # It must not inherit steel or weight from torsion-active neighbours.
+        return options
+    return [row for row in options if (_as_text(row.get("base_longitudinal_label")) or "no se requiere") == base_label]
+
+
 def _build_span_longitudinal_base_options(
     region_rows: list[dict[str, Any]],
     max_items: int = 10,
@@ -769,7 +761,11 @@ def _build_span_longitudinal_base_options(
 
         best_by_base_per_region.append(best_by_base)
         labels = set(best_by_base.keys())
-        common_base_labels = labels if common_base_labels is None else (common_base_labels & labels)
+        if not _has_only_zero_longitudinal_results(row):
+            common_base_labels = labels if common_base_labels is None else (common_base_labels & labels)
+
+    if common_base_labels is None:
+        common_base_labels = {"no se requiere"}
 
     if not common_base_labels:
         return []
@@ -779,8 +775,9 @@ def _build_span_longitudinal_base_options(
         total_weight = 0.0
         long_weight = 0.0
         option_candidates: list[int] = []
-        for by_base in best_by_base_per_region:
-            item = by_base[base_label]
+        for region_row, by_base in zip(coupled_rows, best_by_base_per_region):
+            regional_label = "no se requiere" if _has_only_zero_longitudinal_results(region_row) else base_label
+            item = by_base[regional_label]
             total_weight += float(item["long_total_weight_kg"])
             long_weight += float(item["base_weight_region_kg"])
             option_value = item.get("option")
@@ -843,12 +840,7 @@ def _build_span_longitudinal_option_sets(
         for row in coupled_rows:
             region_id = _as_text(row.get("region_id"))
             region_length_mm = _as_float(row.get("length_mm"))
-            options = row.get("options") if isinstance(row.get("options"), list) else []
-            base_rows = [
-                option_row
-                for option_row in options
-                if (_as_text(option_row.get("base_longitudinal_label")) or "no se requiere") == base_label
-            ]
+            base_rows = _region_options_for_span_base(row, base_label)
             if not base_rows:
                 feasible = False
                 break
@@ -901,6 +893,7 @@ def _build_span_longitudinal_option_sets(
             regions_payload.append(
                 {
                     "region_id": region_id,
+                    "base_longitudinal_label": _as_text(best_row.get("base_longitudinal_label")) or "no se requiere",
                     "transverse_label": _as_text(best_row.get("transverse_label")),
                     "additional_label": _as_text(best_row.get("additional_longitudinal_label")) or "no se requiere",
                     "longitudinal_label": _as_text(best_row.get("longitudinal_label")) or "no se requiere",
@@ -1028,7 +1021,7 @@ def _resolve_span_default_selection(span_row: dict[str, Any]) -> tuple[dict[str,
                     and _norm_match(_as_text(row.get("longitudinal_label")))
                     == _norm_match(_as_text(set_row.get("longitudinal_label")))
                     and _norm_match(_as_text(row.get("base_longitudinal_label")))
-                    == _norm_match(_as_text(span_default.get("base_label")))
+                    == _norm_match(_as_text(set_row.get("base_longitudinal_label") or span_default.get("base_label")))
                     and _norm_match(_as_text(row.get("additional_longitudinal_label")))
                     == _norm_match(_as_text(set_row.get("additional_label")))
                 ),
@@ -1081,11 +1074,7 @@ def _build_region_additional_options_by_base(
     for base in base_options:
         base_value = _as_text(base.get("value"))
         base_label = _as_text(base.get("base_label")) or "no se requiere"
-        rows = [
-            row
-            for row in options
-            if (_as_text(row.get("base_longitudinal_label")) or "no se requiere") == base_label
-        ]
+        rows = _region_options_for_span_base(region_row, base_label)
         rows_sorted = sorted(
             rows,
             key=lambda item: (
@@ -1107,6 +1096,7 @@ def _build_region_additional_options_by_base(
             item = {
                 "value": f"add_{option_value if option_value is not None else len(by_label) + 1}_{add_label.replace(' ', '_')}",
                 "label": add_label,
+                "base_longitudinal_label": _as_text(row.get("base_longitudinal_label")) or "no se requiere",
                 "longitudinal_label": long_label,
                 "weight_kg": weight_kg,
                 "weight_base_region_kg": base_region_weight_kg,
@@ -1405,29 +1395,64 @@ def _build_span_preview(
     }
 
 
+def _read_saved_selection(path: Path | None, span_rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if path is None or not path.exists():
+        return None
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    by_region = {(row["span_id"], row["region_id"]): row for row in saved.get("rows", [])}
+    spans = []
+    for span in span_rows:
+        regions = []
+        for region in span["regions"]:
+            row = by_region.get((span["span_id"], region["region_id"]))
+            if row is None:
+                continue
+            regions.append({
+                "region_id": region["region_id"],
+                "option": row.get("selected_option"),
+                "transverse_label": row.get("selected_transverse_label"),
+                "longitudinal_label": row.get("selected_longitudinal_label"),
+                "base_longitudinal_label": row.get("selected_base_longitudinal_label"),
+                "additional_longitudinal_label": row.get("selected_additional_longitudinal_label"),
+                "weight_total_kg": row.get("selected_weight_kg"),
+            })
+        if not regions:
+            continue
+        labels = {row["base_longitudinal_label"] for row in regions}
+        base = next((item for item in span["longitudinal_base_options"] if item["base_label"] in labels), {})
+        spans.append({
+            "span_id": span["span_id"], "regions": regions,
+            "base_value": base.get("value"), "base_label": base.get("base_label"),
+            "span_option_set_value": None,
+        })
+    return {"spans": spans, "total_weight_kg": saved.get("totals", {}).get("selected_weight_kg")}
+
+
 def build_job_preview_payload(job_id: str) -> dict[str, Any]:
     meta = get_job(job_id)
     case_payload = get_job_case_payload(job_id)
     artifacts = meta.get("artifacts", {})
     optimized_path = Path(artifacts["optimized_results.xlsx"]) if "optimized_results.xlsx" in artifacts else None
     schedule_path = Path(artifacts["reinforcement_schedule.xlsx"]) if "reinforcement_schedule.xlsx" in artifacts else None
+    selection_path = Path(artifacts[SELECTION_JSON_NAME]) if SELECTION_JSON_NAME in artifacts else None
 
     cache_key = (
         str(meta.get("status") or ""),
         _artifact_mtime(optimized_path),
         _artifact_mtime(schedule_path),
+        _artifact_mtime(selection_path),
     )
     with _PREVIEW_CACHE_LOCK:
         cached = _PREVIEW_CACHE.get(job_id)
     if cached is not None and cached[0] == cache_key:
         return cached[1]
 
-    optimized_map = _read_optimized_regions(optimized_path)
-    schedule_map = _read_schedule_rows(schedule_path)
-    transverse_options_map = _read_transverse_options(schedule_path)
-
     beams = case_payload.get("beams") if isinstance(case_payload.get("beams"), list) else []
     beam = beams[0] if beams else {}
+    beam_id = _as_text(beam.get("beam_id")) or None
+    optimized_map = _read_optimized_regions(optimized_path, beam_id=beam_id)
+    schedule_map = _read_schedule_rows(schedule_path, beam_id=beam_id)
+    transverse_options_map = _read_transverse_options(schedule_path, beam_id=beam_id)
     spans = beam.get("spans") if isinstance(beam.get("spans"), list) else []
     span_rows = [
         _build_span_preview(
@@ -1479,6 +1504,7 @@ def build_job_preview_payload(job_id: str) -> dict[str, Any]:
             "spans": default_spans,
             "total_weight_kg": float(optimal_beam_weight_kg),
         },
+        "saved_selection": _read_saved_selection(selection_path, span_rows),
         "total_span_mm": int(round(total_span_mm)),
         "total_support_mm": int(round(total_support_mm)),
         "total_system_mm": int(round(total_span_mm + total_support_mm)),

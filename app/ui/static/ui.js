@@ -278,7 +278,7 @@ const baseRegionWeight=Number.isFinite(parsedBaseRegion)?parsedBaseRegion:0;
 const longitudinalTotalWeightKg=Number.isFinite(parsedLongTotal)?parsedLongTotal:(baseRegionWeight+weight);
 const option=Number.isFinite(Number(row&&row.option))?Number(row.option):null;
 const value=String(row&&row.value||`add_${option!==null?option:index+1}_${label.replace(/\s+/g,'_')}`).trim();
-return{value,label,longitudinal_label:longLabel,weight_kg:weight,weight_base_region_kg:baseRegionWeight,longitudinal_total_weight_kg:longitudinalTotalWeightKg,option};
+return{value,label,base_longitudinal_label:row.base_longitudinal_label,longitudinal_label:longLabel,weight_kg:weight,weight_base_region_kg:baseRegionWeight,longitudinal_total_weight_kg:longitudinalTotalWeightKg,option};
 }).filter(opt=>opt.value&&opt.label);
 return parsed.sort((a,b)=>{if(a.weight_kg!==b.weight_kg)return a.weight_kg-b.weight_kg;return (a.option||0)-(b.option||0);}).slice(0,10);
 }
@@ -332,7 +332,7 @@ const weightTotal=Number.isFinite(totalW)?totalW:(weightLong+weightTrans);
 sumTotal+=weightTotal;
 sumLong+=weightLong;
 sumTrans+=weightTrans;
-region_map[regionId]={transverse_label:transLabel,additional_label:additionalLabel,longitudinal_label:longLabel,weight_total_kg:weightTotal,weight_transverse_kg:weightTrans,weight_longitudinal_kg:weightLong,weight_additional_kg:Number.isFinite(addW)?addW:0,weight_base_region_kg:Number.isFinite(baseW)?baseW:0};
+region_map[regionId]={base_longitudinal_label:r.base_longitudinal_label,transverse_label:transLabel,additional_label:additionalLabel,longitudinal_label:longLabel,weight_total_kg:weightTotal,weight_transverse_kg:weightTrans,weight_longitudinal_kg:weightLong,weight_additional_kg:Number.isFinite(addW)?addW:0,weight_base_region_kg:Number.isFinite(baseW)?baseW:0};
 });
 const missing=[...regionIds].some(id=>!region_map[id]);
 if(missing)return null;
@@ -363,7 +363,7 @@ if(selectionSaveMsg)selectionSaveMsg.textContent='';
 if(saveSelectionBtn)saveSelectionBtn.disabled=true;
 const spans=previewPayload&&Array.isArray(previewPayload.spans)?previewPayload.spans:[];
 const hasSavedSelections=Object.keys(regionOptionSelections||{}).length>0||Object.keys(spanLongSelections||{}).length>0;
-if(!hasSavedSelections&&previewPayload)applyBackendDefaultSelection(previewPayload);
+if(!hasSavedSelections&&previewPayload){applyBackendDefaultSelection(previewPayload);if(previewPayload.saved_selection)applyBackendDefaultSelection({default_selection:previewPayload.saved_selection});}
 const spanBuckets=[];
 
 spans.forEach((sp,sIndex)=>{
@@ -421,12 +421,12 @@ referenceBestWeight:Number(best.weight_total_kg)||0,
 additionalOptionsByBase:(rg&&typeof rg.additional_options_by_base==='object'&&rg.additional_options_by_base)?rg.additional_options_by_base:{},
 });
 });
-if(!regionRows.length)return;
+if(!regionRows.length){spanBuckets.push({spanId,regions:[],unavailable:true});return;}
 
 const isSpanCoupled=regionRows.some(region=>region.longMode==='span_coupled');
 if(isSpanCoupled){
 const spanBaseOptions=normalizeSpanBaseOptions(sp);
-if(!spanBaseOptions.length)return;
+if(!spanBaseOptions.length){spanBuckets.push({spanId,regions:regionRows,unavailable:true});return;}
 const spanLongOptionSets=normalizeSpanLongitudinalOptionSets(sp,regionRows);
 const spanOptionChoices=normalizeSpanOptionChoices(sp);
 const backendDefaultSetValue=String(sp.default_longitudinal_option_set_value||'').trim();
@@ -439,7 +439,7 @@ const preferredTrans=String(preset.transverse_label||'').trim();
 const preferredLong=String(preset.longitudinal_label||'').trim();
 if(preferredTrans&&region.transOptions.some(opt=>opt.label===preferredTrans))region.defaultTrans=preferredTrans;
 if(preferredLong&&region.longOptions.some(opt=>opt.label===preferredLong))region.defaultLong=preferredLong;
-region.defaultBaseLong=String(defaultSet.base_label||region.defaultBaseLong||'no se requiere').trim()||'no se requiere';
+region.defaultBaseLong=String(preset.base_longitudinal_label||defaultSet.base_label||region.defaultBaseLong||'no se requiere').trim()||'no se requiere';
 region.defaultAdditionalLong=normalizeAdditionalLabel(preset.additional_label||region.defaultAdditionalLong);
 const rowWeight=Number(preset.weight_total_kg);
 if(Number.isFinite(rowWeight)&&rowWeight>0)region.referenceBestWeight=rowWeight;
@@ -476,8 +476,9 @@ const summary=document.createElement('div');
 summary.className='region-opt-summary';
 regionOptionsEl.appendChild(summary);
 const states=[];
+const expectedRegionCount=spans.reduce((count,span)=>count+(Array.isArray(span.regions)?span.regions.length:0),0);
 const optimalBeamWeight=Number(previewPayload&&previewPayload.optimal_beam_weight_kg);
-const updateSummary=()=>{const fallbackBestSum=states.reduce((acc,item)=>acc+(Number.isFinite(item.best)?item.best:0),0);const bestSum=Number.isFinite(optimalBeamWeight)?optimalBeamWeight:fallbackBestSum;const hasInvalidSelection=states.some(item=>!Number.isFinite(item.selected));if(hasInvalidSelection){summary.innerHTML=`Peso opcion optima (viga completa): <strong>${fmtKg(bestSum)}</strong> | Peso opcion seleccionada (viga completa): <strong>n/d</strong> | Diferencia: <strong>n/d</strong> | <strong>Seleccion inconsistente</strong>`;if(saveSelectionBtn)saveSelectionBtn.disabled=true;return;}const selectedSum=states.reduce((acc,item)=>acc+(Number.isFinite(item.selected)?item.selected:0),0);const pct=bestSum>0?((selectedSum-bestSum)/bestSum)*100:null;summary.innerHTML=`Peso opcion optima (viga completa): <strong>${fmtKg(bestSum)}</strong> | Peso opcion seleccionada (viga completa): <strong>${fmtKg(selectedSum)}</strong> | Diferencia: <strong>${fmtPct(pct)}</strong>`;if(saveSelectionBtn)saveSelectionBtn.disabled=!currentJobId;};
+const updateSummary=()=>{const fallbackBestSum=states.reduce((acc,item)=>acc+(Number.isFinite(item.best)?item.best:0),0);const bestSum=Number.isFinite(optimalBeamWeight)?optimalBeamWeight:fallbackBestSum;const hasInvalidSelection=states.length!==expectedRegionCount||spanBuckets.some(bucket=>bucket.unavailable)||states.some(item=>!Number.isFinite(item.selected));if(hasInvalidSelection){summary.innerHTML=`Peso opcion optima (viga completa): <strong>${fmtKg(bestSum)}</strong> | Peso opcion seleccionada (viga completa): <strong>n/d</strong> | Diferencia: <strong>n/d</strong> | <strong>Seleccion inconsistente</strong>`;if(saveSelectionBtn)saveSelectionBtn.disabled=true;return;}const selectedSum=states.reduce((acc,item)=>acc+(Number.isFinite(item.selected)?item.selected:0),0);const pct=bestSum>0?((selectedSum-bestSum)/bestSum)*100:null;summary.innerHTML=`Peso opcion optima (viga completa): <strong>${fmtKg(bestSum)}</strong> | Peso opcion seleccionada (viga completa): <strong>${fmtKg(selectedSum)}</strong> | Diferencia: <strong>${fmtPct(pct)}</strong>`;if(saveSelectionBtn)saveSelectionBtn.disabled=!currentJobId;};
 
 spanBuckets.forEach((bucket,bIndex)=>{
 const details=document.createElement('details');
@@ -485,6 +486,7 @@ details.className='span-row region-opt-span';
 details.open=bIndex===0;
 details.innerHTML=`<summary class="span-summary"><span class="span-summary-title">Vano ${bucket.spanId}</span><span class="span-summary-meta">${bucket.regions.length} regiones con alternativas</span></summary><div class="span-body"></div>`;
 const body=details.querySelector('.span-body');
+if(bucket.unavailable){body.textContent='Catalogo de alternativas incompleto para este vano. No se puede calcular ni guardar una seleccion de viga completa.';regionOptionsEl.appendChild(details);return;}
 const spanCard=document.createElement('div');
 spanCard.className='region-opt-card';
 let spanLongSelect=null;
@@ -499,7 +501,7 @@ const customOpt=document.createElement('option');customOpt.value='__custom__';cu
 bucket.spanBaseOptions.forEach(opt=>{const el=document.createElement('option');el.value=opt.value;el.textContent=`${opt.base_label} | ${fmtKg(opt.weight_kg)} (long. vano) | total ${fmtKg(opt.total_weight_kg)}`;spanLongSelect.appendChild(el);});
 const savedSpan=spanLongSelections[bucket.spanId]||{};
 const savedSet=(savedSpan&&savedSpan.mode==='set')?String(savedSpan.value||'').trim():'';
-spanSetSelect.value=(bucket.spanLongOptionSets||[]).some(opt=>opt.value===savedSet)?savedSet:bucket.defaultSpanLongSetValue;
+spanSetSelect.value=savedSpan.mode==='custom'?'__custom__':((bucket.spanLongOptionSets||[]).some(opt=>opt.value===savedSet)?savedSet:bucket.defaultSpanLongSetValue);
 const savedBaseValue=(savedSpan&&savedSpan.mode==='custom')?savedSpan.value:null;
 const initialBaseOption=bucket.spanBaseOptions.find(opt=>opt.value===savedBaseValue)||bucket.spanBaseOptions.find(opt=>opt.value===bucket.defaultSpanBaseValue)||bucket.spanBaseOptions[0];
 spanLongSelect.value=initialBaseOption.value;
@@ -573,7 +575,8 @@ const baseValue=String((selectedBase&&selectedBase.value)||'').trim();
 if(card.dataset.baseValue!==baseValue||!cachedAdditionalOptions.length){
 cachedAdditionalOptions=getAdditionalOptionsByBaseValue(region,baseValue);
 const savedSelection=regionOptionSelections[region.key]||{};
-const keep=savedSelection.additional_value||addSelect.value;
+const savedAdditional=cachedAdditionalOptions.find(opt=>normalizeAdditionalLabel(opt.label)===normalizeAdditionalLabel(savedSelection.additional_longitudinal_label)&&normalizeMatchLabel(opt.longitudinal_label)===normalizeMatchLabel(savedSelection.longitudinal_label));
+const keep=savedSelection.additional_value||(savedAdditional&&savedAdditional.value)||addSelect.value;
 addSelect.innerHTML='';
 if(!cachedAdditionalOptions.length){const el=document.createElement('option');el.value='';el.textContent='Sin opcion adicional viable para esta base (backend)';addSelect.appendChild(el);addSelect.value='';addSelect.disabled=true;card.dataset.baseValue=baseValue;return cachedAdditionalOptions;}
 addSelect.disabled=false;
@@ -618,7 +621,7 @@ if(addSelect)addSelect.disabled=false;
 selectedAdd=addOptions.find(opt=>opt.value===addSelect.value)||addOptions[0]||null;
 }
 
-if(selectedAdd){selectedAdditionalLabel=selectedAdd.label;selectedAdditionalValue=selectedAdd.value;selectedLongLabel=String(selectedAdd.longitudinal_label||region.defaultLong).trim()||region.defaultLong;selectedLongWeight=Number(selectedAdd.longitudinal_total_weight_kg);if(!Number.isFinite(selectedLongWeight))selectedLongWeight=Number(selectedAdd.weight_kg)||0;}
+if(selectedAdd){selectedBaseLabel=selectedAdd.base_longitudinal_label||baseLabel;selectedAdditionalLabel=selectedAdd.label;selectedAdditionalValue=selectedAdd.value;selectedLongLabel=String(selectedAdd.longitudinal_label||region.defaultLong).trim()||region.defaultLong;selectedLongWeight=Number(selectedAdd.longitudinal_total_weight_kg);if(!Number.isFinite(selectedLongWeight))selectedLongWeight=Number(selectedAdd.weight_kg)||0;}
 else{selectedAdditionalLabel='sin opcion viable';selectedAdditionalValue='';selectedLongLabel=String(region.defaultLong||'').trim()||'no se requiere';selectedLongWeight=0;}
 
 reference='GA top';

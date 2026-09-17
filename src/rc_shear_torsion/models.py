@@ -6,21 +6,8 @@ from typing import Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
-ALLOWED_BAR_LABELS = ("#2", "#3", "#4", "#5", "#6", "#7", "#8", "#9", "#10", "#11")
-BAR_DIAMETERS_MM: dict[str, float] = {
-    "#2": 6.4,
-    "#3": 9.5,
-    "#4": 12.7,
-    "#5": 15.9,
-    "#6": 19.1,
-    "#7": 22.2,
-    "#8": 25.4,
-    "#9": 28.7,
-    "#10": 32.3,
-    "#11": 35.8,
-    "#14": 43.0,
-    "#18": 57.3,
-}
+from .reinforcement import ALLOWED_BAR_LABELS as ALLOWED_BAR_LABELS, BAR_DIAMETERS_MM
+
 DEFAULT_STIRRUP_SPACING_MIN_MM = 70
 DEFAULT_STIRRUP_SPACING_STEP_MM = 10
 LEGACY_FIXED_STIRRUP_SPACING_MM = tuple(range(70, 201, 10))

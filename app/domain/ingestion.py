@@ -8,7 +8,7 @@ from openpyxl import load_workbook
 
 from app.core.errors import InvalidUploadError
 from rc_shear_torsion.io import REQUIRED_COLUMNS, as_text, find_header
-from rc_shear_torsion.models import ALLOWED_BAR_LABELS, BAR_DIAMETERS_MM
+from rc_shear_torsion.reinforcement import ALLOWED_BAR_LABELS, BAR_DIAMETERS_MM
 
 
 def _natural_name_key(value: str) -> tuple[int, Any]:

@@ -3,7 +3,8 @@
 from dataclasses import dataclass
 from typing import Iterable
 
-from .design import BAR_AREAS_MM2, RegionDesignResult
+from .design import RegionDesignResult
+from .reinforcement import BAR_AREAS_MM2
 
 
 @dataclass(frozen=True)

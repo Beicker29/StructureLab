@@ -201,3 +201,14 @@ Endpoint: `POST /v1/jobs/{job_id}/selection`
 - `span_selections` (opcional): seleccion longitudinal por vano para `span_coupled`.
 
 Compatibilidad: ambos pueden coexistir; el backend mantiene el contrato previo.
+
+El preview conserva todos los vanos de la viga mostrada en el orden del caso,
+incluso cuando una region intermedia no requiere acero longitudinal por torsion.
+Esa region mantiene su resultado y peso longitudinal nulos; no hereda acero de
+las regiones vecinas. Los catalogos transversales y selecciones son propios de
+cada par vano/region.
+
+`default_selection` conserva la referencia optima; `saved_selection` devuelve
+la seleccion persistida, cuando existe, para restaurarla al recargar el preview.
+Si faltan alternativas para completar la viga, la UI muestra el problema y no
+permite presentar/guardar un peso parcial como total de la viga.

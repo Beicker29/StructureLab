@@ -46,6 +46,15 @@ This repository follows a layered engineering-service architecture focused on tr
 2. Preserve report file names and worksheet headers used by tests/integrations.
 3. Preserve CLI contract (`python -m rc_shear_torsion.run ...`) and exit semantics.
 
+## Shared application and engine responsibilities
+
+- `app/services/selection_service.py` resolves region/span selections against a preview without I/O. The router retains HTTP handling; `job_service` retains report persistence.
+- `job_preview_service._rank_transverse_options` deduplicates and ranks normalized transverse options from workbook and fallback sources using the existing shared ranking key. Input parsing remains specific to each source.
+- `rc_shear_torsion.reinforcement` owns the existing bar catalogs and mass conversions. Historical imports from `models` and `design` remain available; internal consumers use the catalog directly.
+- `design._optimize_region_search` shares region search preparation, candidate evaluation hooks and result assembly. Public exhaustive/genetic entrypoints remain unchanged; search algorithms stay in `optimization` and engineering checks stay in the domain evaluator.
+
+The scope, measurements, verification and deferred findings of the repository cleanup are recorded in [REFACTORING_REPORT.md](docs/REFACTORING_REPORT.md).
+
 ## Separation rules
 
 1. Schemas/Pydantic:

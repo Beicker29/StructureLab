@@ -5,7 +5,7 @@ from typing import Any
 from app.core.errors import DomainValidationAppError, InvalidUploadError
 from rc_shear_torsion.domain.errors import DomainValidationError
 from rc_shear_torsion.domain.validation import validate_case_payload
-from rc_shear_torsion.models import BAR_DIAMETERS_MM
+from rc_shear_torsion.reinforcement import BAR_DIAMETERS_MM
 
 
 def _to_non_negative_support(value: Any) -> float:

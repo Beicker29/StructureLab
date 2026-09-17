@@ -9,6 +9,7 @@ from .codes.aci318_25 import AciRuleEvaluation, RuleCheck, RuleStatus, evaluate_
 from .io import EtabsFrameData, EtabsStationRow
 from .models import (
     BAR_DIAMETERS_MM,
+    GAConfig,
     LEGACY_FIXED_STIRRUP_SPACING_MM,
     OptimizationConfig,
     RegionConfig,
@@ -17,6 +18,13 @@ from .models import (
 )
 from .optimization import SearchHooks, run_exhaustive_search, run_genetic_search
 from .ranking import transverse_alternative_rank_key
+from .reinforcement import (
+    BAR_AREAS_MM2,
+    BAR_MASS_KG_PER_M as BAR_MASS_KG_PER_M,
+    STEEL_DENSITY_KG_PER_MM3,
+    bar_mass_kg_per_m,
+    longitudinal_mass_kg_per_m as longitudinal_mass_kg_per_m,
+)
 from .tolerances import dimensional_comparison_tolerance_mm, torsion_zero_tolerance
 
 FailureMode = Literal[
@@ -28,38 +36,8 @@ FailureMode = Literal[
     "ok",
 ]
 
-BAR_AREAS_MM2: dict[str, float] = {
-    "#2": 32.0,
-    "#3": 71.0,
-    "#4": 129.0,
-    "#5": 199.0,
-    "#6": 284.0,
-    "#7": 387.0,
-    "#8": 510.0,
-    "#9": 645.0,
-    "#10": 819.0,
-    "#11": 1006.0,
-    "#14": 1452.0,
-    "#18": 2581.0,
-}
-
-BAR_MASS_KG_PER_M: dict[str, float] = {
-    "#2": 0.250,
-    "#3": 0.560,
-    "#4": 0.994,
-    "#5": 1.552,
-    "#6": 2.235,
-    "#7": 3.042,
-    "#8": 3.973,
-    "#9": 5.060,
-    "#10": 6.404,
-    "#11": 7.907,
-    "#14": 11.380,
-    "#18": 20.240,
-}
 DEAP_FITNESS_CLASS = "RCFitnessMin"
 DEAP_INDIVIDUAL_CLASS = "RCIndividual"
-STEEL_DENSITY_KG_PER_MM3 = 7.85e-6
 HOOK_LENGTH_MM_BY_BAR: dict[str, float] = {
     "#3": 110.0,
     "#4": 120.0,
@@ -1144,22 +1122,6 @@ def stirrup_set_unit_weight_kg(
     return closed_weight_kg + max(0, g_count) * single_branch_weight_kg
 
 
-def bar_mass_kg_per_m(bar: str | None, count: int = 1) -> float:
-    if count <= 0:
-        return 0.0
-    unit_mass = BAR_MASS_KG_PER_M.get(bar)
-    if unit_mass is not None:
-        return float(unit_mass) * float(count)
-
-    area = BAR_AREAS_MM2.get(bar)
-    if area is None or area <= 0.0:
-        return 0.0
-    return longitudinal_mass_kg_per_m(area * float(count))
-
-
-def longitudinal_mass_kg_per_m(long_provided_mm2: float) -> float:
-    return long_provided_mm2 * 1000.0 * STEEL_DENSITY_KG_PER_MM3
-
 def requires_longitudinal_design(region: RegionDemand) -> bool:
     return any(scenario.torsion_state == "ACTIVE" for scenario in region.scenarios)
 
@@ -1295,118 +1257,7 @@ def optimize_region_exhaustive(
     *,
     check_longitudinal: bool = True,
 ) -> OptimizationOutcome:
-    allowed_g_counts, min_required_g = g_count_domain_for_region(region, variables.G_counts)
-    if not allowed_g_counts:
-        selected = failed_candidate(
-            e_bar=variables.E_bars[0],
-            g_bar=variables.G_bars[0],
-            g_count=0,
-            spacing_mm=(variables.stirrup_spacing_mm or [variables.stirrup_spacing_min_mm])[0],
-            long_bar=variables.longitudinal_bars[0],
-            long_count=0,
-            failure_mode="input_fail",
-            message=(
-                f"No G_counts satisfy min_branches={region.min_branches}; "
-                f"required G_count >= {min_required_g}"
-            ),
-            objective=1.0e9,
-            deficit=1.0,
-        )
-        return OptimizationOutcome(
-            selected=selected,
-            evaluated_candidates=0,
-            feasible_candidates=0,
-            method="exhaustive",
-            failure_counts={"input_fail": 1},
-        )
-
-    spacing_domain = spacing_domain_for_region(region, variables, allowed_g_counts)
-    if not spacing_domain:
-        selected = failed_candidate(
-            e_bar=variables.E_bars[0],
-            g_bar=variables.G_bars[0],
-            g_count=allowed_g_counts[0],
-            spacing_mm=variables.stirrup_spacing_min_mm,
-            long_bar=None,
-            long_count=0,
-            failure_mode="input_fail",
-            message=(
-                "No spacing candidate can be generated from evaluated ACI, demand, "
-                "or explicit project limits"
-            ),
-            objective=1.0e9,
-            deficit=1.0,
-        )
-        return OptimizationOutcome(
-            selected=selected,
-            evaluated_candidates=0,
-            feasible_candidates=0,
-            method="exhaustive",
-            failure_counts={"input_fail": 1},
-        )
-
-    domain: list[list[str | int]] = [
-        variables.E_bars,
-        variables.G_bars,
-        allowed_g_counts,
-        spacing_domain,
-    ]
-    if check_longitudinal:
-        default_long_bar, default_long_count, _, _ = select_longitudinal_independent(region, variables)
-    else:
-        default_long_bar = variables.longitudinal_bars[0]
-        default_long_count = 0
-
-    def decode(individual: list[int]) -> tuple[str, str, int, int]:
-        return (
-            str(domain[0][individual[0]]),
-            str(domain[1][individual[1]]),
-            int(domain[2][individual[2]]),
-            int(domain[3][individual[3]]),
-        )
-
-    def evaluate_individual(individual: list[int]) -> Candidate:
-        e_bar, g_bar, g_count, spacing_mm = decode(individual)
-        candidate = evaluate_candidate(
-            region,
-            e_bar=e_bar,
-            g_bar=g_bar,
-            g_count=g_count,
-            spacing_mm=spacing_mm,
-            long_bar=default_long_bar,
-            long_count=default_long_count,
-            check_longitudinal=check_longitudinal,
-            project_spacing_limit_mm=variables.stirrup_spacing_project_max_mm,
-        )
-        return candidate
-
-    hooks = SearchHooks[Candidate](
-        evaluate=evaluate_individual,
-        score=lambda candidate: candidate.score,
-        objective=lambda candidate: candidate.objective,
-        is_feasible=lambda candidate: candidate.status == "ok",
-        failure_mode=lambda candidate: candidate.failure_mode,
-        tie_break=lambda candidate: transverse_alternative_rank_key(
-            weight_kg=candidate.objective,
-            spacing_mm=candidate.spacing_mm,
-            stable_tie_break=(
-                candidate.e_bar,
-                candidate.g_bar,
-                candidate.g_count,
-            ),
-        ),
-    )
-    outcome = run_exhaustive_search(
-        domain_sizes=[len(values) for values in domain],
-        hooks=hooks,
-    )
-    return OptimizationOutcome(
-        selected=outcome.selected,
-        evaluated_candidates=outcome.evaluated_candidates,
-        feasible_candidates=outcome.feasible_candidates,
-        method="exhaustive",
-        failure_counts=outcome.failure_counts,
-    )
+    return _optimize_region_search(region, variables, check_longitudinal=check_longitudinal, ga=None)
 
 
 def optimize_region_ga(
@@ -1415,10 +1266,24 @@ def optimize_region_ga(
     *,
     check_longitudinal: bool | None = None,
 ) -> OptimizationOutcome:
-    variables = optimization.variables
-    ga = optimization.genetic_algorithm
     if check_longitudinal is None:
         check_longitudinal = optimization.longitudinal_mode == "legacy_region_independent"
+    return _optimize_region_search(
+        region,
+        optimization.variables,
+        check_longitudinal=check_longitudinal,
+        ga=optimization.genetic_algorithm,
+    )
+
+
+def _optimize_region_search(
+    region: RegionDemand,
+    variables: VariablesConfig,
+    *,
+    check_longitudinal: bool,
+    ga: GAConfig | None,
+) -> OptimizationOutcome:
+    method = "genetic" if ga is not None else "exhaustive"
     allowed_g_counts, min_required_g = g_count_domain_for_region(region, variables.G_counts)
     if not allowed_g_counts:
         selected = failed_candidate(
@@ -1440,7 +1305,7 @@ def optimize_region_ga(
             selected=selected,
             evaluated_candidates=0,
             feasible_candidates=0,
-            method="genetic",
+            method=method,
             failure_counts={"input_fail": 1},
         )
 
@@ -1465,7 +1330,7 @@ def optimize_region_ga(
             selected=selected,
             evaluated_candidates=0,
             feasible_candidates=0,
-            method="genetic",
+            method=method,
             failure_counts={"input_fail": 1},
         )
 
@@ -1475,42 +1340,31 @@ def optimize_region_ga(
         allowed_g_counts,
         spacing_domain,
     ]
-    domain_sizes = [len(values) for values in domain]
     if check_longitudinal:
         default_long_bar, default_long_count, _, _ = select_longitudinal_independent(region, variables)
     else:
         default_long_bar = variables.longitudinal_bars[0]
         default_long_count = 0
 
-    def decode(individual: list[int]) -> tuple[str, str, int, int]:
-        return (
-            str(domain[0][individual[0]]),
-            str(domain[1][individual[1]]),
-            int(domain[2][individual[2]]),
-            int(domain[3][individual[3]]),
-        )
-
     evaluation_cache: dict[tuple[int, ...], Candidate] = {}
 
     def evaluate_individual(individual: list[int]) -> Candidate:
         key = tuple(int(gene) for gene in individual)
-        cached = evaluation_cache.get(key)
-        if cached is not None:
-            return cached
-
-        e_bar, g_bar, g_count, spacing_mm = decode(individual)
+        if ga is not None and key in evaluation_cache:
+            return evaluation_cache[key]
         candidate = evaluate_candidate(
             region,
-            e_bar=e_bar,
-            g_bar=g_bar,
-            g_count=g_count,
-            spacing_mm=spacing_mm,
+            e_bar=str(domain[0][individual[0]]),
+            g_bar=str(domain[1][individual[1]]),
+            g_count=int(domain[2][individual[2]]),
+            spacing_mm=int(domain[3][individual[3]]),
             long_bar=default_long_bar,
             long_count=default_long_count,
             check_longitudinal=check_longitudinal,
             project_spacing_limit_mm=variables.stirrup_spacing_project_max_mm,
         )
-        evaluation_cache[key] = candidate
+        if ga is not None:
+            evaluation_cache[key] = candidate
         return candidate
 
     hooks = SearchHooks[Candidate](
@@ -1529,23 +1383,27 @@ def optimize_region_ga(
             ),
         ),
     )
-    outcome = run_genetic_search(
-        domain_sizes=domain_sizes,
-        population_size=ga.population_size,
-        generations=ga.generations,
-        crossover_rate=ga.crossover_rate,
-        mutation_rate=ga.mutation_rate,
-        elite_count=ga.elite_count,
-        hooks=hooks,
-        seed=42,
-        fitness_class_name=DEAP_FITNESS_CLASS,
-        individual_class_name=DEAP_INDIVIDUAL_CLASS,
-    )
+    domain_sizes = [len(values) for values in domain]
+    if ga is None:
+        outcome = run_exhaustive_search(domain_sizes=domain_sizes, hooks=hooks)
+    else:
+        outcome = run_genetic_search(
+            domain_sizes=domain_sizes,
+            population_size=ga.population_size,
+            generations=ga.generations,
+            crossover_rate=ga.crossover_rate,
+            mutation_rate=ga.mutation_rate,
+            elite_count=ga.elite_count,
+            hooks=hooks,
+            seed=42,
+            fitness_class_name=DEAP_FITNESS_CLASS,
+            individual_class_name=DEAP_INDIVIDUAL_CLASS,
+        )
     return OptimizationOutcome(
         selected=outcome.selected,
         evaluated_candidates=outcome.evaluated_candidates,
         feasible_candidates=outcome.feasible_candidates,
-        method="genetic",
+        method=method,
         failure_counts=outcome.failure_counts,
     )
 

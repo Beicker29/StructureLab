@@ -12,15 +12,14 @@ from .codes.aci318_25.longitudinal_torsion import (
 )
 
 from .design import (
-    BAR_AREAS_MM2,
     RegionDemand,
     RegionDesignResult,
-    bar_mass_kg_per_m,
     requires_longitudinal_design,
     scenario_reference,
     stirrup_count_in_region,
 )
-from .models import BAR_DIAMETERS_MM, OptimizationConfig
+from .models import OptimizationConfig
+from .reinforcement import BAR_AREAS_MM2, BAR_DIAMETERS_MM, bar_mass_kg_per_m
 
 @dataclass(frozen=True)
 class SpanRegionState:
